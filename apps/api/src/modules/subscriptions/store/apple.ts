@@ -21,9 +21,11 @@ import type {
  * verified against Apple's published root certificates (./apple-root-certificates.ts) with Apple's own
  * library -- signature chain, bundle id, and app id in production -- before anything is believed.
  *
- * Sandbox transactions are accepted next to production ones on purpose: App Review buys with a
- * sandbox account against the production server, and refusing them fails review. The environment is
- * kept on every billing event so a sandbox purchase is never mistaken for revenue.
+ * Sandbox transactions verify next to production ones on purpose: App Review buys with a sandbox
+ * account against the production server, and refusing them fails review. In production only the
+ * accounts in STORE_SANDBOX_ALLOWED_USER_IDS (the review accounts) may register one (QA-058,
+ * registerStorePurchase). The environment is kept on every billing event so a sandbox purchase is
+ * never mistaken for revenue.
  */
 
 const APPLE_ROOT_CERTIFICATES = [APPLE_ROOT_CA_G3, APPLE_ROOT_CA_G2, APPLE_INC_ROOT];

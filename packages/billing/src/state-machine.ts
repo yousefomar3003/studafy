@@ -278,7 +278,32 @@ export type IntentResolution =
   /** A known event that carries no status meaning. Processed, no transition, no audit row. */
   | { kind: "ignored" }
   /** An event this processor does not know at all. Parked for a human, per ST-132's DLQ rule. */
-  | { kind: "unmapped" };
+  | { kind: "unmapped" }
+  /**
+   * A known event that needs a human but carries no status meaning of its own (QA-056): a dispute
+   * names a charge, not a subscription. Processed, no transition, logged as an alert.
+   */
+  | { kind: "alert"; alert: BillingAlert };
+
+/** The billing events raised to a human (see docs/runbooks/alerts.md, `billing_alert`). */
+export type BillingAlert = "dispute_opened" | "dispute_funds_withdrawn";
+
+const ALERT_EVENTS: Readonly<Record<string, BillingAlert>> = {
+  "charge.dispute.created": "dispute_opened",
+  "charge.dispute.funds_withdrawn": "dispute_funds_withdrawn",
+};
+
+/**
+ * A checkout session is settled when its money has arrived or none was due. A delayed method (SEPA
+ * debit, ACH) completes the session `unpaid` and settles later with
+ * `checkout.session.async_payment_succeeded` (QA-056). A session without the field (Tap and store
+ * events normalized to this type) is settled by construction.
+ */
+const SETTLED_PAYMENT_STATUSES: ReadonlySet<unknown> = new Set([
+  undefined,
+  "paid",
+  "no_payment_required",
+]);
 
 /**
  * Stripe subscription statuses, mapped to intents.
@@ -300,7 +325,7 @@ const STRIPE_STATUS_INTENTS: Readonly<Record<string, BillingEventIntent | null>>
 
 /** Events whose intent is fixed by the event type alone, whatever the payload says. */
 const FIXED_EVENT_INTENTS: Readonly<Record<string, BillingEventIntent>> = {
-  "checkout.session.completed": "activated",
+  "checkout.session.async_payment_succeeded": "activated",
   "customer.subscription.deleted": "canceled",
   "customer.subscription.paused": "dunning_exhausted",
   "invoice.paid": "activated",
@@ -345,8 +370,15 @@ const IGNORED_EVENTS: ReadonlySet<string> = new Set([
   "payment_method.updated",
   "charge.succeeded",
   "charge.failed",
+  // Recorded without a status change until the refund policy is decided (QA-056, needs a human):
+  // a partial refund is routine, and a full one is usually followed by a cancellation anyway.
   "charge.refunded",
+  "charge.dispute.updated",
+  "charge.dispute.closed",
+  "charge.dispute.funds_reinstated",
   "checkout.session.expired",
+  // The subscription's own `incomplete` -> `incomplete_expired` update ends it; nothing to add here.
+  "checkout.session.async_payment_failed",
   "price.created",
   "price.updated",
   "product.created",
@@ -364,8 +396,17 @@ export function deriveIntent(
   eventType: string,
   payload: Record<string, unknown>,
 ): IntentResolution {
+  if (eventType === "checkout.session.completed") {
+    return SETTLED_PAYMENT_STATUSES.has(payload.payment_status)
+      ? { kind: "transition", intent: "activated" }
+      : { kind: "ignored" };
+  }
+
   const fixed = FIXED_EVENT_INTENTS[eventType];
   if (fixed) return { kind: "transition", intent: fixed };
+
+  const alert = ALERT_EVENTS[eventType];
+  if (alert) return { kind: "alert", alert };
 
   if (STATUS_BEARING_EVENTS.has(eventType)) {
     const status = typeof payload.status === "string" ? payload.status : undefined;

@@ -2,6 +2,7 @@ import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { ERROR_CODES } from "@studafy/constants";
 
 import { CodedHttpException } from "../../../coded-http-exception";
+import { secretsMatch } from "../../../lib/security/secret-compare";
 import { auditAction } from "../../../middleware/auditEmitter";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
@@ -62,7 +63,8 @@ export function reconciliationRoutes(
     const apiKey = c.req.header("X-Api-Key");
     const expectedKey = process.env.RECONCILIATION_API_KEY;
 
-    if (!apiKey || !expectedKey || apiKey !== expectedKey) {
+    // Constant time (QA-092): `!==` stops at the first wrong character and leaks how close a guess is.
+    if (!secretsMatch(apiKey, expectedKey)) {
       // ST-249: was a hand-rolled `c.json(..., 403)` that skipped errorHandlerMiddleware entirely,
       // so it carried `Content-Type: application/json` instead of the RFC 9457
       // `application/problem+json` every other error response in the app uses, and no request_id

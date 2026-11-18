@@ -39,6 +39,7 @@ import { inSchool } from "../../src/modules/licensing/context";
 import {
   listInvoicesAcrossSchools,
   listSchoolInvoices,
+  paymentReceiptKey,
 } from "../../src/modules/licensing/invoices";
 import { readLicense } from "../../src/modules/licensing/service";
 import {
@@ -1634,4 +1635,51 @@ describe("route permissions", () => {
       expect(audits[0]!.n).toBeGreaterThanOrEqual(4);
     },
   );
+});
+
+// QA-055: a payment's receipt file was never scanned and was served the moment it was recorded.
+describe("payment receipt scanning (QA-055)", () => {
+  integrationTest("a payment's receipt is served only once the scan finds it clean", async () => {
+    const f = await school();
+    const { invoice } = await accepted(f, (await sentQuote(f, newTerm(10))).id);
+    const key = `permanent/${f.schoolId}/${crypto.randomUUID()}/transfer.pdf`;
+    const payment = (await pay(f, invoice.id, 100_000, { receiptStorageKey: key })) as {
+      payment: { id: string };
+    };
+    const paymentId = payment.payment.id;
+    const servedKey = () => asAdmin(f.schoolId, (tx) => paymentReceiptKey(tx, paymentId));
+
+    const [row] = await asAdmin(
+      f.schoolId,
+      (tx) =>
+        tx<{ scan: string }[]>`
+        SELECT receipt_scan_status::text AS scan FROM app.license_payments WHERE id = ${paymentId}::uuid
+      `,
+    );
+    expect(row!.scan).toBe("scanning");
+    expect(await servedKey()).toBeNull();
+
+    // The scan worker's verdict is the one update a payment accepts besides its void.
+    await db.sql.begin(async (tx) => {
+      await tx.unsafe("SET LOCAL ROLE studafy_system");
+      await tx`SELECT set_config('app.school_id', ${f.schoolId}, true)`;
+      await tx`
+        UPDATE app.license_payments SET receipt_scan_status = 'clean'
+        WHERE id = ${paymentId}::uuid
+      `;
+    });
+    expect(await servedKey()).toBe(key);
+
+    // Anything else is still refused.
+    let refused = false;
+    try {
+      await asAdmin(
+        f.schoolId,
+        (tx) => tx`UPDATE app.license_payments SET note = 'edited' WHERE id = ${paymentId}::uuid`,
+      );
+    } catch {
+      refused = true;
+    }
+    expect(refused).toBe(true);
+  });
 });

@@ -29,10 +29,11 @@ describe("clientIpFrom behind fly.io (CLIENT_IP_HEADER=fly-client-ip)", () => {
     expect(ip).toBe("151.247.101.16");
   });
 
-  test("falls back to the first X-Forwarded-For hop when the trusted header is missing", () => {
-    expect(clientIpFrom(request({ "x-forwarded-for": "203.0.113.7, 66.241.125.144" }))).toBe(
-      "203.0.113.7",
-    );
+  // QA-086: a request without the trusted header did not come through fly's edge, so its
+  // X-Forwarded-For is whatever the caller wrote -- an easy way to dodge per-IP limits.
+  test("never falls back to X-Forwarded-For when the trusted header is missing", () => {
+    expect(clientIpFrom(request({ "x-forwarded-for": "203.0.113.7, 66.241.125.144" }))).toBeNull();
+    expect(clientIpFrom(request({ "x-real-ip": "203.0.113.7" }))).toBeNull();
   });
 });
 

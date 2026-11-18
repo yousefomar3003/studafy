@@ -26,6 +26,7 @@ import { clientIpFrom } from "../../../lib/client-ip";
 import { auditAction } from "../../../middleware/auditEmitter";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
+import { establishedChannel } from "../channels";
 import { deliverTokenPair } from "../delivery";
 import { getGoogleOAuthConfig } from "../oauth/config";
 import { validateGoogleIdToken } from "../oauth/google-id-token";
@@ -195,7 +196,8 @@ export function returningUserLoginRoutes(
   routes.use("/api/auth/login/oauth", auditAction("login", "refresh_tokens"));
 
   routes.openapi(loginRoute, async (c) => {
-    const { id_token, nonce, provider, channel } = c.req.valid("json");
+    const { id_token, nonce, provider } = c.req.valid("json");
+    const channel = establishedChannel(c.req.header("origin"), c.req.valid("json").channel);
     const log = c.get("log");
     const requestId = c.get("requestId");
     const clientIp = clientIpFrom(c);

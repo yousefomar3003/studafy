@@ -72,6 +72,8 @@ describe("subscribeToOutboxEvents", () => {
       gradebookId: "gb-1",
       studentId: "student-1",
       approvedByUserId: "teacher-1",
+      // QA-031: the recipients the publisher named (the student and a guardian).
+      recipientUserIds: ["user-student-1", "user-parent-1"],
     };
     emitPmessage(
       GRADES_PUBLISHED_PATTERN,
@@ -81,8 +83,8 @@ describe("subscribeToOutboxEvents", () => {
 
     expect(received).toHaveLength(2);
     expect(received.map((e) => e.room)).toEqual([
-      "school:school-1:role:STUDENT",
-      "school:school-1:role:PARENT",
+      "school:school-1:user:user-student-1",
+      "school:school-1:user:user-parent-1",
     ]);
     for (const envelope of received) {
       expect(envelope.type).toBe("grades.published");

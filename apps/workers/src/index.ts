@@ -4,11 +4,11 @@ import {
   startQueueGauges,
   startTracing,
 } from "@studafy/observability";
-import postgres from "postgres";
 
 import { createRedisConnection } from "./connection";
-import { closeWorkerPools } from "./db/pool";
+import { closeWorkerPools, createPool } from "./db/pool";
 import { databaseUrlFrom, loadEnv } from "./env";
+import { evaluateHealth, startHealthServer, startHeartbeat } from "./health";
 import { workerLogger } from "./log";
 import { startBillingPipelineGauges } from "./metrics/billing-pipeline";
 import { scheduleAnnouncementPublishJob } from "./queues/announcements";
@@ -28,6 +28,7 @@ import {
   scheduleAccountDeletionSweepJob,
   scheduleAiMessageRetentionSweepJob,
   scheduleIpAddressRetentionSweepJob,
+  scheduleStuckUploadScanSweepJob,
   scheduleAbandonedMaterialSweepJob,
   scheduleDataRetentionSweepJob,
   schedulePartitionMaintenanceJob,
@@ -46,12 +47,15 @@ import { startSchoolEventNotifier } from "./queues/notifications/school-events";
 import { startRelay } from "./queues/outbox-relay";
 import { scheduleReportExpiryJob } from "./queues/reports";
 import { QUEUE_REGISTRY } from "./registry";
-import { shutdownWorkers, startWorkers } from "./worker";
+import { applyS3CredentialAliases } from "./s3-credentials";
+import { drainThenClose, startWorkers } from "./worker";
 
 import type { RelayHandle } from "./queues/outbox-relay/relay";
 
 // Fail fast: an invalid environment throws EnvValidationError here, before any Redis connection opens.
 const env = loadEnv();
+// Before any S3 client resolves credentials: the R2 keys arrive as S3_*, the SDK reads AWS_*.
+applyS3CredentialAliases();
 
 // Sentry error monitoring — null (and every reporting call a no-op) when SENTRY_DSN is unset. Before
 // startTracing(), for the context-manager ordering apps/api/src/index.ts's own call documents.
@@ -67,7 +71,11 @@ const errorMonitoring = initErrorMonitoring({
 // createBullmqWorker records anything, since an OTel instrument stays bound to whichever meter
 // created it and this call is what registers the real global MeterProvider (see
 // packages/observability/src/redMetrics.ts).
-const metricsServer = startMetricsServer({ serviceName: env.SERVICE_NAME, port: env.METRICS_PORT });
+const metricsServer = startMetricsServer({
+  serviceName: env.SERVICE_NAME,
+  port: env.METRICS_PORT,
+  host: env.METRICS_HOST,
+});
 
 // Distributed tracing (ST-260), same ordering requirement — before startWorkers()/worker.ts's
 // createBullmqWorker calls trace.getTracer(). Null when OTEL_EXPORTER_OTLP_ENDPOINT is unset.
@@ -90,15 +98,20 @@ const queueGauges = startQueueGauges(
   queueMetricsConnection as never,
 );
 
+/**
+ * A dedicated pool for one of the long-lived polling loops below. Through createPool(), like the
+ * process-wide pool, so it carries the same TLS settings (QA-066: DATABASE_CA_CERT was dropped
+ * here before, leaving these loops to the system trust store alone).
+ */
+function loopPool(max: number) {
+  return createPool(databaseUrlFrom(env), { max, databaseCaCert: env.DATABASE_CA_CERT });
+}
+
 // Payment pipeline liveness (ST-262): `app.billing_events`' unresolved tail, read on every scrape.
 // Its own small pool, like every other polling loop in this file — the scrape path must never wait
 // behind a job processor for a connection, and vice versa. `max: 1` because there is exactly one
 // in-flight query at a time (one scrape, one callback) and a second connection would only sit idle.
-const billingPipelineDb = postgres(databaseUrlFrom(env), {
-  max: 1,
-  idle_timeout: 20,
-  prepare: false,
-});
+const billingPipelineDb = loopPool(1);
 const billingPipelineGauges = startBillingPipelineGauges({
   db: billingPipelineDb,
   logger: workerLogger,
@@ -112,7 +125,7 @@ const billingPipelineGauges = startBillingPipelineGauges({
 // Falling back to app.schools (a global, RLS-free table) makes the relay self-configuring, and
 // re-reading it each cycle means a newly registered school no longer waits for a worker restart.
 const configuredSchoolIds = env.SCHOOL_IDS.split(",").filter(Boolean);
-const relayDb = postgres(databaseUrlFrom(env), { max: 2, idle_timeout: 20, prepare: false });
+const relayDb = loopPool(2);
 const relayRedis = createRedisConnection(env);
 
 let relayHandle: RelayHandle | null = null;
@@ -136,7 +149,7 @@ void relayRedis.connect().then(() => {
 // Entitlement invalidation (ST-133): the durable consumer the propagation SLA rests on. Started
 // unconditionally, like the email dispatcher and unlike the relay above, because losing an
 // invalidation means serving a canceled school until the cache TTL expires.
-const entitlementDb = postgres(databaseUrlFrom(env), { max: 2, idle_timeout: 20, prepare: false });
+const entitlementDb = loopPool(2);
 const entitlementRedis = createRedisConnection(env);
 const entitlementInvalidator = startEntitlementInvalidator({
   db: entitlementDb,
@@ -154,7 +167,7 @@ const entitlementInvalidator = startEntitlementInvalidator({
 // Email channel: a second polling loop that consumes email-relevant outbox events directly, on its
 // own postgres pool, pacing sends through an in-process token bucket. databaseUrlFrom() — not the
 // raw DATABASE_URL default — so a deployed worker honours the discrete production DB settings.
-const emailDb = postgres(databaseUrlFrom(env), { max: 4, idle_timeout: 20, prepare: false });
+const emailDb = loopPool(4);
 const emailLogger = {
   info: (fields: Record<string, unknown>, msg: string) =>
     console.log(JSON.stringify({ ...fields, msg })),
@@ -180,15 +193,48 @@ const emailDispatcher = startEmailDispatcher({
 // School-event notices: assignment.published, submission.graded, attendance.sessionSubmitted,
 // material.published and marks.released outbox rows become inbox notifications for the students and parents concerned. Its own pool, like
 // the other always-on consumers; idle cycles back off to one discovery statement every 5 s.
-const notifyDb = postgres(databaseUrlFrom(env), { max: 2, idle_timeout: 20, prepare: false });
+const notifyDb = loopPool(2);
 const schoolEventNotifier = startSchoolEventNotifier({ db: notifyDb, logger: workerLogger });
 
 // Push for every inbox notification (messages, announcements, fees, attendance, school events):
 // before this only the grades dispatcher ever reached a phone.
-const pushDb = postgres(databaseUrlFrom(env), { max: 2, idle_timeout: 20, prepare: false });
+const pushDb = loopPool(2);
 const pushConsumer = startPushConsumer({
   db: pushDb,
   sender: createFcmSender(env, workerLogger),
+  logger: workerLogger,
+});
+
+// Liveness (QA-046): /healthz for Fly's check and a heartbeat line every minute for the Axiom
+// absence alert. A loop with no completed cycle for 5 minutes, or a BullMQ worker that stopped, is
+// unhealthy. The slowest healthy loop idles at most a few seconds between cycles.
+const startedAt = Date.now();
+const evaluateWorkersHealth = () =>
+  evaluateHealth({
+    loops: [
+      ...(relayHandle
+        ? [{ name: "outbox-relay", lastCycleAt: () => relayHandle!.lastCycleAt() }]
+        : []),
+      { name: "email-dispatcher", lastCycleAt: () => emailDispatcher.lastCycleAt() },
+      { name: "entitlement-invalidator", lastCycleAt: () => entitlementInvalidator.lastCycleAt() },
+      { name: "school-event-notifier", lastCycleAt: () => schoolEventNotifier.lastCycleAt() },
+      { name: "push-consumer", lastCycleAt: () => pushConsumer.lastCycleAt() },
+    ],
+    workers: workers.map((worker, index) => ({
+      name: QUEUE_REGISTRY[index]?.name ?? `worker-${index}`,
+      isRunning: () => worker.isRunning?.() ?? true,
+    })),
+    now: Date.now(),
+    startedAt,
+    staleAfterMs: 5 * 60_000,
+  });
+const healthServer = startHealthServer({
+  port: env.WORKERS_HEALTH_PORT,
+  evaluate: evaluateWorkersHealth,
+});
+const heartbeat = startHeartbeat({
+  intervalMs: 60_000,
+  evaluate: evaluateWorkersHealth,
   logger: workerLogger,
 });
 
@@ -311,6 +357,10 @@ void scheduleIpAddressRetentionSweepJob(ipAddressRetentionRedis).then(() =>
   ipAddressRetentionRedis.disconnect(),
 );
 
+// Upload-scan sweep scheduler (QA-055): idempotently register the 15-minute re-enqueue of uploads
+// stuck in `scanning` or left `unscanned` on the maintenance queue.
+const stuckScanRedis = createRedisConnection(env);
+void scheduleStuckUploadScanSweepJob(stuckScanRedis).then(() => stuckScanRedis.disconnect());
 // Abandoned material sweep scheduler: idempotently register the daily 04:20 deletion of material
 // uploads never confirmed after 24 hours and of failed materials left for 14 days, with their files.
 const abandonedMaterialRedis = createRedisConnection(env);
@@ -345,38 +395,47 @@ const shutdown = (signal: string) => {
   shuttingDown = true;
 
   console.log(`Received ${signal}, waiting for active jobs to finish…`);
+  heartbeat.stop();
+  healthServer.stop();
 
-  relayHandle?.stop();
-  emailDispatcher.stop();
-  entitlementInvalidator.stop();
-  schoolEventNotifier.stop();
-  pushConsumer.stop();
-
-  void shutdownWorkers(workers, env.SHUTDOWN_TIMEOUT_MS).then(async () => {
-    connection.disconnect();
-    relayRedis.disconnect();
-    entitlementRedis.disconnect();
-    await relayDb.end({ timeout: 5 });
-    await emailDb.end({ timeout: 5 });
-    await entitlementDb.end({ timeout: 5 });
-    await notifyDb.end({ timeout: 5 });
-    await pushDb.end({ timeout: 5 });
-    // The process-wide pools every job processor borrows (db/pool.ts) — after the drain above.
-    await closeWorkerPools();
-    // startQueueGauges() was given queueMetricsConnection as a live IORedis instance rather
-    // than plain connection options, so BullMQ treats it as externally owned and never closes it
-    // itself — queue.close() only stops the per-queue Queue wrapper. Closing it here is what
-    // actually releases the socket.
-    await queueGauges.close();
-    queueMetricsConnection.disconnect();
-    billingPipelineGauges.close();
-    await billingPipelineDb.end({ timeout: 5 });
-    await metricsServer.shutdown();
-    await tracing?.shutdown();
-    // Last, so a failure reported while jobs were draining still goes out before the exit.
-    await errorMonitoring?.shutdown();
-    console.log("Shutdown complete.");
-    process.exit(0);
+  // Loops and jobs drain together, bounded by SHUTDOWN_TIMEOUT_MS (kept under Fly's kill_timeout in
+  // infra/fly/workers.toml); nothing below closes until both have (QA-047).
+  void drainThenClose({
+    loops: [
+      ...(relayHandle ? [relayHandle] : []),
+      emailDispatcher,
+      entitlementInvalidator,
+      schoolEventNotifier,
+      pushConsumer,
+    ],
+    workers,
+    timeoutMs: env.SHUTDOWN_TIMEOUT_MS,
+    close: async () => {
+      connection.disconnect();
+      relayRedis.disconnect();
+      entitlementRedis.disconnect();
+      await relayDb.end({ timeout: 5 });
+      await emailDb.end({ timeout: 5 });
+      await entitlementDb.end({ timeout: 5 });
+      await notifyDb.end({ timeout: 5 });
+      await pushDb.end({ timeout: 5 });
+      // The process-wide pools every job processor borrows (db/pool.ts) — after the drain above.
+      await closeWorkerPools();
+      // startQueueGauges() was given queueMetricsConnection as a live IORedis instance rather
+      // than plain connection options, so BullMQ treats it as externally owned and never closes it
+      // itself — queue.close() only stops the per-queue Queue wrapper. Closing it here is what
+      // actually releases the socket.
+      await queueGauges.close();
+      queueMetricsConnection.disconnect();
+      billingPipelineGauges.close();
+      await billingPipelineDb.end({ timeout: 5 });
+      await metricsServer.shutdown();
+      await tracing?.shutdown();
+      // Last, so a failure reported while jobs were draining still goes out before the exit.
+      await errorMonitoring?.shutdown();
+      console.log("Shutdown complete.");
+      process.exit(0);
+    },
   });
 };
 

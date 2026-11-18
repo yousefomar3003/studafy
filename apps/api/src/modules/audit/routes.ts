@@ -3,6 +3,7 @@ import {
   AuditLogFilterError,
   queryAuditLogPage,
   resolveAuditLogFilter,
+  scopeAuditEntry,
 } from "@studafy/audit-reporting";
 import { ERROR_CODES, JOB_NAMES, PERMISSIONS, QUEUE_NAMES } from "@studafy/constants";
 import { Queue } from "bullmq";
@@ -187,7 +188,8 @@ export function auditRoutes(
           generated_at: new Date().toISOString(),
           filter: filterResponse(result.resolved),
           limit: query.limit,
-          items: result.page.items,
+          // Values the caller may not read are withheld (QA-040).
+          items: result.page.items.map((item) => scopeAuditEntry(item, auth.roles)),
           next_cursor: result.page.nextCursor,
           has_more: result.page.hasMore,
         },

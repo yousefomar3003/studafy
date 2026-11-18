@@ -127,6 +127,18 @@ export const UPLOAD_SCAN_TARGET_SPECS: Readonly<Record<UploadScanTarget, TargetS
     statusColumn: "source_scan_status",
     scope: "school",
   },
+  payment_receipt_file: {
+    table: "license_payments",
+    keyColumn: "receipt_storage_key",
+    statusColumn: "receipt_scan_status",
+    scope: "school",
+  },
+  grant_receipt: {
+    table: "manual_grants",
+    keyColumn: "receipt_storage_key",
+    statusColumn: "receipt_scan_status",
+    scope: "school",
+  },
 };
 
 // ---------------------------------------------------------------------------

@@ -10,7 +10,7 @@
 export const MOBILE_OAUTH_REDIRECT_URI = "studafy://auth/callback";
 
 /** The Android application id per deployment tier (`apps/mobile/android/app/build.gradle.kts`). */
-const ANDROID_PACKAGES = {
+export const ANDROID_PACKAGES = {
   production: "com.studafy.studafy_mobile",
   staging: "com.studafy.studafy_mobile.staging",
   development: "com.studafy.studafy_mobile.dev",

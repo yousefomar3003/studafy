@@ -33,6 +33,9 @@ import type { Context } from "hono";
 // ---------------------------------------------------------------------------
 
 const listEnrollmentsRoute = createRoute({
+  // QA-086: an explicit gate, not RLS alone: roles that read this keep it, a GUEST or PARENT session
+  // does not reach the query.
+  middleware: [requirePermission(PERMISSIONS.ENROLLMENT_READ)] as const,
   method: "get",
   path: "/api/academics/classes/{classId}/enrollments",
   tags: ["Academics"],

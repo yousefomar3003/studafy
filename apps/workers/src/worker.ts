@@ -13,6 +13,8 @@ import type { ConnectionOptions, Job } from "bullmq";
 /** Minimal surface of a BullMQ Worker needed for shutdown — satisfied by the real `Worker` class. */
 export interface StoppableWorker {
   close(force?: boolean): Promise<void>;
+  /** BullMQ's Worker#isRunning; false once the worker has closed (QA-046 liveness). */
+  isRunning?(): boolean;
 }
 
 export type WorkerFactory = (
@@ -26,6 +28,8 @@ export type WorkerFactory = (
  * does, so a copy from a second bundled bullmq still counts).
  */
 function willRetry(job: Job, error: unknown): boolean {
+  // A job moved back to the delayed set (DelayedError, QA-064) has not failed at all.
+  if (error instanceof Error && error.name === "DelayedError") return true;
   const unrecoverable = error instanceof Error && error.name === "UnrecoverableError";
   return !unrecoverable && job.attemptsMade + 1 < (job.opts.attempts ?? 1);
 }
@@ -45,10 +49,11 @@ export function runMonitoredJob(
   definition: QueueDefinition,
   job: Job,
   reportError: (error: unknown, context: CaptureContext) => void = captureError,
+  token?: string,
 ): Promise<unknown> {
   return withErrorMonitoringScope(async () => {
     try {
-      return await definition.processor(job);
+      return await definition.processor(job, token);
     } catch (error) {
       if (!willRetry(job, error)) {
         const data = job.data as { schoolId?: unknown; school_id?: unknown } | undefined;
@@ -87,11 +92,11 @@ export const createBullmqWorker: WorkerFactory = (definition, connection) => {
     // rather than every processor file importing `withConsumerSpan` itself. `job.data` is read
     // generically (`traceContext` is not part of any per-queue job-data type) because this wrapper
     // is queue-agnostic by construction.
-    (job: Job) => {
+    (job: Job, token?: string) => {
       const carrier = (job.data as { traceContext?: TraceContextCarrier } | undefined)
         ?.traceContext;
       return withConsumerSpan(definition.name, job.name, carrier, () =>
-        runMonitoredJob(definition, job),
+        runMonitoredJob(definition, job, captureError, token),
       );
     },
     {
@@ -150,4 +155,37 @@ export async function shutdownWorkers(
   } finally {
     clearTimeout(timer);
   }
+}
+
+/** Anything shutdown has to wait for: a poll loop, whose stop() resolves after its current cycle. */
+export interface StoppableLoop {
+  stop(): Promise<void>;
+}
+
+/**
+ * The shutdown sequence (QA-047): stop the poll loops and drain the BullMQ workers in parallel,
+ * both bounded by `timeoutMs`, and only then run `close` (pools, Redis, telemetry). Closing a
+ * database pool under a cycle that is mid-send would fail its bookkeeping write, and the next
+ * process would send again.
+ */
+export async function drainThenClose(options: {
+  loops: StoppableLoop[];
+  workers: StoppableWorker[];
+  timeoutMs: number;
+  close: () => Promise<void>;
+}): Promise<void> {
+  let deadline: ReturnType<typeof setTimeout> | undefined;
+  const expired = new Promise<void>((resolve) => {
+    deadline = setTimeout(resolve, options.timeoutMs);
+  });
+  const loopsStopped = Promise.allSettled(options.loops.map((loop) => loop.stop()));
+  try {
+    await Promise.all([
+      Promise.race([loopsStopped, expired]),
+      shutdownWorkers(options.workers, options.timeoutMs),
+    ]);
+  } finally {
+    clearTimeout(deadline);
+  }
+  await options.close();
 }

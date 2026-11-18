@@ -2,6 +2,7 @@ import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { PERMISSIONS, STORAGE_ADDON_PLAN_CODES } from "@studafy/constants";
 import { z } from "zod";
 
+import { returnUrlSchema } from "../../../lib/security/return-url";
 import { requireAuth } from "../../../middleware/authContext";
 import { requirePermission } from "../../../middleware/authz";
 import { requireChannel } from "../../../middleware/channelGuard";
@@ -109,8 +110,8 @@ const StorageOfferSchema = z
 
 const StorageCheckoutRequestSchema = z.object({
   priceId: z.string().uuid(),
-  successUrl: z.string().url(),
-  cancelUrl: z.string().url(),
+  successUrl: returnUrlSchema,
+  cancelUrl: returnUrlSchema,
 });
 
 const StorageCheckoutResponseSchema = z.object({
@@ -226,7 +227,7 @@ const StorageBillingSchema = z
   })
   .openapi("StorageAddOnBilling");
 
-const PaymentMethodSessionRequestSchema = z.object({ returnUrl: z.string().url() });
+const PaymentMethodSessionRequestSchema = z.object({ returnUrl: returnUrlSchema });
 
 const SavedCardSchema = z
   .object({
@@ -240,8 +241,8 @@ const SavedCardSchema = z
   .openapi("StorageAddOnCard");
 
 const CardSetupRequestSchema = z.object({
-  successUrl: z.string().url(),
-  cancelUrl: z.string().url(),
+  successUrl: returnUrlSchema,
+  cancelUrl: returnUrlSchema,
 });
 
 const BASE = "/api/subscriptions/storage";

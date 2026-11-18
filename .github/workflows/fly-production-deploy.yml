@@ -10,6 +10,14 @@ name: Production deploy (fly.io)
 # Order matters and matches the README: the scanner first (the workers reach it), then migrations
 # (a release never runs against an older schema), then api, realtime, workers and web.
 #
+# QA-005: a `gate` job (no secrets, no environment) refuses any ref but dev and any commit whose CI
+# run did not pass. App images are built once, Trivy-scanned at HIGH, and deployed by digest, so the
+# scanned image is the released one. The smoke check needs /readyz, the auth surface and one shared
+# JWT key; if it (or any deploy step) fails, the services go back to the digests they ran before.
+# Migrations are forward-only and are not rolled back. The `prod` environment's deployment-branch
+# policy (dev only) and required reviewers are the server-side half of the gate: a modified copy of
+# this file on another branch cannot pass them (docs/runbooks/deploy.md).
+#
 # Replaced the retired AWS ECS deploy workflows, removed with the rest of the AWS stack.
 
 on:
@@ -23,7 +31,21 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Release only dev, and only a commit CI passed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/deploy/verify-ci-green.sh "$GITHUB_REPOSITORY" "$GITHUB_SHA" "$GITHUB_REF" ci.yml dev
+
   deploy:
+    needs: gate
     runs-on: ubuntu-latest
     environment: prod
     timeout-minutes: 60
@@ -51,6 +73,9 @@ jobs:
           RECORDS_ENCRYPTION_KEYS: ${{ secrets.RECORDS_ENCRYPTION_KEYS }}
           RECORDS_ENCRYPTION_CURRENT_KEY_ID: ${{ secrets.RECORDS_ENCRYPTION_CURRENT_KEY_ID }}
           WS_JWT_SECRET: ${{ secrets.WS_JWT_SECRET }}
+          # QA-023: the API's access-token signing key; the NEXT key only during a rotation window.
+          JWT_PRIVATE_KEY_PEM: ${{ secrets.JWT_PRIVATE_KEY_PEM }}
+          JWT_NEXT_PRIVATE_KEY_PEM: ${{ secrets.JWT_NEXT_PRIVATE_KEY_PEM }}
           TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
           AI_LLM_API_KEY: ${{ secrets.AI_LLM_API_KEY }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
@@ -73,7 +98,7 @@ jobs:
           missing=()
           for key in DATABASE_USER DATABASE_PASSWORD DATABASE_CA_CERT REDIS_URL \
             S3_ENDPOINT S3_ACCESS_KEY_ID S3_SECRET_ACCESS_KEY \
-            RECORDS_ENCRYPTION_KEYS RECORDS_ENCRYPTION_CURRENT_KEY_ID WS_JWT_SECRET \
+            RECORDS_ENCRYPTION_KEYS RECORDS_ENCRYPTION_CURRENT_KEY_ID WS_JWT_SECRET JWT_PRIVATE_KEY_PEM \
             TURNSTILE_SECRET_KEY AI_LLM_API_KEY RESEND_API_KEY RESEND_WEBHOOK_SECRET \
             FIREBASE_SERVICE_ACCOUNT GOOGLE_PLAY_SERVICE_ACCOUNT GOOGLE_PLAY_RTDN_TOKEN; do
             [ -n "${!key:-}" ] || missing+=("$key")
@@ -83,13 +108,13 @@ jobs:
             exit 1
           fi
 
-          # Derived values. The workers write Supabase's CA to a file from a base64 secret, and read
-          # the R2 keys through the AWS SDK's own variable names; realtime reads the session denylist
-          # from the API's Redis, which in this deployment is the same database.
+          # Derived values. The workers write Supabase's CA to a file from a base64 secret; realtime
+          # reads the session denylist from the API's Redis, which in this deployment is the same
+          # database. (QA-071: the workers take the R2 keys under their own S3_* names now, like the
+          # api, instead of being handed them as AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY.)
           SUPABASE_CA_CERT_B64="$(printf '%s' "$DATABASE_CA_CERT" | base64 -w0)"
           echo "::add-mask::$SUPABASE_CA_CERT_B64"
           export SUPABASE_CA_CERT_B64
-          export AWS_ACCESS_KEY_ID="$S3_ACCESS_KEY_ID" AWS_SECRET_ACCESS_KEY="$S3_SECRET_ACCESS_KEY"
           export AUTH_REDIS_URL="$REDIS_URL"
 
           # stage APP NAME... : stage each named variable that has a value, under the same name.
@@ -111,6 +136,7 @@ jobs:
           stage studafy-core-api DATABASE_USER DATABASE_PASSWORD DATABASE_CA_CERT REDIS_URL \
             S3_ENDPOINT S3_ACCESS_KEY_ID S3_SECRET_ACCESS_KEY SENTRY_DSN \
             RECORDS_ENCRYPTION_KEYS RECORDS_ENCRYPTION_CURRENT_KEY_ID WS_JWT_SECRET \
+            JWT_PRIVATE_KEY_PEM JWT_NEXT_PRIVATE_KEY_PEM \
             TURNSTILE_SECRET_KEY AI_LLM_API_KEY RESEND_WEBHOOK_SECRET \
             GOOGLE_PLAY_SERVICE_ACCOUNT GOOGLE_PLAY_RTDN_TOKEN \
             GOOGLE_OAUTH_CLIENT_ID GOOGLE_OAUTH_CLIENT_SECRET \
@@ -122,11 +148,82 @@ jobs:
             OTEL_EXPORTER_OTLP_ENDPOINT OTEL_EXPORTER_OTLP_HEADERS
 
           stage studafy-core-workers DATABASE_USER DATABASE_PASSWORD SUPABASE_CA_CERT_B64 REDIS_URL \
-            S3_ENDPOINT AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY SENTRY_DSN \
+            S3_ENDPOINT S3_ACCESS_KEY_ID S3_SECRET_ACCESS_KEY SENTRY_DSN \
             RECORDS_ENCRYPTION_KEYS RECORDS_ENCRYPTION_CURRENT_KEY_ID \
             AI_LLM_API_KEY RESEND_API_KEY FIREBASE_SERVICE_ACCOUNT STRIPE_SECRET_KEY \
             GOOGLE_PLAY_SERVICE_ACCOUNT \
             OTEL_EXPORTER_OTLP_ENDPOINT OTEL_EXPORTER_OTLP_HEADERS
+
+      - name: Record the images running now (the rollback targets)
+        id: previous
+        run: |
+          set -euo pipefail
+          for app in api realtime workers web; do
+            echo "$app=$(scripts/deploy/release.sh current-image "studafy-core-$app")" >> "$GITHUB_OUTPUT"
+          done
+
+      - name: Build the app images once
+        id: images
+        run: |
+          set -euo pipefail
+          flyctl auth docker
+          build() { scripts/deploy/release.sh build "studafy-core-$1" "infra/fly/$1.toml" "$RELEASE" "${@:2}"; }
+          echo "api=$(build api)" >> "$GITHUB_OUTPUT"
+          echo "realtime=$(build realtime)" >> "$GITHUB_OUTPUT"
+          echo "workers=$(build workers)" >> "$GITHUB_OUTPUT"
+          echo "web=$(build web \
+            --build-arg "VITE_RELEASE_VERSION=$RELEASE" \
+            --build-arg "VITE_TURNSTILE_SITE_KEY=${{ vars.VITE_TURNSTILE_SITE_KEY }}" \
+            --build-arg "VITE_SENTRY_DSN=${{ vars.VITE_SENTRY_DSN }}" \
+            --build-arg "SENTRY_ORG=${{ vars.SENTRY_ORG }}" \
+            --build-arg "SENTRY_PROJECT=${{ vars.SENTRY_PROJECT }}" \
+            ${SENTRY_AUTH_TOKEN:+--build-secret "sentry_auth_token=$SENTRY_AUTH_TOKEN"})" >> "$GITHUB_OUTPUT"
+        env:
+          # Source maps upload to Sentry only when the token is there (web.Dockerfile mounts it as a
+          # BuildKit secret, so it never lands in the image).
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+
+      # The exact digests about to be released, scanned before anything changes in production.
+      - name: Scan the api image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ steps.images.outputs.api }}
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          trivyignores: .trivyignore
+        env:
+          TRIVY_DB_REPOSITORY: ghcr.io/aquasecurity/trivy-db:2
+      - name: Scan the realtime image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ steps.images.outputs.realtime }}
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          trivyignores: .trivyignore
+        env:
+          TRIVY_DB_REPOSITORY: ghcr.io/aquasecurity/trivy-db:2
+      - name: Scan the workers image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ steps.images.outputs.workers }}
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          trivyignores: .trivyignore
+        env:
+          TRIVY_DB_REPOSITORY: ghcr.io/aquasecurity/trivy-db:2
+      - name: Scan the web image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ steps.images.outputs.web }}
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          trivyignores: .trivyignore
+        env:
+          TRIVY_DB_REPOSITORY: ghcr.io/aquasecurity/trivy-db:2
 
       - name: Deploy the virus scanner
         run: flyctl deploy . --config infra/fly/scanner.toml --remote-only
@@ -195,37 +292,41 @@ jobs:
           fi
 
       - name: Deploy the API
-        run: flyctl deploy . --config infra/fly/api.toml --remote-only --env "RELEASE_VERSION=$RELEASE"
+        id: deploy_api
+        run: scripts/deploy/release.sh deploy studafy-core-api infra/fly/api.toml "${{ steps.images.outputs.api }}" --env "RELEASE_VERSION=$RELEASE"
 
       - name: Deploy the realtime gateway
-        run: flyctl deploy . --config infra/fly/realtime.toml --remote-only --env "RELEASE_VERSION=$RELEASE"
+        run: scripts/deploy/release.sh deploy studafy-core-realtime infra/fly/realtime.toml "${{ steps.images.outputs.realtime }}" --env "RELEASE_VERSION=$RELEASE"
 
       - name: Deploy the workers
-        run: flyctl deploy . --config infra/fly/workers.toml --remote-only --env "RELEASE_VERSION=$RELEASE"
+        run: scripts/deploy/release.sh deploy studafy-core-workers infra/fly/workers.toml "${{ steps.images.outputs.workers }}" --env "RELEASE_VERSION=$RELEASE"
 
       - name: Deploy the web app
-        env:
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-        run: |
-          set -euo pipefail
-          args=(
-            --build-arg "VITE_RELEASE_VERSION=$RELEASE"
-            --build-arg "VITE_TURNSTILE_SITE_KEY=${{ vars.VITE_TURNSTILE_SITE_KEY }}"
-            --build-arg "VITE_SENTRY_DSN=${{ vars.VITE_SENTRY_DSN }}"
-            --build-arg "SENTRY_ORG=${{ vars.SENTRY_ORG }}"
-            --build-arg "SENTRY_PROJECT=${{ vars.SENTRY_PROJECT }}"
-          )
-          # Source maps upload to Sentry only when the token is there (web.Dockerfile mounts it as a
-          # BuildKit secret, so it never lands in the image).
-          if [ -n "${SENTRY_AUTH_TOKEN:-}" ]; then
-            args+=(--build-secret "sentry_auth_token=$SENTRY_AUTH_TOKEN")
-          fi
-          flyctl deploy . --config infra/fly/web.toml --remote-only "${args[@]}"
+        run: scripts/deploy/release.sh deploy studafy-core-web infra/fly/web.toml "${{ steps.images.outputs.web }}"
 
       - name: Smoke check
+        run: scripts/deploy/release.sh smoke https://studafy-core-api.fly.dev https://studafy-core-web.fly.dev
+
+      # Anything after the API deploy started failed: put every service back on the digest it ran
+      # before this workflow. A service with no recorded digest (first release) is left as it is.
+      - name: Roll back to the previous images
+        if: ${{ failure() && steps.deploy_api.outcome != 'skipped' }}
         run: |
-          set -euo pipefail
-          for url in https://studafy-core-api.fly.dev/healthz https://studafy-core-web.fly.dev/healthz; do
-            curl --fail --silent --show-error --retry 10 --retry-delay 6 --retry-all-errors "$url" > /dev/null
-            echo "ok: $url"
+          set -uo pipefail
+          status=0
+          for app in api realtime workers web; do
+            case "$app" in
+              api) image="${{ steps.previous.outputs.api }}" ;;
+              realtime) image="${{ steps.previous.outputs.realtime }}" ;;
+              workers) image="${{ steps.previous.outputs.workers }}" ;;
+              web) image="${{ steps.previous.outputs.web }}" ;;
+            esac
+            if [ -z "$image" ]; then
+              echo "::warning::No previous image recorded for studafy-core-$app; left as is."
+              continue
+            fi
+            echo "Rolling studafy-core-$app back to $image"
+            scripts/deploy/release.sh deploy "studafy-core-$app" "infra/fly/$app.toml" "$image" || status=1
           done
+          echo "::error::Release $RELEASE failed and was rolled back. Migrations are not reverted."
+          exit $status

@@ -4,10 +4,20 @@
 app = "studafy-core-workers"
 primary_region = "fra"
 
+# Graceful shutdown (QA-047). Fly's default is SIGINT with 5 s before SIGKILL, shorter than the
+# drain the service waits for, so every deploy killed in-flight work. SHUTDOWN_TIMEOUT_MS ([env])
+# stays below kill_timeout so the process exits on its own.
+kill_signal = "SIGTERM"
+kill_timeout = "60s"
+
 [build]
   dockerfile = "../docker/workers.Dockerfile"
 
 [env]
+  # QA-072: the Prometheus endpoint (METRICS_PORT, [metrics] below) listens on the private network
+  # address only, where fly's scraper reaches it, not on every interface.
+  METRICS_HOST = "fly-local-6pn"
+  SHUTDOWN_TIMEOUT_MS = "45000"
   NODE_ENV = "production"
   SERVICE_NAME = "workers"
   SENTRY_ENVIRONMENT = "production"
@@ -26,7 +36,8 @@ primary_region = "fra"
   NODE_EXTRA_CA_CERTS = "/etc/studafy/supabase-ca.pem"
   S3_REGION = "auto"
   S3_APP_FILES_BUCKET = "studafy-prod-files"
-  # The AWS SDK's own credential chain reads the R2 keys from AWS_ACCESS_KEY_ID/SECRET (secrets).
+  # The R2 keys are the S3_ACCESS_KEY_ID/S3_SECRET_ACCESS_KEY secrets, as on the api; the workers
+  # hand them to the S3 SDK at startup (apps/workers/src/s3-credentials.ts, QA-071).
   AWS_REGION = "auto"
   # clamd runs as its own app, reached over the organisation's private network (scanner.toml).
   CLAMAV_HOST = "studafy-core-scanner.flycast"
@@ -53,3 +64,21 @@ primary_region = "fra"
 [[vm]]
   size = "shared-cpu-1x"
   memory = "2gb"
+
+# Liveness (QA-046): /healthz fails when a poll loop has not cycled for 5 minutes or a BullMQ worker
+# stopped (apps/workers/src/health.ts). Fly shows the check state and alerts on it; it is on an
+# internal port, never published.
+[checks]
+  [checks.workers_alive]
+    type = "http"
+    port = 8081
+    path = "/healthz"
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "60s"
+
+# Prometheus metrics (queue depth, job outcomes, durations) scraped by Fly's managed Prometheus.
+[metrics]
+  port = 9464
+  path = "/metrics"
+

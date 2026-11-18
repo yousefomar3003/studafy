@@ -3,6 +3,7 @@ import { HTTPException } from "hono/http-exception";
 
 import { CodedHttpException } from "../../coded-http-exception";
 import { decodeKeysetCursor, encodeKeysetCursor } from "../../lib/keyset-cursor";
+import { likeContains } from "../../lib/sql/like";
 import { emitAuditLog } from "../../middleware/auditEmitter";
 
 import type { StudentStatus, CreateStudentBody, UpdateStudentBody } from "./schemas";
@@ -63,9 +64,9 @@ export async function listStudents(
 
   const searchFilter = params.search
     ? tx` AND (
-        s.first_name ILIKE ${`%${params.search}%`}
-        OR s.last_name ILIKE ${`%${params.search}%`}
-        OR s.admission_number ILIKE ${`%${params.search}%`}
+        s.first_name ILIKE ${likeContains(params.search)}
+        OR s.last_name ILIKE ${likeContains(params.search)}
+        OR s.admission_number ILIKE ${likeContains(params.search)}
       )`
     : tx``;
 
@@ -80,7 +81,7 @@ export async function listStudents(
   const cursorFilter = params.cursor
     ? (() => {
         const { created_at, id } = decodeKeysetCursor(params.cursor);
-        return tx` AND (s.created_at, s.id) < (${created_at}::timestamptz, ${id}::uuid)`;
+        return tx` AND (s.created_at, s.id) < (COALESCE((SELECT k.created_at FROM app.students k WHERE k.id = ${id}::uuid), ${created_at}::timestamptz), ${id}::uuid)`;
       })()
     : tx``;
 

@@ -5,7 +5,13 @@ import { createApp } from "../../src/app";
 import { signResendPayload } from "../../src/email/resend-signature";
 import { createInflightTracker } from "../../src/lifecycle";
 import { createLogger } from "../../src/logger";
-import { createSchool, createTestDatabase, integrationEnabled, migrateDatabase } from "../harness";
+import {
+  appDatabaseFor,
+  createSchool,
+  createTestDatabase,
+  integrationEnabled,
+  migrateDatabase,
+} from "../harness";
 
 import type { AppEnv } from "../../src/middleware";
 import type { TestDatabase } from "../harness";
@@ -54,7 +60,7 @@ beforeAll(async () => {
     tracker: createInflightTracker(),
     logger: createLogger({ destination: () => undefined }),
     redis: null,
-    database: sql,
+    database: appDatabaseFor(sql),
   });
 }, 60_000);
 

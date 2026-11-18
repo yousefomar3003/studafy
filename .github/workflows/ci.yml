@@ -16,6 +16,12 @@ jobs:
     env:
       POSTGRES_PASSWORD: studafy_ci_only
       TEST_DATABASE_URL: postgresql://studafy_test:studafy_ci_only@127.0.0.1:54329/postgres?sslmode=disable
+      # This job exists to run the database-backed tests: abort rather than skip them if the URL
+      # above ever goes missing (scripts/test-db-gate.ts, QA-004).
+      REQUIRE_DB_TESTS: "1"
+      # tests/security/route-guard-coverage.test.ts mounts the Redis-backed routes (AI, entitlements)
+      # so it can see their guards; compose already starts test-redis for this job (QA-001).
+      TEST_REDIS_URL: redis://127.0.0.1:6390
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Start disposable PostgreSQL
@@ -35,12 +41,57 @@ jobs:
         if: always()
         run: docker compose rm -sfv test-postgres test-redis
 
+  # QA-003: the API suite again, with the app logged in as studafy_runtime -- not a superuser, no
+  # BYPASSRLS, owns nothing, reaches data only through the app's own role switches. Production logs
+  # in as Supabase `postgres` (S-01), so code that silently needs RLS bypass passes every other job.
+  # The known QA-014 work list may only shrink: a new failure, or a listed test that now passes,
+  # fails this job (scripts/ci/least-privilege-check.ts).
+  least-privilege-db:
+    name: least-privilege-db
+    runs-on: ubuntu-latest
+    env:
+      POSTGRES_PASSWORD: studafy_ci_only
+      TEST_DATABASE_URL: postgresql://studafy_test:studafy_ci_only@127.0.0.1:54329/postgres?sslmode=disable
+      TEST_REDIS_URL: redis://127.0.0.1:6390
+      REQUIRE_DB_TESTS: "1"
+      TEST_APP_DB_ROLE: studafy_runtime:studafy_runtime_test_only
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Start disposable PostgreSQL + Redis
+        run: docker compose up -d --wait test-postgres test-redis
+      - uses: ./.github/actions/setup-bun-workspace
+      - name: Build the workspace packages the API imports
+        run: bunx turbo run build --filter=@studafy/api^...
+      # studafy_app / studafy_admin are created by the first migration; roles are cluster-wide.
+      - name: Migrate the shared database, then create the least-privilege login
+        working-directory: packages/db
+        env:
+          DATABASE_URL: postgresql://studafy_test:studafy_ci_only@127.0.0.1:54329/postgres?sslmode=disable
+          DATABASE_SSL_MODE: disable
+        run: |
+          bun --no-env-file src/cli.ts migrate
+          docker compose -f ../../compose.yml exec -T test-postgres \
+            psql -U studafy_test -d postgres -v ON_ERROR_STOP=1 -f - < ../../db/test-roles/runtime-role.sql
+      - name: API suite as studafy_runtime
+        working-directory: apps/api
+        # Failures are judged by the next step against the known list, not by the exit code here.
+        continue-on-error: true
+        run: bun test --timeout 120000 --reporter=junit --reporter-outfile=least-privilege.xml
+      - name: Compare with the QA-014 known-failures list
+        run: bun scripts/ci/least-privilege-check.ts apps/api/tests/least-privilege-known-failures.txt apps/api/least-privilege.xml
+      - name: Stop disposable PostgreSQL + Redis
+        if: always()
+        run: docker compose rm -sfv test-postgres test-redis
+
   api-integration:
     name: api-integration
     runs-on: ubuntu-latest
     env:
       POSTGRES_PASSWORD: studafy_ci_only
       TEST_DATABASE_URL: postgresql://studafy_test:studafy_ci_only@127.0.0.1:54329/postgres?sslmode=disable
+      # This job exists to run the database-backed tests: abort rather than skip them if the URL
+      # above ever goes missing (scripts/test-db-gate.ts, QA-004).
+      REQUIRE_DB_TESTS: "1"
       # compose.yml test profile already starts Redis for this job; without the URL exported, every
       # Redis-gated suite silently skips. ST-116's cache-invalidation SLA test is one of them.
       REDIS_URL: redis://127.0.0.1:6390
@@ -135,6 +186,9 @@ jobs:
       # Disposable, ephemeral-container-only password (matches compose.yml test profile's required variable).
       POSTGRES_PASSWORD: studafy_ci_only
       TEST_DATABASE_URL: postgresql://studafy_test:studafy_ci_only@127.0.0.1:54329/postgres?sslmode=disable
+      # This job exists to run the database-backed tests: abort rather than skip them if the URL
+      # above ever goes missing (scripts/test-db-gate.ts, QA-004).
+      REQUIRE_DB_TESTS: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Start PostgreSQL 16 (pgvector + pg_stat_statements preloaded)
@@ -253,7 +307,7 @@ jobs:
         working-directory: apps/web
       - name: Upload keyboard-walkthrough recordings
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: a11y-walkthrough-videos
           path: apps/web/test-results/**/*.webm
@@ -277,7 +331,7 @@ jobs:
         run: bunx turbo run build --filter=@studafy/api^...
       - name: Regenerate the OpenAPI document
         run: bun run openapi:generate
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version: 3.44.8
           channel: stable
@@ -333,7 +387,7 @@ jobs:
         run: bunx turbo run build --filter=@studafy/api^...
       - name: Regenerate the OpenAPI document
         run: bun run openapi:generate
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version: 3.44.8
           channel: stable
@@ -352,12 +406,10 @@ jobs:
       # then the coverage-upload step below it) and report a confusing second failure on top of
       # the real one.
       #
-      # Report-only for now (see "Report analyze findings" below): this job is *new* in the branch
-      # that added it, and the branch touches only CI YAML/scripts -- so every finding it reports
-      # is a pre-existing issue in apps/mobile, not a regression this change introduced. `dart
-      # analyze` has no --baseline-commit equivalent to scope it to the diff the way the sast job
-      # scopes Semgrep, so gating on it here would block unrelated PRs on a pre-existing backlog.
-      # Tracked for its own cleanup pass; flip this back to a hard gate (exit 1) once that lands.
+      # A hard gate since QA-004: this used to be report-only while apps/mobile carried a backlog
+      # of pre-existing findings, and with the client regenerated above that backlog is now zero
+      # (`flutter analyze`: "No issues found!"). continue-on-error stays only so the test and
+      # coverage steps below still run; "Fail on analyze findings" turns the job red afterwards.
       - name: flutter analyze
         id: analyze
         continue-on-error: true
@@ -377,20 +429,18 @@ jobs:
         working-directory: apps/mobile
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: mobile-coverage-report
           path: |
             apps/mobile/coverage/lcov.info
             apps/mobile/coverage/coverage-report.md
           if-no-files-found: error
-      # Report-only, not a gate -- see the "flutter analyze" step's comment for why (new job,
-      # CI-only branch, pre-existing findings, no diff-scoping available). Surfaces the result
-      # without redding the job.
-      - name: Report analyze findings
+      - name: Fail on analyze findings
         if: steps.analyze.outcome == 'failure'
         run: |
-          echo '::warning::flutter analyze reported issues -- see the "flutter analyze" step above. Report-only for now (pre-existing apps/mobile backlog); not gating this job.'
+          echo '::error::flutter analyze reported issues -- see the "flutter analyze" step above.'
+          exit 1
       - name: Fail on any failing test
         if: steps.test.outcome == 'failure'
         run: |
@@ -523,6 +573,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_CONFIG: .gitleaks.toml
+          # QA-075: the action defaults to gitleaks 8.24.3, which predates the `[[allowlists]]`
+          # tables .gitleaks.toml uses (8.25+). Pinned to the version the allowlist was audited with.
+          GITLEAKS_VERSION: "8.30.1"
 
   quality:
     runs-on: ubuntu-latest
@@ -560,6 +613,13 @@ jobs:
           PUSH_BEFORE_SHA: ${{ github.event.before }}
         run: echo "filter=$(bash .github/scripts/resolve-affected-filter.sh)" >> "$GITHUB_OUTPUT"
       - run: bun run format:check
+      # Repo-level script and infra guards: the deploy gate and release scripts (QA-005, against fake
+      # gh/flyctl/curl), the container base-image pins (QA-053) and the action SHA pins (QA-006).
+      - run: bun test scripts/deploy scripts/ci
+      - name: Every action is pinned to a commit SHA (QA-006)
+        run: bash scripts/ci/check-pinned-actions.sh
+      - name: Every .trivyignore waiver is inside its review date (QA-073)
+        run: bash scripts/ci/check-trivyignore-expiry.sh
       # `--continue=dependencies-successful` surfaces every independent package's failures in one
       # run instead of stopping at the first, so a PR sees all its annotations at once. Piped
       # through annotate-diagnostics.mjs to turn tsc/ESLint output into inline PR annotations --
@@ -641,7 +701,7 @@ jobs:
         if: github.event_name == 'pull_request' && steps.base_spec.outputs.exists == 'true'
         id: breaking_check
         continue-on-error: ${{ contains(github.event.pull_request.labels.*.name, 'version-bump') }}
-        uses: oasdiff/oasdiff-action/breaking@v0.1.6
+        uses: oasdiff/oasdiff-action/breaking@024f6c399f9a21ada1addb0f9a36ce1bfac995f1 # v0.1.6
         with:
           base: .oasdiff/base.json
           revision: apps/api/openapi.json

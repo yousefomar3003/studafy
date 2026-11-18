@@ -78,15 +78,23 @@ Google and Microsoft do not rename the OAuth client when you rotate its secret â
 
 ### S3-compatible access keys (`S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY`)
 
-The Cloudflare R2 API token for `studafy-prod-files`. The api reads it as
-`S3_ACCESS_KEY_ID`/`S3_SECRET_ACCESS_KEY`; the workflow hands the workers the same pair as
-`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`.
+The Cloudflare R2 API token for `studafy-prod-files`. The api and the workers both read it as
+`S3_ACCESS_KEY_ID`/`S3_SECRET_ACCESS_KEY` (QA-071; the workers used to be handed it as
+`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`, which is only the S3 SDK's name for it, not AWS).
 
 1. Create a new R2 API token in the Cloudflare dashboard.
 2. Set both halves in the `prod` environment and run the deploy workflow (they must be set together
    to satisfy the schema's pair rule).
 3. Verify: a put/get of an attachment round-trips (or, for a read-only reporter, a list succeeds).
 4. After the configured rotation window, delete the old pair in the console.
+
+### Reconciliation trigger key (`RECONCILIATION_API_KEY`, api)
+
+The `X-Api-Key` for `POST /api/finance/reconciliation/run`, compared in constant time (QA-092). The deploy workflow does not stage it today, so in production the route answers 403 to everyone until the key is added there on purpose.
+
+1. Generate 32+ random bytes in the password manager.
+2. Set `RECONCILIATION_API_KEY` in the `prod` environment, stage it onto `studafy-core-api` in the deploy workflow's secret step, and deploy. Update the caller (the scheduler that triggers the run) in the same window, because the old key stops working at the deploy.
+3. Verify: one triggered run answers 200, and a wrong key still answers 403.
 
 ## Rollback / abort criteria
 

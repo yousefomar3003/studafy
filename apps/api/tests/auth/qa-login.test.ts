@@ -7,6 +7,7 @@ import { createInflightTracker } from "../../src/lifecycle";
 import { createLogger } from "../../src/logger";
 import { KeyStore, QA_LOGIN_PROVIDER, REVIEW_LOGIN_PROVIDER } from "../../src/modules/auth";
 import {
+  appDatabaseFor,
   assignRole,
   createSchool,
   createTestDatabase,
@@ -43,7 +44,7 @@ function buildApp(qaLoginPassword: string | undefined): OpenAPIHono<AppEnv> {
     isReady: () => true,
     tracker: createInflightTracker(),
     logger: createLogger({ destination: () => undefined }),
-    database: sql,
+    database: appDatabaseFor(sql),
     keyStore,
     jwtIssuer: TEST_JWT_ISSUER,
     jwtAudience: TEST_JWT_AUDIENCE,

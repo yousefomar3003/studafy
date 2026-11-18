@@ -51,7 +51,10 @@ export interface RelayContext {
 }
 
 export interface RelayHandle {
-  stop(): void;
+  /** Resolves once the in-flight cycle, if any, has finished. */
+  stop(): Promise<void>;
+  /** When the loop last finished a cycle (QA-046 liveness). */
+  lastCycleAt(): number | null;
 }
 
 /**
@@ -64,6 +67,24 @@ export interface RelayHandle {
  * RLS (the services' current `postgres` login does; the dedicated NOBYPASSRLS login that
  * docs/security/S-01-database-role-verification.md plans would not).
  */
+/**
+ * Payload keys that are bearer credentials (QA-032): INVITATION_SENT, SCHOOL_VERIFICATION_EMAIL_SENT
+ * and ACCOUNT_DELETION_REQUESTED carry their one-time `token` so the email dispatcher can build the
+ * link. No subscriber needs it, and anyone able to read events:* could otherwise accept an
+ * invitation or confirm someone's deletion.
+ */
+const UNPUBLISHED_PAYLOAD_KEYS: ReadonlySet<string> = new Set(["token"]);
+
+/** The payload as broadcast on events:*, without bearer credentials. */
+export function publishablePayload(payload: unknown): unknown {
+  if (payload === null || typeof payload !== "object" || Array.isArray(payload)) return payload;
+  return Object.fromEntries(
+    Object.entries(payload as Record<string, unknown>).filter(
+      ([key]) => !UNPUBLISHED_PAYLOAD_KEYS.has(key),
+    ),
+  );
+}
+
 async function relayBatch(ctx: RelayContext, schoolId: string): Promise<number> {
   return await withSystemTenantTx(ctx.db, { schoolId }, async (tx) => {
     const { rows } = await claimBatch(tx, schoolId, ctx.config.batchSize);
@@ -71,7 +92,7 @@ async function relayBatch(ctx: RelayContext, schoolId: string): Promise<number> 
 
     for (const row of rows) {
       const channel = `events:${row.school_id}:${row.event_name}`;
-      await ctx.redis.publish(channel, JSON.stringify(row.payload));
+      await ctx.redis.publish(channel, JSON.stringify(publishablePayload(row.payload)));
 
       const lagMs = Date.now() - new Date(row.created_at).getTime();
       recordLag(lagMs);
@@ -136,8 +157,9 @@ export function startRelay(ctx: RelayContext): RelayHandle {
 
   return {
     stop: () => {
-      loop.stop();
       ctx.logger.info({}, "outbox relay stopping");
+      return loop.stop();
     },
+    lastCycleAt: () => loop.lastCycleAt(),
   };
 }

@@ -25,7 +25,7 @@ The rest of this doc covers the four application images and ERPNext:
 | `apps/api`      | `infra/docker/api.Dockerfile`      | `oven/bun:1.3.14-alpine`    | 3000                             | 147MB                                                               |
 | `apps/workers`  | `infra/docker/workers.Dockerfile`  | `oven/bun:1.3.14-alpine`    | —                                | 148MB                                                               |
 | `apps/realtime` | `infra/docker/realtime.Dockerfile` | `oven/bun:1.3.14-alpine`    | 3001                             | 147MB                                                               |
-| `apps/web`      | `infra/docker/web.Dockerfile`      | `nginx:1.27-alpine`         | 8080                             | 93MB                                                                |
+| `apps/web`      | `infra/docker/web.Dockerfile`      | `nginx:1.30-alpine`         | 8080                             | 93MB                                                                |
 | ERPNext plane   | `infra/docker/erpnext.Dockerfile`  | `frappe/erpnext:version-15` | none (role-dependent, see below) | ~2.7GB on CI (`containers.yml` budget 3072MB); not measured locally |
 
 \* `docker images` size on this machine, x86_64, with the base images current as of 2026-07-10.
@@ -84,7 +84,7 @@ All three Bun services follow the same two-stage shape:
    binary plus a whole dependency tree."
 
 `apps/web` differs: its `build` stage is the same Bun/turbo shape, but its `runtime` stage is
-`nginx:1.27-alpine` serving the static `vite build` output — there is no Bun runtime, and nothing
+`nginx:1.30-alpine` serving the static `vite build` output — there is no Bun runtime, and nothing
 server-side, in the final `apps/web` image.
 
 **`--ignore-scripts`** on every `bun install`: the root `package.json`'s `"prepare"` script runs
@@ -110,7 +110,7 @@ resurface if a future dependency starts needing it too.
 
 `apps/web`'s nginx runs entirely as the non-root user from PID 1 (never starts as root and drops
 privilege) — it listens on 8080, not 80, so it never needs `CAP_NET_BIND_SERVICE`. This required
-two changes to the stock `nginx:1.27-alpine` config beyond the non-root user itself:
+two changes to the stock `nginx:1.30-alpine` config beyond the non-root user itself:
 the compiled-in default pidfile path (`/run/nginx.pid`) isn't writable by a non-root process, so
 `infra/docker/web.Dockerfile` `sed`s the existing `pid` directive's _value_ to `/tmp/nginx.pid`
 in place (an `nginx -g "pid ...;"` override on the CMD line was tried first and rejected by nginx

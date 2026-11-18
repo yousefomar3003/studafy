@@ -24,6 +24,8 @@ line, so it does not land in shell history or the process list.
 """
 
 import argparse
+import hashlib
+import hmac
 import datetime
 import os
 import sys
@@ -115,13 +117,27 @@ WEBHOOK_TEMPLATE = (
 )
 
 
-def install_webhooks(school_id, api_url, secret):
-    """One Frappe Webhook per projected doctype, posting to apps/api signed with the shared secret.
+def site_webhook_secret(master_secret, school_id):
+    """This school's own webhook secret (QA-034), derived exactly as apps/api's siteWebhookSecret.
 
-    Frappe signs each request body (base64 HMAC-SHA256 in X-Frappe-Webhook-Signature), which
-    apps/api verifies with ERPNEXT_WEBHOOK_SECRET. Idempotent: an existing hook is updated in place.
+    The site stores only this value, never the master ERPNEXT_WEBHOOK_SECRET, so a secret read off
+    one school's site cannot sign events for another school.
+    """
+    return hmac.new(
+        master_secret.encode(), f"erpnext-webhook-site:v1:{school_id}".encode(), hashlib.sha256
+    ).hexdigest()
+
+
+def install_webhooks(school_id, api_url, secret):
+    """One Frappe Webhook per projected doctype, posting to apps/api signed with this site's secret.
+
+    Frappe signs each request body (base64 HMAC-SHA256 in X-Frappe-Webhook-Signature) with the
+    per-site secret derived from `secret` (the master); every request names the school in
+    X-Studafy-School, which tells apps/api which per-site secret to verify against (QA-034).
+    Idempotent: an existing hook is updated in place.
     """
     url = api_url.rstrip("/") + "/erpnext/webhooks"
+    site_secret = site_webhook_secret(secret, school_id)
     template = WEBHOOK_TEMPLATE.replace("__SCHOOL_ID__", school_id)
     for doctype in WEBHOOK_EVENTS:
         if not frappe.db.exists("DocType", doctype):
@@ -142,10 +158,16 @@ def install_webhooks(school_id, api_url, secret):
                 "request_structure": "JSON",
                 "webhook_json": template,
                 "enable_security": 1,
-                "webhook_secret": secret,
+                "webhook_secret": site_secret,
             }
         )
-        hook.set("webhook_headers", [{"key": "Content-Type", "value": "application/json"}])
+        hook.set(
+            "webhook_headers",
+            [
+                {"key": "Content-Type", "value": "application/json"},
+                {"key": "X-Studafy-School", "value": school_id},
+            ],
+        )
         hook.save(ignore_permissions=True)
     frappe.db.commit()
     print(f"webhooks installed -> {url}")
@@ -182,6 +204,35 @@ def ensure_scholarship_award_doctype():
     ).insert(ignore_permissions=True)
     frappe.db.commit()
     print("Scholarship Award doctype created")
+
+
+def ensure_invoice_idempotency_field():
+    """`custom_studafy_idempotency_key` on Sales Invoice (QA-022).
+
+    apps/workers stamps every invoice it creates with its idempotency key and, before any POST,
+    looks the key up here, so an invoice created by an attempt that timed out or crashed is adopted
+    rather than created twice. `unique` makes a racing duplicate fail instead of billing twice;
+    `no_copy` keeps the key off amended and duplicated invoices, which would otherwise collide with
+    it. Idempotent.
+    """
+    from frappe.custom.doctype.custom_field.custom_field import create_custom_field
+
+    if frappe.db.exists("Custom Field", {"dt": "Sales Invoice", "fieldname": "custom_studafy_idempotency_key"}):
+        return
+    create_custom_field(
+        "Sales Invoice",
+        {
+            "fieldname": "custom_studafy_idempotency_key",
+            "label": "Studafy Idempotency Key",
+            "fieldtype": "Data",
+            "unique": 1,
+            "no_copy": 1,
+            "read_only": 1,
+            "insert_after": "customer",
+        },
+    )
+    frappe.db.commit()
+    print("Sales Invoice idempotency field created")
 
 
 DEMO_FAMILIES = (
@@ -297,6 +348,7 @@ def main(argv=None):
             company = complete_setup(args.company, args.abbr, args.currency, args.country)
             set_integration_key(api_key, api_secret)
             ensure_scholarship_award_doctype()
+            ensure_invoice_idempotency_field()
             install_webhooks(args.school_id, args.api_url, webhook_secret)
             print(f"STUDAFY_COMPANY={company}")
         elif args.step == "fixtures":

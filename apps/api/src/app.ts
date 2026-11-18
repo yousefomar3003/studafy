@@ -54,7 +54,6 @@ import {
   aiExamRoutes,
   aiExplainRoutes,
   aiFlashcardRoutes,
-  aiGatewayRoutes,
   aiModerationRoutes,
   aiQuizRoutes,
   aiReportRoutes,
@@ -326,6 +325,8 @@ export interface AppOptions {
    * env.REVIEW_LOGIN_PASSWORD. Absent keeps POST /api/auth/login/review registered but answering 404.
    */
   reviewLoginPassword?: string;
+  /** The review accounts that password may open (QA-085); absent: all. From env.REVIEW_LOGIN_ALLOWED_EMAILS. */
+  reviewLoginAllowedEmails?: readonly string[];
   /**
    * Shared password for the staging QA tenants' email/password login (QA-02), threaded from
    * env.QA_LOGIN_PASSWORD, which env.ts refuses in production. Absent keeps POST /api/auth/login/qa
@@ -334,6 +335,13 @@ export interface AppOptions {
   qaLoginPassword?: string;
   /** Skips the rate limiter. Local development only (env.RATE_LIMIT_DISABLED, refused elsewhere). */
   rateLimitDisabled?: boolean;
+  /**
+   * Mount the bare ID-token login, POST /api/auth/login/oauth (QA-025). Off by default and never set
+   * by index.ts: it trades any Studafy-audience ID token for a session, with a client-chosen nonce
+   * and no server-issued state, and no client uses it (web and mobile sign in through the callback
+   * and mobile-exchange flows). Only the tests of the shared returning-user login policy turn it on.
+   */
+  idTokenLoginEnabled?: boolean;
   /**
    * S3-compatible object storage for assignment attachments (ST-103).
    *
@@ -430,8 +438,10 @@ export function createApp({
   aiLlmModelOverrides = {},
   microsoftIdentityVerifier,
   reviewLoginPassword,
+  reviewLoginAllowedEmails,
   qaLoginPassword,
   rateLimitDisabled = false,
+  idTokenLoginEnabled = false,
   storage = null,
   uploadScanEnqueuer,
   scannerWarmup = null,
@@ -914,7 +924,8 @@ export function createApp({
   // Returning-user OAuth login (ST-079). Authenticates an active user via a verified Microsoft
   // OIDC id_token, matches against oauth_identities, enforces tenant suspension policy, and
   // issues session tokens. Public like the OAuth callbacks — the id_token is the credential.
-  if (database && keyStore) {
+  // Test-only since QA-025 (see idTokenLoginEnabled): a deployed API does not mount it.
+  if (database && keyStore && idTokenLoginEnabled) {
     app.route(
       "/",
       returningUserLoginRoutes(
@@ -947,6 +958,7 @@ export function createApp({
           refreshTtlSeconds: jwtRefreshTtlSeconds,
         },
         reviewLoginPassword,
+        reviewLoginAllowedEmails,
       ),
     );
   }
@@ -987,6 +999,7 @@ export function createApp({
         },
         rateLimitDisabled ? null : (redis ?? null),
         eventSink,
+        jtiDenylist,
       ),
     );
     // "Add <child> to this phone" (000217): a parent puts a linked child's own account on the phone.
@@ -1534,19 +1547,10 @@ export function createApp({
         flags,
       }),
     );
-    // LLM gateway (ST-164). Mounted under the same gate so a generation reserves and commits the
-    // caller's AI quota, and only when the gate's dependencies exist — the generate surface must
-    // never run un-metered. The provider may be null (AI_LLM_ENABLED off): the route still
-    // registers and answers 503 AI_LLM_DISABLED at request time.
-    app.route(
-      "/",
-      aiGatewayRoutes({
-        database,
-        provider: aiLlmProvider,
-        flags,
-        modelOverrides: aiLlmModelOverrides,
-      }),
-    );
+    // The raw LLM gateway (ST-164, POST /api/ai/students/{studentId}/generate) is deliberately not
+    // mounted (QA-030): it passed a caller's prompt and system prompt straight to the provider with
+    // no moderation and let the caller choose the model tier. No client used it; every product
+    // feature has its own moderated route. aiGatewayRoutes stays for a future staff-only use.
     // Ask AI streaming (ST-165). Mounted under the same gate so a grounded answer reserves and
     // commits the caller's AI quota, and only when the gate's dependencies exist — the ask surface
     // must never run un-metered. The provider may be null on the same kill-switch terms as the

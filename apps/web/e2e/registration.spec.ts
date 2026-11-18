@@ -37,8 +37,8 @@ const REGISTER_RESPONSE = {
     email: "principal@springfield-academy.edu",
     role: "ORG_ADMIN",
   },
-  invitation: { token: "inv-token", expires_at: "2026-08-20T00:00:00.000Z" },
-  verification: { token: "ver-token", expires_at: "2026-08-14T00:00:00.000Z" },
+  invitation: { expires_at: "2026-08-20T00:00:00.000Z" },
+  verification: { expires_at: "2026-08-14T00:00:00.000Z" },
 };
 
 async function fulfillJson(route: Route, status: number, body: unknown) {

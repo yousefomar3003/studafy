@@ -22,6 +22,8 @@
 
 import { createHash, timingSafeEqual } from "node:crypto";
 
+import { withTenantTx } from "../../../db/tenant-tx";
+
 import { findOAuthIdentity, loginReturningUser } from "./returning-user-login-service";
 
 import type {
@@ -63,16 +65,17 @@ async function isReviewTenantIdentity(db: Database, subject: string): Promise<bo
   const identity = await findOAuthIdentity(db, REVIEW_LOGIN_PROVIDER, subject);
   if (!identity) return false;
 
-  // app.schools is a global table without RLS; the tenant scope is not needed to read the flag.
-  let isReviewTenant = false;
-  await db.begin(async (tx) => {
-    await tx.unsafe("SET LOCAL ROLE studafy_app");
-    const [school] = await tx<{ is_review_tenant: boolean }[]>`
-      SELECT is_review_tenant FROM app.schools WHERE id = ${identity.schoolId}::uuid
-    `;
-    isReviewTenant = school?.is_review_tenant === true;
-  });
-  return isReviewTenant;
+  // Read in the identity's own school scope: app.schools is row-level secured (QA-016), and a
+  // tenant transaction sees exactly its own school's row.
+  const [school] = await withTenantTx(
+    db,
+    { schoolId: identity.schoolId },
+    (tx) =>
+      tx<
+        { is_review_tenant: boolean }[]
+      >`SELECT is_review_tenant FROM app.schools WHERE id = ${identity.schoolId}::uuid`,
+  );
+  return school?.is_review_tenant === true;
 }
 
 export async function loginReviewUser(

@@ -10,6 +10,7 @@ import { jtiDenylistKey, KeyStore } from "../../src/modules/auth";
 import { AUTH_CHANNELS } from "../../src/modules/auth/channels";
 import { createRedisClient } from "../../src/redis";
 import {
+  appDatabaseFor,
   assignRole,
   createFullTenant,
   createRefreshSession,
@@ -90,7 +91,7 @@ beforeAll(async () => {
     isReady: () => true,
     tracker: createInflightTracker(),
     logger,
-    database: sql,
+    database: appDatabaseFor(sql),
     redis,
     keyStore,
     jwtIssuer: TEST_JWT_ISSUER,

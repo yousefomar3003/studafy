@@ -12,9 +12,14 @@ import 'pii_scrubber.dart';
 /// free-text fields this class controls directly ([addBreadcrumb]'s message, [recordError]'s
 /// reason).
 class FirebaseCrashlyticsReporter implements CrashReporter {
-  FirebaseCrashlyticsReporter({this._scrubber = const PiiScrubber()});
+  /// [crashlytics] is for tests; the app uses [FirebaseCrashlytics.instance].
+  FirebaseCrashlyticsReporter({
+    this._scrubber = const PiiScrubber(),
+    FirebaseCrashlytics Function()? crashlytics,
+  }) : _instance = crashlytics ?? (() => FirebaseCrashlytics.instance);
 
   final PiiScrubber _scrubber;
+  final FirebaseCrashlytics Function() _instance;
 
   // Crashlytics is gated on Firebase being initialized, which happens post-first-frame (deferred
   // init, see app_bootstrap.dart). Until then `FirebaseCrashlytics.instance` throws, and the first
@@ -22,7 +27,7 @@ class FirebaseCrashlyticsReporter implements CrashReporter {
   // a no-op until [initialize] has set this.
   bool _initialized = false;
 
-  FirebaseCrashlytics get _crashlytics => FirebaseCrashlytics.instance;
+  FirebaseCrashlytics get _crashlytics => _instance();
 
   @override
   Future<void> initialize() async {
@@ -50,17 +55,31 @@ class FirebaseCrashlyticsReporter implements CrashReporter {
     String? reason,
   }) {
     if (!_initialized) return Future.value();
+    // Crashlytics sends `error.toString()` as the exception message, so the scrubbed text is
+    // passed in its place (QA-088): a Dio error's message carries the failing URL.
     return _crashlytics.recordError(
-      error,
+      _scrubber.scrubText(error.toString()),
       stackTrace,
       reason: reason == null ? null : _scrubber.scrubText(reason),
       fatal: fatal,
     );
   }
 
+  /// What `FirebaseCrashlytics.recordFlutterFatalError` sends, scrubbed: the exception text, the
+  /// context and the framework's extra information. The error was already printed by
+  /// `FlutterError.onError` (app_bootstrap.dart), so it isn't printed again.
   @override
   Future<void> recordFlutterError(FlutterErrorDetails details) {
     if (!_initialized) return Future.value();
-    return _crashlytics.recordFlutterFatalError(details);
+    final context = details.context?.toStringDeep(minLevel: DiagnosticLevel.info).trim();
+    final information = details.informationCollector?.call() ?? const <DiagnosticsNode>[];
+    return _crashlytics.recordError(
+      _scrubber.scrubText(details.exceptionAsString()),
+      details.stack,
+      reason: context == null ? null : _scrubber.scrubText(context),
+      information: [for (final node in information) _scrubber.scrubText(node.toString())],
+      printDetails: false,
+      fatal: true,
+    );
   }
 }

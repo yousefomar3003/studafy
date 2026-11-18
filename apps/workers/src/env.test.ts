@@ -9,6 +9,16 @@ const RECORD_KEYS = {
   RECORDS_ENCRYPTION_CURRENT_KEY_ID: "prod-1",
 };
 
+// QA-066: what a deployed worker needs to reach Postgres and Redis encrypted. The CA is the one
+// workers.toml mounts and points NODE_EXTRA_CA_CERTS at.
+const PRODUCTION_TRANSPORT = {
+  DATABASE_HOST: "aws-1-eu-central-1.pooler.supabase.com",
+  DATABASE_USER: "postgres.ref",
+  DATABASE_SSL_MODE: "verify-full",
+  NODE_EXTRA_CA_CERTS: "/etc/studafy/supabase-ca.pem",
+  REDIS_URL: "rediss://default:pw@redis.example.com:6380",
+};
+
 describe("loadEnv", () => {
   test("applies defaults for an empty environment", () => {
     expect(loadEnv({})).toEqual({
@@ -16,6 +26,7 @@ describe("loadEnv", () => {
       SERVICE_NAME: "workers",
       RELEASE_VERSION: "unknown",
       METRICS_PORT: 9464,
+      WORKERS_HEALTH_PORT: 8081,
       REDIS_URL: "redis://localhost:6379",
       SHUTDOWN_TIMEOUT_MS: 10_000,
       DATABASE_URL: "postgres://localhost:5432/studafy",
@@ -26,7 +37,7 @@ describe("loadEnv", () => {
       PUSH_DRY_RUN: false,
       CLAMAV_PORT: 3310,
       CLAMAV_TIMEOUT_MS: 30_000,
-      CLAMAV_MAX_FILE_BYTES: 25 * 1024 * 1024,
+      CLAMAV_MAX_FILE_BYTES: 100 * 1024 * 1024,
       FRONTEND_URL: "http://localhost:5180",
       EMAIL_MAX_RATE_PER_SECOND: 2,
       EMAIL_POLL_INTERVAL_MS: 1_000,
@@ -51,6 +62,7 @@ describe("loadEnv", () => {
       SERVICE_NAME: "workers",
       RELEASE_VERSION: "unknown",
       METRICS_PORT: 9464,
+      WORKERS_HEALTH_PORT: 8081,
       REDIS_URL: "redis://redis.internal:6380",
       SHUTDOWN_TIMEOUT_MS: 30_000,
       DATABASE_URL: "postgres://localhost:5432/studafy",
@@ -61,7 +73,7 @@ describe("loadEnv", () => {
       PUSH_DRY_RUN: false,
       CLAMAV_PORT: 3310,
       CLAMAV_TIMEOUT_MS: 30_000,
-      CLAMAV_MAX_FILE_BYTES: 25 * 1024 * 1024,
+      CLAMAV_MAX_FILE_BYTES: 100 * 1024 * 1024,
       FRONTEND_URL: "http://localhost:5180",
       EMAIL_MAX_RATE_PER_SECOND: 2,
       EMAIL_POLL_INTERVAL_MS: 1_000,
@@ -99,6 +111,8 @@ describe("loadEnv", () => {
     expect(
       loadEnv({
         NODE_ENV: "production",
+        ...PRODUCTION_TRANSPORT,
+        ...PRODUCTION_TRANSPORT,
         READ_DATABASE_HOST: "pgbouncer.internal",
         READ_DATABASE_NAME: "workers_read",
         STRIPE_SECRET_KEY: "sk_test_prod",
@@ -119,6 +133,7 @@ describe("loadEnv", () => {
   test("boots in production without Stripe, as a Tap-only deployment does", () => {
     const env = loadEnv({
       NODE_ENV: "production",
+      ...PRODUCTION_TRANSPORT,
       READ_DATABASE_HOST: "pgbouncer.internal",
       READ_DATABASE_NAME: "workers_read",
       CLAMAV_HOST: "clamd.internal",
@@ -152,6 +167,7 @@ describe("loadEnv", () => {
   describe("email in production", () => {
     const deployed = {
       NODE_ENV: "production",
+      ...PRODUCTION_TRANSPORT,
       READ_DATABASE_HOST: "pgbouncer.internal",
       READ_DATABASE_NAME: "workers_read",
       CLAMAV_HOST: "clamd.internal",
@@ -179,6 +195,7 @@ describe("loadEnv", () => {
   describe("push in production", () => {
     const deployed = {
       NODE_ENV: "production",
+      ...PRODUCTION_TRANSPORT,
       READ_DATABASE_HOST: "pgbouncer.internal",
       READ_DATABASE_NAME: "workers_read",
       CLAMAV_HOST: "clamd.internal",
@@ -201,6 +218,7 @@ describe("loadEnv", () => {
   test("requires a real records keyring in production", () => {
     const production = {
       NODE_ENV: "production",
+      ...PRODUCTION_TRANSPORT,
       EMAIL_DRY_RUN: "true",
       PUSH_DRY_RUN: "true",
       CLAMAV_HOST: "clamd.internal",
@@ -248,5 +266,77 @@ describe("database URL", () => {
     expect(databaseUrlFrom(loadEnv(discrete))).toBe(
       "postgresql://postgres.ref:p%40ss@pooler.example.com:6543/postgres",
     );
+  });
+});
+
+describe("transport security in production (QA-066)", () => {
+  const deployed = {
+    NODE_ENV: "production",
+    ...PRODUCTION_TRANSPORT,
+    READ_DATABASE_HOST: "aws-1-eu-central-1.pooler.supabase.com",
+    READ_DATABASE_NAME: "postgres",
+    CLAMAV_HOST: "studafy-core-scanner.flycast",
+    ...RECORD_KEYS,
+    EMAIL_DRY_RUN: "true",
+    PUSH_DRY_RUN: "true",
+  };
+
+  test("boots with verified TLS to Postgres and TLS to Redis", () => {
+    const env = loadEnv(deployed);
+    expect(databaseUrlFrom(env)).toEndWith("?sslmode=verify-full");
+    expect(readDatabaseUrlFrom(env)).toEndWith("?sslmode=verify-full");
+  });
+
+  test("refuses a database connection without verify-full", () => {
+    expect(() => loadEnv({ ...deployed, DATABASE_SSL_MODE: undefined })).toThrow(
+      /DATABASE_SSL_MODE must be verify-full in production/,
+    );
+    // Without the discrete settings the URL is the local-development default, which has no TLS.
+    expect(() =>
+      loadEnv({ ...deployed, DATABASE_HOST: undefined, DATABASE_USER: undefined }),
+    ).toThrow(/DATABASE_SSL_MODE must be verify-full in production/);
+  });
+
+  test("refuses verify-full with no CA to verify against", () => {
+    expect(() => loadEnv({ ...deployed, NODE_EXTRA_CA_CERTS: undefined })).toThrow(
+      /DATABASE_CA_CERT or NODE_EXTRA_CA_CERTS is required in production/,
+    );
+    expect(() => loadEnv({ ...deployed, NODE_EXTRA_CA_CERTS: "" })).toThrow(
+      /DATABASE_CA_CERT or NODE_EXTRA_CA_CERTS is required in production/,
+    );
+    expect(
+      loadEnv({
+        ...deployed,
+        NODE_EXTRA_CA_CERTS: undefined,
+        DATABASE_CA_CERT: "-----BEGIN CERTIFICATE-----",
+      }).DATABASE_CA_CERT,
+    ).toBe("-----BEGIN CERTIFICATE-----");
+  });
+
+  test("refuses a plaintext Redis URL, including the default", () => {
+    for (const REDIS_URL of [
+      undefined,
+      "redis://redis.example.com:6379",
+      "redis://10.0.0.5:6379",
+      "redis://evil.internal.example.com:6379",
+      "not a url",
+    ]) {
+      expect(() => loadEnv({ ...deployed, REDIS_URL })).toThrow(/REDIS_URL must use rediss:\/\//);
+    }
+  });
+
+  test("accepts plaintext Redis only on Fly's private network", () => {
+    for (const REDIS_URL of [
+      "redis://studafy-redis.internal:6379",
+      "redis://studafy-redis.flycast:6379",
+      "rediss://redis.example.com:6380/1",
+    ]) {
+      expect(loadEnv({ ...deployed, REDIS_URL }).REDIS_URL).toBe(REDIS_URL);
+    }
+  });
+
+  test("leaves development and tests alone", () => {
+    expect(loadEnv({}).REDIS_URL).toBe("redis://localhost:6379");
+    expect(databaseUrlFrom(loadEnv({}))).toBe("postgres://localhost:5432/studafy");
   });
 });

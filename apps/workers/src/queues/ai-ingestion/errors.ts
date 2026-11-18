@@ -44,3 +44,14 @@ export class EncryptedDocumentError extends MaterialParseError {
     super(reason, message);
   }
 }
+
+/**
+ * The document exceeds an ingestion limit (pages, OCR pages, rendered pixels, uncompressed zip size
+ * or entries, image dimensions, parse time). QA-043: refused before the expensive work, so a
+ * hostile or simply enormous file fails its material instead of exhausting the worker.
+ */
+export class DocumentTooLargeError extends MaterialParseError {
+  constructor(reason: string, message?: string) {
+    super(reason, message);
+  }
+}

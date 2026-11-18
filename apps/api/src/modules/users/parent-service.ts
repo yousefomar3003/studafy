@@ -94,7 +94,7 @@ export async function listParents(
   const cursorFilter = params.cursor
     ? (() => {
         const { created_at, id } = decodeKeysetCursor(params.cursor);
-        return tx` AND (u.created_at, u.id) < (${created_at}::timestamptz, ${id}::uuid)`;
+        return tx` AND (u.created_at, u.id) < (COALESCE((SELECT k.created_at FROM app.users k WHERE k.id = ${id}::uuid), ${created_at}::timestamptz), ${id}::uuid)`;
       })()
     : tx``;
 

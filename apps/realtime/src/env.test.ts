@@ -26,8 +26,8 @@ describe("loadEnv", () => {
         NODE_ENV: "production",
         PORT: "8080",
         HOST: "127.0.0.1",
-        REDIS_URL: "redis://cache:6379/0",
-        AUTH_REDIS_URL: "redis://cache:6379/1",
+        REDIS_URL: "rediss://cache.example.com:6380/0",
+        AUTH_REDIS_URL: "rediss://cache.example.com:6380/1",
         WS_JWT_SECRET: PRODUCTION_SECRET,
         WS_ALLOWED_ORIGINS: "https://app.studafy.com, https://staging.studafy.com",
       }),
@@ -38,8 +38,8 @@ describe("loadEnv", () => {
       SERVICE_NAME: "realtime",
       RELEASE_VERSION: "unknown",
       METRICS_PORT: 9464,
-      REDIS_URL: "redis://cache:6379/0",
-      AUTH_REDIS_URL: "redis://cache:6379/1",
+      REDIS_URL: "rediss://cache.example.com:6380/0",
+      AUTH_REDIS_URL: "rediss://cache.example.com:6380/1",
       WS_JWT_SECRET: PRODUCTION_SECRET,
       WS_ALLOWED_ORIGINS: ["https://app.studafy.com", "https://staging.studafy.com"],
     });
@@ -62,7 +62,8 @@ describe("loadEnv", () => {
   test("refuses to boot in production with the default WS_JWT_SECRET", () => {
     const production = {
       NODE_ENV: "production",
-      AUTH_REDIS_URL: "redis://cache:6379/1",
+      REDIS_URL: "rediss://cache.example.com:6380/0",
+      AUTH_REDIS_URL: "rediss://cache.example.com:6380/1",
       WS_ALLOWED_ORIGINS: "https://app.studafy.com",
     };
     expect(() => loadEnv(production)).toThrow(/WS_JWT_SECRET must not be the development default/);
@@ -85,6 +86,50 @@ describe("loadEnv", () => {
         WS_ALLOWED_ORIGINS: "https://app.studafy.com",
       }),
     ).toThrow(/AUTH_REDIS_URL is required/);
+  });
+
+  // QA-066: both Redis connections carry session-revocation data and fan-out payloads, so production
+  // refuses plaintext unless the host is on Fly's private network (`*.internal`, `*.flycast`).
+  describe("Redis transport in production (QA-066)", () => {
+    const production = {
+      NODE_ENV: "production",
+      WS_JWT_SECRET: PRODUCTION_SECRET,
+      WS_ALLOWED_ORIGINS: "https://app.studafy.com",
+      REDIS_URL: "rediss://cache.example.com:6380/0",
+      AUTH_REDIS_URL: "rediss://cache.example.com:6380/1",
+    };
+
+    test("boots with TLS on both connections", () => {
+      expect(loadEnv(production).AUTH_REDIS_URL).toBe("rediss://cache.example.com:6380/1");
+    });
+
+    test("refuses a plaintext REDIS_URL, including the localhost default", () => {
+      for (const REDIS_URL of [undefined, "redis://cache.example.com:6379/0", "not a url"]) {
+        expect(() => loadEnv({ ...production, REDIS_URL })).toThrow(
+          /REDIS_URL must use rediss:\/\//,
+        );
+      }
+    });
+
+    test("refuses a plaintext AUTH_REDIS_URL", () => {
+      expect(() =>
+        loadEnv({ ...production, AUTH_REDIS_URL: "redis://cache.example.com:6379/1" }),
+      ).toThrow(/AUTH_REDIS_URL must use rediss:\/\//);
+    });
+
+    test("accepts plaintext only on Fly's private network", () => {
+      const env = loadEnv({
+        ...production,
+        REDIS_URL: "redis://studafy-redis.flycast:6379/0",
+        AUTH_REDIS_URL: "redis://studafy-redis.internal:6379/1",
+      });
+      expect(env.REDIS_URL).toBe("redis://studafy-redis.flycast:6379/0");
+      expect(env.AUTH_REDIS_URL).toBe("redis://studafy-redis.internal:6379/1");
+    });
+
+    test("leaves development alone", () => {
+      expect(loadEnv({}).REDIS_URL).toBe("redis://localhost:6379");
+    });
   });
 
   test("requires WS_ALLOWED_ORIGINS in production", () => {

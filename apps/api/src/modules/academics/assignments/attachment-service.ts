@@ -7,7 +7,7 @@ import {
   assertSchoolOwnedKey,
   buildPermanentKey,
   buildTempKey,
-  readStagedSize,
+  readStagedSizeAndEtag,
 } from "../../../lib/storage";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
 import {
@@ -161,7 +161,7 @@ export async function confirmAttachment(
   const copy: StagedCopy = {
     tempKey: params.storage_key,
     permanentKey: buildPermanentKey(schoolId, staged.objectId, staged.filename),
-    sizeBytes: await readStagedSize(storage, params.storage_key),
+    ...(await readStagedSizeAndEtag(storage, params.storage_key)),
   };
   const mimeType = params.content_type ?? (await stagedContentType(storage, params.storage_key));
 

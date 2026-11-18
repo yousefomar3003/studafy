@@ -1,6 +1,8 @@
 # ClamAV for the workers' file-scan queue, on fly.io (production). It is its own app, so it binds
 # every interface and is reachable only through its
-# Flycast (private) address — it has no public IP. It runs only while there are scans ([[services]]
+# Flycast (private) address — it has no public IP. clamd has no authentication: anything on the same
+# fly organisation's private network can reach it, which is why Studafy needs an organisation of its
+# own (QA-072, docs/runbooks/fly-org-migration.md). It runs only while there are scans ([[services]]
 # below). Deploy from the repo root:
 #   fly deploy . --config infra/fly/scanner.toml --remote-only
 app = "studafy-core-scanner"

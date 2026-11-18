@@ -8,6 +8,7 @@ import { createLogger } from "../../src/logger";
 import { hashInvitationToken, KeyStore } from "../../src/modules/auth";
 import { createUnusableRedis } from "../../src/redis-unusable";
 import {
+  appDatabaseFor,
   createSchool,
   createTestDatabase,
   integrationEnabled,
@@ -126,7 +127,7 @@ beforeAll(async () => {
     isReady: () => true,
     tracker: createInflightTracker(),
     logger,
-    database: sql,
+    database: appDatabaseFor(sql),
     keyStore,
     securityEventSink,
     jwtIssuer: TEST_JWT_ISSUER,
@@ -351,7 +352,7 @@ describe("invitation verification rate limit", () => {
       isReady: () => true,
       tracker: createInflightTracker(),
       logger: createLogger({ destination: () => undefined }),
-      database: sql,
+      database: appDatabaseFor(sql),
       keyStore,
       redis: createMemoryRateLimitRedis(),
       jwtIssuer: TEST_JWT_ISSUER,

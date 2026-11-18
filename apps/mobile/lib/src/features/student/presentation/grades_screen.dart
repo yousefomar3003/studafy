@@ -18,6 +18,7 @@ import 'widgets/recent_grades_widgets.dart';
 import 'widgets/released_marks_widgets.dart';
 import 'widgets/subject_grades_card.dart';
 import 'widgets/term_grade_summary_card.dart';
+import '../../../design/widgets/protected_screen.dart';
 
 export '../domain/work_and_grades.dart' show GradesTab;
 
@@ -181,7 +182,7 @@ class _GradesViewState extends ConsumerState<GradesView> with SingleTickerProvid
       ],
     );
 
-    return Column(
+    final screen = Column(
       children: [
         tabBar,
         Expanded(
@@ -231,6 +232,8 @@ class _GradesViewState extends ConsumerState<GradesView> with SingleTickerProvid
         ),
       ],
     );
+    // Grades and transcripts: no screenshots, hidden in the app switcher (QA-084).
+    return ProtectedScreen(child: screen);
   }
 
   void _scrollToHighlightOnce() {

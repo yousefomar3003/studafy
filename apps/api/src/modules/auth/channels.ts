@@ -29,3 +29,16 @@ export const AUTH_CHANNELS = {
 } as const;
 
 export type AuthChannel = (typeof AUTH_CHANNELS)[keyof typeof AUTH_CHANNELS];
+
+/**
+ * The channel a sign-in establishes (QA-085). The body names it, but a request a browser made always
+ * carries `Origin`, and a browser session must get its refresh token as an HttpOnly cookie: a page
+ * script that could claim `mobile` would otherwise read the token out of the JSON body. Native apps
+ * and servers send no Origin, so their claim stands.
+ */
+export function establishedChannel<T extends AuthChannel | undefined>(
+  origin: string | undefined,
+  claimed: T,
+): T | typeof AUTH_CHANNELS.WEB {
+  return origin ? AUTH_CHANNELS.WEB : claimed;
+}

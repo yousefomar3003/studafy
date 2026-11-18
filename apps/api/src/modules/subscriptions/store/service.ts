@@ -55,6 +55,19 @@ export interface StoreBilling {
   google: GooglePlayStore | null;
   /** Shared secret in the Pub/Sub push endpoint's URL (`?token=`), authenticating Google's pushes. */
   googleNotificationToken: string | null;
+  /**
+   * Who may register a sandbox (Apple) or test (Google Play) purchase (QA-058). `null` means anyone,
+   * which is right off production. In production it is always a set, possibly empty: the App Review
+   * demo accounts, because App Review buys with a sandbox account against the production server.
+   * Anyone else's sandbox purchase is refused, so a TestFlight user or Play license tester does not
+   * get the add-on for free.
+   */
+  sandboxAllowedUserIds?: ReadonlySet<string> | null;
+}
+
+/** Apple reports `Production`, Google Play `production`; anything else is a sandbox or test buy. */
+function isProductionPurchase(subscription: StoreSubscription): boolean {
+  return subscription.environment.toLowerCase() === "production";
 }
 
 export interface StorePurchaseResult {
@@ -259,6 +272,18 @@ export async function registerStorePurchase(
   const { locale } = params;
   const subscription = await verify(store, params.platform, params.verificationData, locale);
   if (!storeProductIds(store).includes(subscription.productId)) {
+    throw storeError(400, ERROR_CODES.STORE_PURCHASE_INVALID, locale);
+  }
+  const sandboxAllowed = store.sandboxAllowedUserIds ?? null;
+  if (
+    sandboxAllowed !== null &&
+    !isProductionPurchase(subscription) &&
+    !sandboxAllowed.has(params.userId)
+  ) {
+    logger.warn(
+      { environment: subscription.environment, platform: subscription.platform },
+      "store purchase refused: sandbox purchase from an account not on the review allowlist",
+    );
     throw storeError(400, ERROR_CODES.STORE_PURCHASE_INVALID, locale);
   }
   // Credited to the student the app stamped on the purchase when it was bought, and nobody else.

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { expect, test } from "@playwright/test";
 
+import { emailedToken } from "./support/emailed-token";
 import { API_BASE_URL } from "./support/ports";
 import { stubTurnstile } from "./support/turnstile";
 
@@ -14,10 +15,10 @@ import { stubTurnstile } from "./support/turnstile";
  * flips the school from `registered` to `active`, and fires real ERPNext tenant provisioning
  * against the sandbox. See playwright.critical.config.ts for why Turnstile alone is still stubbed.
  *
- * The verification token is never rendered on screen (RegistrationResult.tsx: it only ever goes out
- * by email in a real deployment, by design) — this test reads it off the real network response the
- * registration form's own submission produces, the same way an E2E run with no email inbox to check
- * has to.
+ * The verification token is never rendered on screen and never returned by the registration API
+ * (QA-007: it only ever goes out by email) — this test reads it from the disposable database's
+ * `school.verificationEmailSent` outbox row, the same row the email dispatcher sends from, since an
+ * E2E run has no inbox to check.
  */
 test.describe("registration → verification", () => {
   test("a school self-registers, verifies its email, and becomes active", async ({
@@ -53,9 +54,10 @@ test.describe("registration → verification", () => {
 
     const body = (await response.json()) as {
       school: { id: string; status: string };
-      verification: { token: string };
+      verification: Record<string, unknown>;
     };
     expect(body.school.status).toBe("registered");
+    expect(body.verification).not.toHaveProperty("token");
 
     await expect(
       page.getByRole("heading", { name: new RegExp(`${schoolName} is registered`, "i") }),
@@ -63,8 +65,9 @@ test.describe("registration → verification", () => {
     await expect(page.getByText(schoolEmail)).toBeVisible();
     await expect(page.getByText(adminEmail)).toBeVisible();
 
-    // The verification step: a real GET against the token the registration response carried.
-    const verifyUrl = `${API_BASE_URL}/api/schools/verify-email/${encodeURIComponent(body.verification.token)}`;
+    // The verification step: a real GET against the token the verification email carries.
+    const verificationToken = emailedToken("school.verificationEmailSent", schoolEmail);
+    const verifyUrl = `${API_BASE_URL}/api/schools/verify-email/${encodeURIComponent(verificationToken)}`;
     const verifyRes = await request.get(verifyUrl);
     expect(verifyRes.ok()).toBe(true);
     const verifyBody = (await verifyRes.json()) as {

@@ -11,6 +11,7 @@ import {
 import {
   ERROR_CODES,
   isAllowedLicensePaymentLink,
+  isServableUploadScanStatus,
   LICENSE_NONPAYMENT_GRACE_DAYS,
   licenseAiStopDate,
 } from "@studafy/constants";
@@ -1715,11 +1716,13 @@ export async function paymentReceiptKey(
   tx: TransactionSql,
   paymentId: string,
 ): Promise<string | null | undefined> {
-  const [row] = await tx<{ key: string | null }[]>`
-    SELECT receipt_storage_key AS key FROM app.license_payments
+  const [row] = await tx<{ key: string | null; scan: string }[]>`
+    SELECT receipt_storage_key AS key, receipt_scan_status::text AS scan FROM app.license_payments
     WHERE school_id = current_setting('app.school_id')::uuid AND id = ${paymentId}::uuid
   `;
-  return row ? row.key : undefined;
+  if (!row) return undefined;
+  // A receipt still being scanned, or quarantined, is not served (QA-055).
+  return isServableUploadScanStatus(row.scan) ? row.key : null;
 }
 
 /** Tie a pending receipt to the payment it evidences (same invoice, not voided). */

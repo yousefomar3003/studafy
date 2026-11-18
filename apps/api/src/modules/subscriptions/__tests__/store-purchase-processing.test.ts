@@ -1127,3 +1127,47 @@ describe("the withdrawal waiver", () => {
     },
   );
 });
+
+// QA-058: production credited sandbox (Apple) and test (Google Play) purchases like real ones, so
+// any TestFlight user or Play license tester got the AI add-on free on the production API. With an
+// allowlist configured (production always has one, possibly empty), only those accounts -- the
+// App Review demo accounts -- may register a sandbox purchase.
+describe("sandbox purchases in production (QA-058)", () => {
+  integrationTest(
+    "a sandbox purchase from an account not on the allowlist is refused",
+    async () => {
+      const f = await createBillingFixture(database!);
+      const { store } = fakeStores({ transaction: subscriptionFor(f, { environment: "Sandbox" }) });
+      store.sandboxAllowedUserIds = new Set();
+      expect(await rejectionCode(register(f, store))).toBe(ERROR_CODES.STORE_PURCHASE_INVALID);
+      expect(await readAiSubscriptionStatuses(f)).toEqual([]);
+    },
+  );
+
+  integrationTest("a Google Play test purchase is refused the same way", async () => {
+    const f = await createBillingFixture(database!);
+    const { store } = fakeStores({
+      google: subscriptionFor(f, { platform: "google", environment: "test" }),
+    });
+    store.sandboxAllowedUserIds = new Set();
+    expect(await rejectionCode(register(f, store, "google"))).toBe(
+      ERROR_CODES.STORE_PURCHASE_INVALID,
+    );
+  });
+
+  integrationTest("an allowlisted review account may register a sandbox purchase", async () => {
+    const f = await createBillingFixture(database!);
+    const { store } = fakeStores({ transaction: subscriptionFor(f, { environment: "Sandbox" }) });
+    store.sandboxAllowedUserIds = new Set([f.studentUserId]);
+    expect((await register(f, store)).active).toBe(true);
+  });
+
+  integrationTest("a production purchase needs no allowlist", async () => {
+    const f = await createBillingFixture(database!);
+    const { store } = fakeStores({
+      transaction: subscriptionFor(f, { environment: "Production" }),
+    });
+    store.sandboxAllowedUserIds = new Set();
+    expect((await register(f, store)).active).toBe(true);
+  });
+});

@@ -241,7 +241,15 @@ describeDb("attendance taking", () => {
 
   test("the class teacher takes a past day's register and corrects it; another teacher cannot", async () => {
     const world = await buildWorld();
-    const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+    // Yesterday on the school's own calendar, from the database. The correction window opens at
+    // local midnight of the session date (school timezone, default Africa/Casablanca) and lasts 48
+    // hours. A UTC "yesterday" is two local days back late each UTC evening, which closed the window
+    // and failed this test for an hour every night (seen at 23:05 UTC during QA-014). Asked of
+    // Postgres, not Intl: the two disagreed on Casablanca's offset (DB UTC+1, Bun ICU UTC+0), and
+    // the window itself is computed in SQL.
+    const [{ yesterday }] = await database!.sql<{ yesterday: string }[]>`
+      SELECT ((CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Casablanca')::date - 1)::text AS yesterday
+    `;
 
     const opened = await request(world.teacher, "POST", "/api/attendance/sessions", {
       class_id: world.classId,

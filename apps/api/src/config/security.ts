@@ -29,7 +29,14 @@ export interface SecurityConfig {
 
 const CSRF_COOKIE_NAME = "XSRF-TOKEN";
 const CSRF_HEADER_NAME = "X-XSRF-TOKEN";
-const SESSION_COOKIE_NAME = "session";
+/**
+ * The refresh cookie (QA-070). `__Host-` makes the browser refuse the cookie unless it is Secure,
+ * has Path=/ and no Domain, so a sibling `*.studafy.com` origin cannot set one over it (login CSRF).
+ * Local development and tests have no TLS to make it Secure, so they keep the plain name.
+ */
+export const HOST_SESSION_COOKIE_NAME = "__Host-session";
+/** The name before QA-070, still read until every issued cookie has expired (30 days). */
+export const LEGACY_SESSION_COOKIE_NAME = "session";
 const CSRF_TOKEN_SIZE = 32; // 256 bits
 const CSRF_COOKIE_MAX_AGE = 86400; // 24 hours
 const HSTS_MAX_AGE = 63072000; // 2 years
@@ -68,7 +75,7 @@ export function getSecurityConfig(): SecurityConfig {
     allowedOrigins,
     csrfCookieName: CSRF_COOKIE_NAME,
     csrfHeaderName: CSRF_HEADER_NAME,
-    sessionCookieName: SESSION_COOKIE_NAME,
+    sessionCookieName: sessionCookieNameFor(environment),
     csrfTokenSize: CSRF_TOKEN_SIZE,
     csrfCookieMaxAge: CSRF_COOKIE_MAX_AGE,
     hstsMaxAge: HSTS_MAX_AGE,
@@ -77,6 +84,13 @@ export function getSecurityConfig(): SecurityConfig {
   };
 
   return cachedConfig;
+}
+
+/** The refresh cookie's name: `__Host-` wherever the cookie is Secure, plain where there is no TLS. */
+export function sessionCookieNameFor(environment: SecurityConfig["environment"]): string {
+  return environment === "development" || environment === "test"
+    ? LEGACY_SESSION_COOKIE_NAME
+    : HOST_SESSION_COOKIE_NAME;
 }
 
 export function resetSecurityConfig(): void {

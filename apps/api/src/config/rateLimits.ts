@@ -63,8 +63,9 @@ export const IP_SCOPED_ROUTE_CLASSES: ReadonlySet<RouteClass> = new Set([
  *   bounded by the per-member-ID and platform-wide budgets below and by the account lockout, so the
  *   per-IP budget only has to stop one address dominating the platform-wide one. 30 burst,
  *   30/min sustained.
- * - `auth`: Authenticated admin-mutating endpoints (invitations). 10 tokens burst,
- *   ~10 req/min sustained.
+ * - `auth`: Sensitive account endpoints (sessions, devices, invitations). 10 tokens burst,
+ *   ~10 req/min sustained. Keyed by school and user when the caller is signed in (QA-028), so a
+ *   campus behind one NAT address is not one bucket; by IP otherwise.
  * - `ai`: Metered tenant+user scoped (existing).
  * - `messaging`: Sending a parent<->teacher message, tenant+user scoped. Not path-resolved: the
  *   send route mounts it explicitly for POST only (modules/messaging/routes.ts), so polling the
@@ -89,15 +90,27 @@ export const RATE_LIMIT_BUDGETS: Record<RouteClass, RateLimitBudget> = {
  * - `username`: one member ID, whoever asks. 10 burst, ~10 per 15 minutes sustained — above the
  *   five-wrong-password lockout, so it never blocks someone the lockout would let through, and it
  *   also covers IDs that do not exist, which have no lockout.
- * - `global`: every member sign-in on the platform. A circuit breaker for a distributed spray across
- *   many IDs, sized well above a whole school signing in at once (600 burst, 10/s sustained). An
- *   attacker who drains it blocks member sign-in for everyone until it refills; that is the
- *   intended trade against letting the spray continue, and it raises the auth anomaly alert.
+ * - `school`: every member sign-in for one school, read from the school number inside the member
+ *   ID (QA-028). It bounds a spray across one school's sequential IDs, sized above a whole school
+ *   signing in at once (300 burst, 5/s sustained). It replaced one platform-wide bucket, which
+ *   ~20 addresses could drain to lock every school out of member sign-in. Draining this one locks
+ *   out only the school being sprayed, and the block is reported as an auth anomaly.
  */
 export const MEMBER_LOGIN_BUDGETS = {
   username: { maxTokens: 10, refillRate: 10 / 900, windowSeconds: 900 },
-  global: { maxTokens: 600, refillRate: 10, windowSeconds: 60 },
+  school: { maxTokens: 300, refillRate: 5, windowSeconds: 60 },
 } as const satisfies Record<string, RateLimitBudget>;
+
+/**
+ * The school number inside a member ID (`<KIND>-<school number><5-digit sequence>`, 000140), or
+ * null when the input is not shaped like one. Only ever used to pick a bucket, so an ID whose
+ * sequence outgrew five digits merely shares a neighbour's bucket.
+ */
+export function memberLoginSchoolNumber(username: string): string | null {
+  const match = /^[A-Z]+-(\d{6,12})$/u.exec(username.trim().toUpperCase());
+  if (!match) return null;
+  return String(Number(match[1]!.slice(0, -5)));
+}
 
 /**
  * "Add <child> to this phone" (000217): per parent. A family adds each child once per phone, so ten
@@ -116,16 +129,19 @@ export function buildGuardianDeviceSigninRateLimitKey(guardianUserId: string): s
   return `rl:guardian-device:user:${guardianUserId}:${window}`;
 }
 
-/** Redis key for a member sign-in bucket: per normalized member ID, or the one global bucket. */
+/**
+ * Redis key for a member sign-in bucket: per normalized member ID, or per school. Input that is not
+ * a member ID shares one `unknown` school bucket.
+ */
 export function buildMemberLoginRateLimitKey(
   scope: keyof typeof MEMBER_LOGIN_BUDGETS,
-  username?: string,
+  username: string,
 ): string {
   // eslint-disable-next-line security/detect-object-injection -- `scope` is a closed union
   const window = Math.floor(Date.now() / 1000 / MEMBER_LOGIN_BUDGETS[scope].windowSeconds);
   return scope === "username"
-    ? `rl:member-login:user:${(username ?? "").trim().toUpperCase()}:${window}`
-    : `rl:member-login:global:${window}`;
+    ? `rl:member-login:user:${username.trim().toUpperCase()}:${window}`
+    : `rl:member-login:school:${memberLoginSchoolNumber(username) ?? "unknown"}:${window}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -179,6 +195,11 @@ export const ROUTE_CLASS_MAP: Record<string, RouteClass> = {
   "/api/account/deletion-requests/confirm": "auth-strict",
   "/api/auth/oauth/google/start": "auth-strict",
   "/api/auth/oauth/google/callback": "auth-strict",
+  // Every other sign-in step (QA-028): Microsoft and mock start/callback, and the mobile
+  // start/authorize/exchange handoff. A class signing in together shares one address, so the
+  // per-IP sign-in class rather than auth-strict; the exact entries above and below still win.
+  "/api/auth/oauth/*": "auth-login",
+  "/api/auth/login/*": "auth-login",
   // "/api/auth/login": "auth",
   // "/api/auth/register": "auth",
   // "/api/auth/forgot-password": "auth",

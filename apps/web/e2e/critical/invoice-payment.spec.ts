@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 
 import { apiActivateAndLoginAs, apiLoginAs, bearer, loginInBrowser } from "./support/auth";
+import { emailedToken } from "./support/emailed-token";
 import { API_BASE_URL } from "./support/ports";
 
 const PROVISIONING_TIMEOUT_MS = 60_000;
@@ -30,11 +31,12 @@ test.describe("invoice → payment", () => {
     request,
   }) => {
     const unique = randomUUID().slice(0, 8);
+    const schoolEmail = `hello+${unique}@e2e-billing.test`;
     const registerRes = await request.post(`${API_BASE_URL}/api/schools/register`, {
       data: {
         school_name: `E2E Billing Academy ${unique}`,
         slug: `e2e-billing-academy-${unique}`,
-        email: `hello+${unique}@e2e-billing.test`,
+        email: schoolEmail,
         admin_email: `admin+${unique}@e2e-billing.test`,
         // Same US country/currency the registration journey uses — both real, migration-000005 seed.
         country_id: await lookupId(request, "countries", "alpha2_code", "US"),
@@ -49,18 +51,19 @@ test.describe("invoice → payment", () => {
     const registered = (await registerRes.json()) as {
       school: { id: string };
       admin: { email: string };
-      invitation: { token: string };
-      verification: { token: string };
     };
+    // The registration API never returns its tokens (QA-007); read what the two emails carry.
+    const verificationToken = emailedToken("school.verificationEmailSent", schoolEmail);
+    const invitationToken = emailedToken("invitation.sent", registered.admin.email);
 
     const verifyRes = await request.get(
-      `${API_BASE_URL}/api/schools/verify-email/${registered.verification.token}`,
+      `${API_BASE_URL}/api/schools/verify-email/${verificationToken}`,
     );
     expect(verifyRes.ok()).toBe(true);
 
     const adminToken = await apiActivateAndLoginAs(
       request,
-      registered.invitation.token,
+      invitationToken,
       registered.admin.email,
     );
 

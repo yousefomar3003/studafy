@@ -32,9 +32,11 @@ const silentLogger = { info: () => undefined, warn: () => undefined, error: () =
 
 function context(schoolIds: string[] | null) {
   const published: string[] = [];
+  const messages: string[] = [];
   const redis = {
-    publish: async (channel: string) => {
+    publish: async (channel: string, message: string) => {
       published.push(channel);
+      messages.push(message);
       return 1;
     },
   } as unknown as IORedis;
@@ -44,7 +46,7 @@ function context(schoolIds: string[] | null) {
     config: { batchSize: 100, pollIntervalMs: 500, schoolIds },
     logger: silentLogger,
   };
-  return { ctx, published };
+  return { ctx, published, messages };
 }
 
 async function seedSchool(): Promise<string> {
@@ -123,5 +125,31 @@ describe("outbox relay cycle", () => {
     const all = context(null);
     expect(await pollOnce(all.ctx)).toBeGreaterThanOrEqual(1);
     expect(await isRelayed(excluded, excludedRow)).toBe(true);
+  });
+});
+
+// QA-032: an invitation's or deletion confirmation's one-time token is a bearer credential. It is
+// in the outbox only so the email can be built, and must never be broadcast on events:*.
+describe("relay never publishes bearer tokens (QA-032)", () => {
+  dbTest("an INVITATION_SENT payload is published without its token", async () => {
+    const school = await seedSchool();
+    await db!.begin(async (tx) => {
+      await tx.unsafe("SET LOCAL ROLE studafy_admin");
+      await tx`SELECT set_config('app.school_id', ${school}, true)`;
+      await tx`
+        INSERT INTO app.outbox_events (school_id, event_name, payload)
+        VALUES (
+          ${school}::uuid, ${DOMAIN_EVENTS.INVITATION_SENT},
+          ${tx.json({ email: "new@example.test", token: "secret-invite-token", expiresAt: "2030-01-01" })}
+        )
+      `;
+    });
+    const { ctx, messages } = context([school]);
+    expect(await pollOnce(ctx)).toBe(1);
+    expect(messages).toHaveLength(1);
+    const published = JSON.parse(messages[0]!) as Record<string, unknown>;
+    expect(published).not.toHaveProperty("token");
+    expect(published.email).toBe("new@example.test");
+    expect(messages[0]).not.toContain("secret-invite-token");
   });
 });

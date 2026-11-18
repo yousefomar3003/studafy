@@ -165,12 +165,13 @@ describe("extractClientIp behind fly.io (CLIENT_IP_HEADER=fly-client-ip)", () =>
     expect(extractClientIp(fromFly)).toBe("203.0.113.7");
   });
 
-  test("falls back to X-Forwarded-For when the header is missing", () => {
+  // QA-086: a forged X-Forwarded-For must not choose the caller's bucket.
+  test("never falls back to X-Forwarded-For when the header is missing", () => {
     expect(
       extractClientIp({
         req: { header: (name: string) => (name === "x-forwarded-for" ? "1.2.3.4" : undefined) },
       }),
-    ).toBe("1.2.3.4");
+    ).toBe("unknown");
   });
 
   test("unset, the header is ignored (a client could send it anywhere else)", () => {

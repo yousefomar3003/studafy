@@ -1,6 +1,7 @@
 import { ERROR_CODES } from "@studafy/constants";
 
 import { CodedHttpException } from "../../../coded-http-exception";
+import { withAppTx, withSystemTx } from "../../../db/tenant-tx";
 
 import type { Database } from "../../../db";
 import type { Logger } from "../../../logger";
@@ -47,20 +48,23 @@ export async function syncPlanPrices(
   };
 
   try {
-    const plans = await database<
-      {
-        id: string;
-        code: string;
-        display_name: string;
-        description: string | null;
-        is_active: boolean;
-        stripe_product_id: string | null;
-      }[]
-    >`
+    const plans = await withAppTx(
+      database,
+      (tx) => tx<
+        {
+          id: string;
+          code: string;
+          display_name: string;
+          description: string | null;
+          is_active: boolean;
+          stripe_product_id: string | null;
+        }[]
+      >`
       SELECT id, code, display_name, description, is_active, stripe_product_id
       FROM app.plans
       ORDER BY code
-    `;
+    `,
+    );
 
     for (const plan of plans) {
       try {
@@ -73,27 +77,32 @@ export async function syncPlanPrices(
         });
 
         if (productResult.providerProductId !== plan.stripe_product_id) {
-          await database`
+          await withSystemTx(
+            database,
+            (tx) => tx`
             UPDATE app.plans
             SET stripe_product_id = ${productResult.providerProductId}, updated_at = CURRENT_TIMESTAMP
             WHERE id = ${plan.id}::uuid
-          `;
+          `,
+          );
         }
 
         result.syncedPlans++;
         result.products[productResult.outcome]++;
 
-        const prices = await database<
-          {
-            id: string;
-            currency_id: string;
-            billing_interval: string;
-            amount_minor: number;
-            is_active: boolean;
-            currency_code: string;
-            stripe_price_id: string | null;
-          }[]
-        >`
+        const prices = await withAppTx(
+          database,
+          (tx) => tx<
+            {
+              id: string;
+              currency_id: string;
+              billing_interval: string;
+              amount_minor: number;
+              is_active: boolean;
+              currency_code: string;
+              stripe_price_id: string | null;
+            }[]
+          >`
           SELECT
             pp.id,
             pp.currency_id,
@@ -106,7 +115,8 @@ export async function syncPlanPrices(
           JOIN app.currencies c ON c.id = pp.currency_id
           WHERE pp.plan_id = ${plan.id}::uuid
           ORDER BY pp.billing_interval
-        `;
+        `,
+        );
 
         for (const price of prices) {
           try {
@@ -121,11 +131,14 @@ export async function syncPlanPrices(
             });
 
             if (priceResult.providerPriceId !== price.stripe_price_id) {
-              await database`
+              await withSystemTx(
+                database,
+                (tx) => tx`
                 UPDATE app.plan_prices
                 SET stripe_price_id = ${priceResult.providerPriceId}, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ${price.id}::uuid
-              `;
+              `,
+              );
             }
 
             result.syncedPrices++;

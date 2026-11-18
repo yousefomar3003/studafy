@@ -131,4 +131,55 @@ void main() {
     );
     expect(adapter.bearers, ['Bearer expired-token']);
   });
+
+  // QA-084: the bearer token goes only to the API this Dio was built for. An
+  // absolute URL on any other host (a pre-signed storage URL, a redirect, a
+  // link in content) gets no Authorization.
+  group('host scoping', () {
+    Future<void> getIgnoringErrors(String url) async {
+      try {
+        await dio.get<dynamic>(url);
+      } on DioException {
+        // The adapter answers 401 to a missing bearer; only the header matters.
+      }
+    }
+
+    setUp(() {
+      currentToken = 'new-token';
+      dio = Dio(BaseOptions(baseUrl: 'https://api.studafy.test'));
+      adapter = _TokenCheckingAdapter('new-token');
+      dio.httpClientAdapter = adapter;
+      dio.interceptors.add(AuthInterceptor(() async => currentToken));
+    });
+
+    test('a relative path on the API gets the bearer', () async {
+      await dio.get<dynamic>('/api/students/me');
+      expect(adapter.bearers, ['Bearer new-token']);
+    });
+
+    test('an absolute URL on the API host gets the bearer', () async {
+      await dio.get<dynamic>('https://api.studafy.test/api/students/me');
+      expect(adapter.bearers, ['Bearer new-token']);
+    });
+
+    test('another origin gets no bearer', () async {
+      for (final url in [
+        'https://storage.example.com/object?sig=1',
+        'https://api.studafy.test.evil.com/x',
+        'http://api.studafy.test/api/students/me',
+        'https://api.studafy.test:8443/api/students/me',
+      ]) {
+        await getIgnoringErrors(url);
+      }
+      expect(adapter.bearers, [null, null, null, null]);
+    });
+
+    test('a Dio with no base URL never sends the bearer', () async {
+      dio = Dio();
+      dio.httpClientAdapter = adapter;
+      dio.interceptors.add(AuthInterceptor(() async => currentToken));
+      await getIgnoringErrors('https://storage.example.com/object');
+      expect(adapter.bearers, [null]);
+    });
+  });
 }

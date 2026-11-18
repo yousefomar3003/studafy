@@ -5,7 +5,7 @@ import { HTTPException } from "hono/http-exception";
 import { withTenantTx } from "../../../db/tenant-tx";
 import { auditAction } from "../../../middleware/auditEmitter";
 import { requireAuth } from "../../../middleware/authContext";
-import { requirePermission, requirePermissionIn } from "../../../middleware/authz";
+import { requirePermission } from "../../../middleware/authz";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
 import {
@@ -82,6 +82,8 @@ const listTemplatesRoute = createRoute({
 });
 
 const createTemplateRoute = createRoute({
+  // QA-086: checked before the body is validated, so an unauthorised caller gets 403, not 400.
+  middleware: [requirePermission(PERMISSIONS.EVALUATION_TEMPLATE_CREATE)] as const,
   method: "post",
   path: "/api/evaluations/templates",
   tags: ["Evaluations"],
@@ -127,6 +129,8 @@ const getTemplateRoute = createRoute({
 });
 
 const updateTemplateRoute = createRoute({
+  // QA-086: checked before the body is validated, so an unauthorised caller gets 403, not 400.
+  middleware: [requirePermission(PERMISSIONS.EVALUATION_TEMPLATE_UPDATE)] as const,
   method: "patch",
   path: "/api/evaluations/templates/{templateId}",
   tags: ["Evaluations"],
@@ -153,6 +157,8 @@ const updateTemplateRoute = createRoute({
 });
 
 const deleteTemplateRoute = createRoute({
+  // QA-086: checked before the body is validated, so an unauthorised caller gets 403, not 400.
+  middleware: [requirePermission(PERMISSIONS.EVALUATION_TEMPLATE_DELETE)] as const,
   method: "delete",
   path: "/api/evaluations/templates/{templateId}",
   tags: ["Evaluations"],
@@ -195,6 +201,8 @@ const listEvaluationsRoute = createRoute({
 });
 
 const createEvaluationRoute = createRoute({
+  // QA-086: checked before the body is validated, so an unauthorised caller gets 403, not 400.
+  middleware: [requirePermission(PERMISSIONS.EVALUATION_CREATE)] as const,
   method: "post",
   path: "/api/evaluations",
   tags: ["Evaluations"],
@@ -242,6 +250,8 @@ const getEvaluationRoute = createRoute({
 });
 
 const updateEvaluationRoute = createRoute({
+  // QA-086: checked before the body is validated, so an unauthorised caller gets 403, not 400.
+  middleware: [requirePermission(PERMISSIONS.EVALUATION_UPDATE)] as const,
   method: "patch",
   path: "/api/evaluations/{evaluationId}",
   tags: ["Evaluations"],
@@ -268,6 +278,8 @@ const updateEvaluationRoute = createRoute({
 });
 
 const submitEvaluationRoute = createRoute({
+  // QA-086: checked before the body is validated, so an unauthorised caller gets 403, not 400.
+  middleware: [requirePermission(PERMISSIONS.EVALUATION_SUBMIT)] as const,
   method: "post",
   path: "/api/evaluations/{evaluationId}/submit",
   tags: ["Evaluations"],
@@ -288,6 +300,8 @@ const submitEvaluationRoute = createRoute({
 });
 
 const shareEvaluationRoute = createRoute({
+  // QA-086: checked before the body is validated, so an unauthorised caller gets 403, not 400.
+  middleware: [requirePermission(PERMISSIONS.EVALUATION_SHARE)] as const,
   method: "post",
   path: "/api/evaluations/{evaluationId}/share",
   tags: ["Evaluations"],
@@ -332,6 +346,8 @@ const listScoresRoute = createRoute({
 });
 
 const upsertScoreRoute = createRoute({
+  // QA-086: checked before the body is validated, so an unauthorised caller gets 403, not 400.
+  middleware: [requirePermission(PERMISSIONS.EVALUATION_SCORE_CREATE)] as const,
   method: "put",
   path: "/api/evaluations/{evaluationId}/scores/{criteriaTemplateId}",
   tags: ["Evaluations"],
@@ -358,6 +374,8 @@ const upsertScoreRoute = createRoute({
 });
 
 const deleteScoreRoute = createRoute({
+  // QA-086: checked before the body is validated, so an unauthorised caller gets 403, not 400.
+  middleware: [requirePermission(PERMISSIONS.EVALUATION_SCORE_DELETE)] as const,
   method: "delete",
   path: "/api/evaluations/{evaluationId}/scores/{criteriaTemplateId}",
   tags: ["Evaluations"],
@@ -429,7 +447,6 @@ export function evaluationRoutes(database: Database): OpenAPIHono<AppEnv> {
 
   routes.openapi(createTemplateRoute, async (c) => {
     const auth = requireAuth(c);
-    requirePermissionIn(c, PERMISSIONS.EVALUATION_TEMPLATE_CREATE);
     const body = c.req.valid("json");
 
     const row = await withTenantTx(database, tenantFrom(c), (tx) =>
@@ -456,7 +473,6 @@ export function evaluationRoutes(database: Database): OpenAPIHono<AppEnv> {
 
   routes.openapi(updateTemplateRoute, async (c) => {
     const auth = requireAuth(c);
-    requirePermissionIn(c, PERMISSIONS.EVALUATION_TEMPLATE_UPDATE);
     const { templateId } = c.req.valid("param");
     const body = c.req.valid("json");
 
@@ -469,7 +485,6 @@ export function evaluationRoutes(database: Database): OpenAPIHono<AppEnv> {
 
   routes.openapi(deleteTemplateRoute, async (c) => {
     const auth = requireAuth(c);
-    requirePermissionIn(c, PERMISSIONS.EVALUATION_TEMPLATE_DELETE);
     const { templateId } = c.req.valid("param");
 
     await withTenantTx(database, tenantFrom(c), (tx) =>
@@ -495,7 +510,6 @@ export function evaluationRoutes(database: Database): OpenAPIHono<AppEnv> {
 
   routes.openapi(createEvaluationRoute, async (c) => {
     const auth = requireAuth(c);
-    requirePermissionIn(c, PERMISSIONS.EVALUATION_CREATE);
     const body = c.req.valid("json");
 
     const row = await withTenantTx(database, tenantFrom(c), (tx) =>
@@ -522,7 +536,6 @@ export function evaluationRoutes(database: Database): OpenAPIHono<AppEnv> {
 
   routes.openapi(updateEvaluationRoute, async (c) => {
     const auth = requireAuth(c);
-    requirePermissionIn(c, PERMISSIONS.EVALUATION_UPDATE);
     const { evaluationId } = c.req.valid("param");
     const body = c.req.valid("json");
 
@@ -535,7 +548,6 @@ export function evaluationRoutes(database: Database): OpenAPIHono<AppEnv> {
 
   routes.openapi(submitEvaluationRoute, async (c) => {
     const auth = requireAuth(c);
-    requirePermissionIn(c, PERMISSIONS.EVALUATION_SUBMIT);
     const { evaluationId } = c.req.valid("param");
 
     const row = await withTenantTx(database, tenantFrom(c), (tx) =>
@@ -547,7 +559,6 @@ export function evaluationRoutes(database: Database): OpenAPIHono<AppEnv> {
 
   routes.openapi(shareEvaluationRoute, async (c) => {
     const auth = requireAuth(c);
-    requirePermissionIn(c, PERMISSIONS.EVALUATION_SHARE);
     const { evaluationId } = c.req.valid("param");
 
     const row = await withTenantTx(database, tenantFrom(c), (tx) =>
@@ -580,7 +591,6 @@ export function evaluationRoutes(database: Database): OpenAPIHono<AppEnv> {
 
   routes.openapi(upsertScoreRoute, async (c) => {
     const auth = requireAuth(c);
-    requirePermissionIn(c, PERMISSIONS.EVALUATION_SCORE_CREATE);
     const { evaluationId, criteriaTemplateId } = c.req.valid("param");
     const body = c.req.valid("json");
 
@@ -593,7 +603,6 @@ export function evaluationRoutes(database: Database): OpenAPIHono<AppEnv> {
 
   routes.openapi(deleteScoreRoute, async (c) => {
     const auth = requireAuth(c);
-    requirePermissionIn(c, PERMISSIONS.EVALUATION_SCORE_DELETE);
     const { evaluationId, criteriaTemplateId } = c.req.valid("param");
 
     await withTenantTx(database, tenantFrom(c), (tx) =>

@@ -32,6 +32,7 @@ import { fromTapAmount } from "@studafy/tap-payments";
 
 import { CodedHttpException } from "../../../coded-http-exception";
 import { withTenantTx } from "../../../db/tenant-tx";
+import { schoolToday } from "../../../lib/school-today";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
 import { hasPermission } from "../../../middleware/authz";
 import { selectPaymentProviderForSchool } from "../../subscriptions/payment-provider-routing";
@@ -456,7 +457,8 @@ export async function settleOnlineFeePayment(
       payment_mode: "card_external",
       currency: payment.currency,
       reference_no: payment.provider_session_id!,
-      reference_date: new Date().toISOString().slice(0, 10),
+      // The school's local date, like the posting date createPayment defaults (QA-044).
+      reference_date: await withTenantTx(database, { schoolId }, schoolToday),
       remarks: `Online payment via ${provider} (${payment.id})`,
     },
     `online-fee-${payment.id}`,

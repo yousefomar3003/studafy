@@ -17,7 +17,7 @@
 
 import { deleteCookie, setCookie } from "hono/cookie";
 
-import { getSecurityConfig } from "../../config/security";
+import { getSecurityConfig, LEGACY_SESSION_COOKIE_NAME } from "../../config/security";
 
 import { AUTH_CHANNELS } from "./channels";
 
@@ -28,14 +28,13 @@ import type { Context } from "hono";
 import type { CookieOptions } from "hono/utils/cookie";
 
 /**
- * Where the refresh token is scoped to.
- *
- * Narrower than "/" on purpose: the cookie is only ever needed by the two endpoints that consume a
- * refresh token, so scoping it there keeps it off every other API request. A credential that is not
- * transmitted cannot be captured in transit, logged by a proxy, or replayed from a request that had
- * no business carrying it.
+ * Where the refresh token is scoped to: "/" because a `__Host-` cookie must have Path=/ (QA-070).
+ * It used to be "/api/auth", which kept it off other requests; the prefix's protection against a
+ * sibling origin overwriting it is worth more, and it stays HttpOnly and SameSite=Strict.
  */
-const REFRESH_COOKIE_PATH = "/api/auth";
+const REFRESH_COOKIE_PATH = "/";
+/** Where the pre-QA-070 cookie lived; needed to clear it, since a cookie is deleted by name+path. */
+const LEGACY_REFRESH_COOKIE_PATH = "/api/auth";
 
 /** The response body shape. `refresh_token` is present only for non-web channels. */
 export interface TokenResponseBody {
@@ -83,8 +82,11 @@ export function readPresentedToken(
   c: Context<AppEnv>,
   body: { refresh_token?: string } | undefined,
 ): string | undefined {
-  const fromCookie = getCookieValue(c, refreshCookieName());
-  if (fromCookie !== undefined && fromCookie.length > 0) return fromCookie;
+  // The current name first, then the pre-QA-070 one until its cookies have expired.
+  for (const name of new Set([refreshCookieName(), LEGACY_SESSION_COOKIE_NAME])) {
+    const fromCookie = getCookieValue(c, name);
+    if (fromCookie !== undefined && fromCookie.length > 0) return fromCookie;
+  }
 
   const fromBody = body?.refresh_token;
   return fromBody !== undefined && fromBody.length > 0 ? fromBody : undefined;
@@ -97,6 +99,14 @@ export function clearRefreshCookie(c: Context<AppEnv>): void {
     secure: useSecureCookie(),
     sameSite: "Strict",
   });
+  // And the pre-QA-070 cookie, wherever it still exists.
+  if (refreshCookieName() !== LEGACY_SESSION_COOKIE_NAME) {
+    deleteCookie(c, LEGACY_SESSION_COOKIE_NAME, {
+      path: LEGACY_REFRESH_COOKIE_PATH,
+      secure: useSecureCookie(),
+      sameSite: "Strict",
+    });
+  }
 }
 
 /** Whether a channel receives its token as a cookie rather than in the body. */
@@ -165,7 +175,14 @@ function getCookieValue(c: Context<AppEnv>, name: string): string | undefined {
     const eq = part.indexOf("=");
     if (eq === -1) continue;
     if (part.slice(0, eq).trim() !== name) continue;
-    return decodeURIComponent(part.slice(eq + 1).trim());
+    const raw = part.slice(eq + 1).trim();
+    // A malformed escape threw here and answered 500 (QA-070). Handed on undecoded, it is simply a
+    // token that matches nothing: 401, like any other bad credential.
+    try {
+      return decodeURIComponent(raw);
+    } catch {
+      return raw;
+    }
   }
   return undefined;
 }

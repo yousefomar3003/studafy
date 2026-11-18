@@ -1,7 +1,7 @@
 import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { NOTIFICATION_TYPES } from "@studafy/constants";
 import { sanitizePlainText } from "@studafy/sanitize";
-import { UnrecoverableError } from "bullmq";
+import { DelayedError, UnrecoverableError } from "bullmq";
 import postgres from "postgres";
 
 import { leaseDatabase } from "../../db/pool";
@@ -9,7 +9,7 @@ import { withSystemTenantTx } from "../../db/tenant-tx";
 
 import { buildAssignmentBlocks, loadAssignmentSourceContent } from "./assignment-source";
 import { createEmbeddingStage, createMockEmbeddingProvider } from "./embedding";
-import { MaterialParseError } from "./errors";
+import { DocumentTooLargeError, MaterialParseError } from "./errors";
 import { buildIngestChunks, buildIngestChunksFromBlocks } from "./ingest";
 import { aiIngestionJobDataSchema } from "./job";
 import { lowConfidencePages, TesseractOcrEngine } from "./ocr";
@@ -89,6 +89,9 @@ type IngestResult =
   | { processed: true; materialId: string; ingested: boolean; chunks: number }
   | { processed: false; reason: string };
 
+/** How long a job waits when its school is at the ingestion cap, before jitter (QA-064). */
+const CONTENDED_RETRY_MS = 10_000;
+
 /**
  * Process one `ai-ingestion` job: claim the material, extract and chunk its text, and store the
  * chunks on `app.material_chunks`.
@@ -115,6 +118,7 @@ type IngestResult =
 export async function processIngestJob(
   job: Job,
   config: AiIngestionWorkerConfig,
+  token?: string,
 ): Promise<IngestResult> {
   const parsed = aiIngestionJobDataSchema.safeParse(job.data);
   if (!parsed.success) return { processed: false, reason: "invalid job data" };
@@ -136,7 +140,19 @@ export async function processIngestJob(
     // makes BullMQ retry with the job's backoff; on the terminal attempt the failure path records
     // it as a scheduling failure (see failureReason).
     lease = await semaphore.acquire(data.schoolId);
-    if (!lease) throw new TenantConcurrencyExceededError(data.schoolId);
+    if (!lease) {
+      // QA-064: the school is at its cap. Wait our turn rather than burn an attempt: moved back to
+      // the delayed set, the job keeps every retry for real failures. Jittered so a burst of
+      // contended jobs does not come back in lockstep.
+      if (token) {
+        await job.moveToDelayed(
+          Date.now() + CONTENDED_RETRY_MS + Math.random() * CONTENDED_RETRY_MS,
+          token,
+        );
+        throw new DelayedError();
+      }
+      throw new TenantConcurrencyExceededError(data.schoolId);
+    }
 
     let heldBack = false;
     // Thumbnails and notifications are for class materials only (see MaterialClaim.source_kind).
@@ -331,12 +347,18 @@ export async function processIngestJob(
       chunks: committed ? chunks.length : 0,
     };
   } catch (error) {
-    // A parse error is a verdict on the file's bytes (corrupt, encrypted, unsupported, no text):
-    // every retry would read the same bytes and fail the same way, only later -- with the default
-    // 5 attempts that is 75 s of backoff plus four more parses before the teacher sees "failed".
-    // So it is recorded as the terminal failure now and the job is not retried. Anything else (the
-    // bucket, the database, the concurrency cap) may be transient and keeps its retries.
-    const deterministic = error instanceof MaterialParseError;
+    // A delayed job (QA-064) has not failed: nothing to record.
+    if (error instanceof DelayedError) throw error;
+    // A verdict on the file itself fails it now rather than spending each retry re-reading it:
+    //  - a file over an ingestion limit (QA-043) is over it on every attempt (a parse timeout would
+    //    cost minutes per attempt);
+    //  - a parse error (corrupt, encrypted, unsupported, no text) reads the same bytes and fails the
+    //    same way every time, only later -- with the default 5 attempts that is 75 s of backoff plus
+    //    four more parses before the teacher sees "failed".
+    // Anything else (the bucket, the database, the concurrency cap) may be transient and keeps its
+    // retries.
+    const deterministic =
+      error instanceof DocumentTooLargeError || error instanceof MaterialParseError;
     if (deterministic || job.attemptsMade + 1 >= (job.opts.attempts ?? 1)) {
       const reason = failureReason(error);
       await withSystemTenantTx(database, { schoolId: data.schoolId }, async (tx) => {
@@ -361,7 +383,7 @@ export async function processIngestJob(
         }
       });
     }
-    if (deterministic) throw new UnrecoverableError(error.message);
+    if (deterministic) throw new UnrecoverableError((error as Error).message);
     throw error;
   } finally {
     await lease?.release().catch(() => undefined);

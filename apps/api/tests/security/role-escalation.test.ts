@@ -257,7 +257,8 @@ describe("F-01 database: a platform role lives only in a platform school", () =>
       FROM app.schools WHERE id = ${schoolId}::uuid
     `,
     );
-    expect(await failureOf(attempt)).toMatch(/only studafy_admin/);
+    // Since QA-016 studafy_app holds no INSERT on app.schools at all: refused before the trigger.
+    expect(await failureOf(attempt)).toMatch(/only studafy_admin|permission denied/);
   });
 
   integrationTest("studafy_app cannot unflag a platform school", async () => {

@@ -12,8 +12,20 @@ import { CodedHttpException } from "../coded-http-exception";
  * immutable and `created_at` never changes once a row exists.
  *
  * Shared by every list route that pages `DESC` on `(created_at, id)` — `app.users` (ST-093) and
- * `app.notifications` (ST-142) — so the wire format has exactly one definition. The SQL predicate
- * a consumer builds from a decoded cursor is `(created_at, id) < ($created_at, $id)`.
+ * `app.notifications` (ST-142) — so the wire format has exactly one definition.
+ *
+ * Precision (QA-091): the cursor's `created_at` is a JS Date, so it holds milliseconds, while the
+ * column holds microseconds. Comparing against it directly skips every row in the same millisecond
+ * as the page's last row -- every row one transaction wrote shares `now()`, so a bulk import lost
+ * all but its first page. Consumers therefore compare against the cursor row's *exact* value, read
+ * back by primary key, and fall back to the cursor's value only if that row has since been deleted:
+ *
+ *   (t.created_at, t.id) < (
+ *     COALESCE((SELECT k.created_at FROM app.<table> k WHERE k.id = $id), $created_at),
+ *     $id
+ *   )
+ *
+ * The wire format is unchanged, so cursors issued before the fix keep working.
  */
 
 export interface KeysetCursor {

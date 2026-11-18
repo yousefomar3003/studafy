@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -17,24 +18,30 @@ import '../auth/auth_state.dart';
 /// directory rather than being passed back in at lookup time, so a caller asking "is this
 /// downloaded?" never needs to know the material's file name — only its id.
 ///
-/// Scoped under the app's own support directory, never a shared or public location: a material's
+/// Scoped under the app's own cache directory, never a shared or public location: a material's
 /// bytes are school data, subject to the same "must not survive a different account signing in on
 /// this device" rule [OfflineDatabase] (`offline_providers.dart`) follows — see
-/// [materialFileCacheProvider]'s logout listener.
+/// [materialFileCacheProvider]'s logout listener. The cache directory is left out of Android
+/// backups and device transfer and out of iCloud backups (QA-080); the OS may purge it under
+/// storage pressure, which only means a material is downloaded again.
 class MaterialFileCache {
-  const MaterialFileCache();
+  const MaterialFileCache({this._root});
+
+  final Future<Directory> Function()? _root;
+
+  Future<Directory> _rootDir() => (_root ?? getApplicationCacheDirectory)();
 
   // Async filesystem calls throughout: every row of the materials list runs [find], so blocking
   // `*Sync` calls here stall the UI isolate once per row.
   Future<Directory> _materialsDir() async {
-    final support = await getApplicationSupportDirectory();
-    return Directory(p.join(support.path, 'materials')).create(recursive: true);
+    final root = await _rootDir();
+    return Directory(p.join(root.path, 'materials')).create(recursive: true);
   }
 
   /// The cached file for [materialId], or null if it hasn't been downloaded (or was cleared).
   Future<File?> find(String materialId) async {
-    final support = await getApplicationSupportDirectory();
-    final dir = Directory(p.join(support.path, 'materials'));
+    final root = await _rootDir();
+    final dir = Directory(p.join(root.path, 'materials'));
     if (!await dir.exists()) return null;
     await for (final entry in dir.list()) {
       if (entry is File && p.basenameWithoutExtension(entry.path) == materialId) {
@@ -60,6 +67,12 @@ class MaterialFileCache {
   }
 }
 
+/// The directory downloaded school files (materials, attachment pictures) are kept under: the OS
+/// cache directory, which backups never copy (QA-080). Tests point it at a temporary directory.
+final offlineFilesRootProvider = Provider<Future<Directory> Function()>(
+  (ref) => getApplicationCacheDirectory,
+);
+
 /// A bare [Dio] used only to fetch pre-signed download bytes.
 ///
 /// Deliberately not `apiClientProvider`'s (`core/auth/auth_providers.dart`): the pre-signed URL
@@ -69,14 +82,18 @@ class MaterialFileCache {
 /// shape).
 final materialBytesDioProvider = Provider<Dio>((ref) => Dio());
 
-/// Wipes itself the moment a session logs out, the same rule [OfflineDatabase]'s own provider
-/// (`offline_providers.dart`) follows: a downloaded material's bytes are school data and must not
-/// survive into a different account signing in on the same device.
+/// Wipes itself the moment a session logs out or the account switches, the same rule
+/// [OfflineDatabase]'s own provider (`offline_providers.dart`) follows: a downloaded material's
+/// bytes are school data and must not survive into a different account signing in on the same
+/// device.
 final materialFileCacheProvider = Provider<MaterialFileCache>((ref) {
-  const cache = MaterialFileCache();
+  final cache = MaterialFileCache(root: ref.watch(offlineFilesRootProvider));
   ref.listen(authStatusProvider, (previous, next) {
-    if (previous == AuthStatus.authenticated && next == AuthStatus.unauthenticated) {
-      cache.clear();
+    // Any exit from `authenticated`, not only to `unauthenticated` (QA-081): logging out with
+    // another account on the phone, and switching accounts, go authenticated → loading →
+    // authenticated. The same condition as `offlineDatabaseProvider`.
+    if (previous == AuthStatus.authenticated && next != AuthStatus.authenticated) {
+      unawaited(cache.clear());
     }
   });
   return cache;

@@ -379,3 +379,70 @@ describe("cross-entity cascade", () => {
     });
   });
 });
+
+// QA-035: two *different* events about one subscription, processed concurrently. Only redeliveries
+// of one event id used to serialize; two distinct events each folded the sequence they could see,
+// and the one that wrote last won, even when its fold was stale. Event A (earlier, active) pauses
+// after folding, until event B (later, cancel) has finished or 500 ms have passed. Without a lock,
+// B folds without A, commits `canceled`, and A then writes its stale `active`. With the row locked
+// before the fold, B waits for A, re-folds with A included, and the result is `canceled`.
+describe("concurrent distinct events (QA-035)", () => {
+  integrationTest(
+    "a later cancellation is never overwritten by an earlier event's stale fold",
+    async () => {
+      const f = await setup();
+      const a = postgres(f.db.url, { max: 1, ssl: false, prepare: false });
+      const b = postgres(f.db.url, { max: 1, ssl: false, prepare: false });
+      let bDone = false;
+      const options = (beforeApply?: () => Promise<void>) => ({
+        emitAudit: async () => undefined,
+        publishEntitlementChange: async () => undefined,
+        logger: silentLogger,
+        beforeApply,
+      });
+      try {
+        const first = withSystemTx(a, (tx) =>
+          processBillingEvent(
+            tx,
+            {
+              provider: "stripe",
+              id: "evt_race_activate",
+              type: "customer.subscription.updated",
+              effectiveAt: new Date(1_700_000_100 * 1000),
+              data: { id: f.stripeSubscriptionId, customer: f.stripeCustomerId, status: "active" },
+            },
+            options(async () => {
+              const until = Date.now() + 500;
+              while (!bDone && Date.now() < until) await new Promise((r) => setTimeout(r, 10));
+            }),
+          ),
+        );
+        await new Promise((r) => setTimeout(r, 50)); // A has folded and is paused
+        const second = withSystemTx(b, (tx) =>
+          processBillingEvent(
+            tx,
+            {
+              provider: "stripe",
+              id: "evt_race_cancel",
+              type: "customer.subscription.updated",
+              effectiveAt: new Date(1_700_000_200 * 1000),
+              data: {
+                id: f.stripeSubscriptionId,
+                customer: f.stripeCustomerId,
+                status: "canceled",
+              },
+            },
+            options(),
+          ),
+        ).finally(() => {
+          bDone = true;
+        });
+        await Promise.all([first, second]);
+      } finally {
+        await a.end({ timeout: 5 });
+        await b.end({ timeout: 5 });
+      }
+      expect(await readSubscriptionStatus(f, f.subscriptionId)).toBe("canceled");
+    },
+  );
+});

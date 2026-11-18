@@ -67,7 +67,10 @@ Supabase's `postgres` is not a superuser, which the first migrations ran into on
   and installs `pg_stat_statements` in its own `extensions` schema, so 000003's three grants for
   `studafy_monitor` cannot run. Production applied 000003 without those three statements and
   recorded it under the file's real checksum; everything else in it ran as written. The app does
-  not use `studafy_monitor`.
+  not use `studafy_monitor`. Migration 000248 (QA-074) re-applies the `REVOKE ALL … FROM PUBLIC`
+  on `pg_stat_statements` wherever the extension lives, and warns rather than fails where Supabase
+  refuses a grant. Check its warnings in the deploy log; if it could not revoke, run the revoke as
+  the view's owner.
 - **Migration 000002 revokes `CONNECT` on the database from `PUBLIC`.** Supabase's own login roles
   (`pgbouncer`, which the pooler's auth query uses, `authenticator`, `supabase_auth_admin`,
   `supabase_storage_admin`, …) connect through exactly that `PUBLIC` grant. After 000002 every one
@@ -126,24 +129,24 @@ the secrets onto the fly apps (staged, so they apply with that deploy), so a sec
 GitHub and released by rerunning the workflow — never with `fly secrets set` by hand, which the next
 run would overwrite. The workflow checks the required ones up front and names any that are missing.
 
-| GitHub secret                                                                                                                     | api | workers                          | realtime                   | migrate |
-| --------------------------------------------------------------------------------------------------------------------------------- | --- | -------------------------------- | -------------------------- | ------- |
-| `DATABASE_USER` (`postgres.<project ref>`; migrate logs in directly as `postgres`, migrate.toml)                                  | ✓   | ✓                                |                            |         |
-| `DATABASE_PASSWORD`                                                                                                               | ✓   | ✓                                |                            | ✓       |
-| `DATABASE_CA_CERT` (PEM)                                                                                                          | ✓   | as `SUPABASE_CA_CERT_B64`        |                            | ✓       |
-| `REDIS_URL` (`rediss://…`)                                                                                                        | ✓   | ✓                                | ✓, and as `AUTH_REDIS_URL` |         |
-| `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` (R2 token)                                                              | ✓   | as `AWS_ACCESS_KEY_ID`/`_SECRET` |                            |         |
-| `SENTRY_DSN` (optional)                                                                                                           | ✓   | ✓                                | ✓                          |         |
-| `RECORDS_ENCRYPTION_KEYS` (`{"<id>":"<base64 32 bytes>"}`), `RECORDS_ENCRYPTION_CURRENT_KEY_ID`                                   | ✓   | ✓                                |                            |         |
-| `WS_JWT_SECRET` (32+ characters)                                                                                                  | ✓   |                                  | ✓                          |         |
-| `AI_LLM_API_KEY` (Together)                                                                                                       | ✓   | ✓                                |                            |         |
-| `RESEND_API_KEY`                                                                                                                  |     | ✓                                |                            |         |
-| `RESEND_WEBHOOK_SECRET`                                                                                                           | ✓   |                                  |                            |         |
-| `TURNSTILE_SECRET_KEY`                                                                                                            | ✓   |                                  |                            |         |
-| `GOOGLE_PLAY_SERVICE_ACCOUNT`, `GOOGLE_PLAY_RTDN_TOKEN`                                                                           | ✓   | `GOOGLE_PLAY_SERVICE_ACCOUNT`    |                            |         |
-| `FIREBASE_SERVICE_ACCOUNT`                                                                                                        |     | ✓                                |                            |         |
-| Optional: `GOOGLE_OAUTH_CLIENT_ID`/`_SECRET`, `MICROSOFT_OAUTH_CLIENT_ID`/`_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | ✓   | `STRIPE_SECRET_KEY`              |                            |         |
-| Optional: `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS` (traces to Axiom, see Observability)                        | ✓   | ✓                                | ✓                          |         |
+| GitHub secret                                                                                                                     | api | workers                       | realtime                   | migrate |
+| --------------------------------------------------------------------------------------------------------------------------------- | --- | ----------------------------- | -------------------------- | ------- |
+| `DATABASE_USER` (`postgres.<project ref>`; migrate logs in directly as `postgres`, migrate.toml)                                  | ✓   | ✓                             |                            |         |
+| `DATABASE_PASSWORD`                                                                                                               | ✓   | ✓                             |                            | ✓       |
+| `DATABASE_CA_CERT` (PEM)                                                                                                          | ✓   | as `SUPABASE_CA_CERT_B64`     |                            | ✓       |
+| `REDIS_URL` (`rediss://…`)                                                                                                        | ✓   | ✓                             | ✓, and as `AUTH_REDIS_URL` |         |
+| `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` (R2 token)                                                              | ✓   | ✓                             |                            |         |
+| `SENTRY_DSN` (optional)                                                                                                           | ✓   | ✓                             | ✓                          |         |
+| `RECORDS_ENCRYPTION_KEYS` (`{"<id>":"<base64 32 bytes>"}`), `RECORDS_ENCRYPTION_CURRENT_KEY_ID`                                   | ✓   | ✓                             |                            |         |
+| `WS_JWT_SECRET` (32+ characters)                                                                                                  | ✓   |                               | ✓                          |         |
+| `AI_LLM_API_KEY` (Together)                                                                                                       | ✓   | ✓                             |                            |         |
+| `RESEND_API_KEY`                                                                                                                  |     | ✓                             |                            |         |
+| `RESEND_WEBHOOK_SECRET`                                                                                                           | ✓   |                               |                            |         |
+| `TURNSTILE_SECRET_KEY`                                                                                                            | ✓   |                               |                            |         |
+| `GOOGLE_PLAY_SERVICE_ACCOUNT`, `GOOGLE_PLAY_RTDN_TOKEN`                                                                           | ✓   | `GOOGLE_PLAY_SERVICE_ACCOUNT` |                            |         |
+| `FIREBASE_SERVICE_ACCOUNT`                                                                                                        |     | ✓                             |                            |         |
+| Optional: `GOOGLE_OAUTH_CLIENT_ID`/`_SECRET`, `MICROSOFT_OAUTH_CLIENT_ID`/`_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | ✓   | `STRIPE_SECRET_KEY`           |                            |         |
+| Optional: `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS` (traces to Axiom, see Observability)                        | ✓   | ✓                             | ✓                          |         |
 
 Build-time values for the web app come from the environment's **variables**: `VITE_TURNSTILE_SITE_KEY`,
 `VITE_SENTRY_DSN`, `SENTRY_ORG`, `SENTRY_PROJECT` (and the `SENTRY_AUTH_TOKEN` secret, for source maps).
@@ -231,7 +234,7 @@ domains; keep the three lists in step.
 
 ## Deploying
 
-Normally: run **Production deploy (fly.io)** from the Actions tab. By hand, the same steps:
+Normally: run **Production deploy (fly.io)** from the Actions tab, on `dev`. It gates on CI, builds and scans each image once, deploys by digest, smoke-checks `/readyz` and rolls back on failure ([docs/runbooks/deploy.md](../../docs/runbooks/deploy.md)). By hand, in an emergency only, the same steps:
 
 ```sh
 fly deploy . --config infra/fly/scanner.toml --remote-only

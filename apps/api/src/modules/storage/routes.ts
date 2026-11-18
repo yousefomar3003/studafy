@@ -247,6 +247,7 @@ export function storageRoutes(
           inspected.parsed.filename,
         ),
         sizeBytes: inspected.sizeBytes,
+        etag: inspected.etag,
       };
       await copyStagedUploads(storageService, runTx, [copy]);
       await discardStagedUploads(storageService, [copy]);

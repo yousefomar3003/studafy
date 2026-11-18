@@ -171,15 +171,22 @@ export function emailEventWebhookRoutes(
 async function ingestEvent(db: Database, event: ParsedEmailEvent, logger: Logger): Promise<void> {
   try {
     await db.begin(async (tx) => {
+      // As studafy_app, not the raw login (QA-014): the global email ledgers are granted to it, and
+      // the per-school delivery updates below run under its tenant-isolation policy.
+      await tx`SELECT set_config('role', 'studafy_app', true)`;
+
       // The unique (message_id, event_type) constraint is the dedup arbiter: a redelivered event
       // inserts nothing, and this transaction stops before it changes any state.
+      // Insert-only, as the runtime role may record into this global ledger but not read it (QA-017):
+      // the row count instead of RETURNING, and ON CONFLICT without a conflict target (a target
+      // needs SELECT on its columns). The table's one unique key is (message_id, event_type), so a
+      // conflict is still exactly a redelivery.
       const inserted = await tx`
         INSERT INTO app.email_events (message_id, event_type, payload)
         VALUES (${event.messageId}, ${event.eventType}, ${tx.json(event.payload as unknown as JSONValue)}::jsonb)
-        ON CONFLICT (message_id, event_type) DO NOTHING
-        RETURNING id
+        ON CONFLICT DO NOTHING
       `;
-      if (inserted.length === 0) {
+      if (inserted.count === 0) {
         logger.info(
           { message_id: event.messageId, event_type: event.eventType },
           "Email event already recorded; ignoring redelivery",
@@ -192,7 +199,7 @@ async function ingestEvent(db: Database, event: ParsedEmailEvent, logger: Logger
           await tx`
             INSERT INTO app.email_suppressions (address, reason)
             VALUES (${address}, ${event.reason})
-            ON CONFLICT (address) DO NOTHING
+            ON CONFLICT DO NOTHING
           `;
         }
       }
@@ -215,20 +222,17 @@ async function ingestEvent(db: Database, event: ParsedEmailEvent, logger: Logger
  * 'claimed') is left for the send to complete; the ledger and the suppression list already carry the
  * feedback's ground truth, and no row is ever walked backwards.
  *
- * The message_id → school resolution is inherently cross-tenant, so this reads and writes a
- * tenant-isolated table without a tenant context. That relies on the application connection having
- * RLS bypass — the same assumption the ERPNext webhook makes when it inserts an outbox row for the
- * school named in an unauthenticated payload (see docs/runbooks/edge-security.md on the PgBouncer
- * user). The per-school set_config keeps each update tenant-shaped for any future connection that
- * does not bypass RLS.
+ * The message_id → school resolution is inherently cross-tenant. It used to be a plain SELECT on
+ * this FORCE-RLS table, which returned rows only because the production login bypasses RLS (QA-014).
+ * It now goes through app.resolve_email_delivery_schools (000240): a SECURITY DEFINER resolver that
+ * sees exactly the rows carrying this message id and returns their school ids, nothing else. Each
+ * update then runs under that school's tenant scope.
  */
 async function transitionDeliveries(tx: TransactionSql, event: ParsedEmailEvent): Promise<void> {
   const status = event.eventType === "bounce" ? "bounced" : "complained";
 
-  const schools = await tx`
-    SELECT DISTINCT school_id
-    FROM app.email_deliveries
-    WHERE message_id = ${event.messageId}
+  const schools = await tx<{ school_id: string }[]>`
+    SELECT school_id FROM app.resolve_email_delivery_schools(${event.messageId}) AS school_id
   `;
 
   for (const row of schools) {

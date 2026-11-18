@@ -30,7 +30,7 @@ both of which a caller can forge.
   `HttpOnly` (SAD_13, "Delivery"). The access token carries the same value as a claim, so downstream
   policy can distinguish surfaces with no lookup.
 - **Delivery depends on the channel.** `web` sessions deliver the refresh token only via
-  `Set-Cookie` (`HttpOnly; Secure; SameSite=Strict; Path=/api/auth`) and never in the body; `mobile`
+  `Set-Cookie` (`__Host-session`, `HttpOnly; Secure; SameSite=Strict; Path=/`, QA-070) and never in the body; `mobile`
   and `api` sessions deliver it in the response body, because a native client has no `document.cookie`
   and needs the token for its OS keychain (SAD_13).
 - **Routes can be limited by channel with a guard.** `requireChannel(...)` middleware

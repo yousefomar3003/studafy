@@ -11,6 +11,7 @@ import {
   renderNotification,
 } from "@studafy/notification-templates";
 
+import { likeContains } from "../../lib/sql/like";
 import { publishUserEntitlementChanges } from "../subscriptions/entitlements/entitlement-change-publisher";
 
 import { resolveAiProgrammeValues } from "./ai-programme";
@@ -293,13 +294,13 @@ export async function readOptIn(
 // School context: today, the programme's price, windows
 // ---------------------------------------------------------------------------------------------------
 
-/** The armed school's local date (its school_settings timezone) at `now`. */
+/**
+ * The armed school's local date (its school_settings timezone, UTC without one) at `now`:
+ * app.school_today, the one definition of a school's "today" (QA-044).
+ */
 export async function schoolToday(tx: TransactionSql, now: Date): Promise<string> {
   const [row] = await tx<{ today: string }[]>`
-    SELECT (${now}::timestamptz AT TIME ZONE COALESCE(
-      (SELECT timezone FROM app.school_settings WHERE school_id = current_setting('app.school_id')::uuid),
-      'UTC'
-    ))::date::text AS today
+    SELECT app.school_today(${now}::timestamptz)::text AS today
   `;
   return row!.today;
 }
@@ -1425,9 +1426,7 @@ export async function listOptInStudents(
   const latest = await latestWindowRow(tx);
   const year = latest ? { id: latest.academic_year_id } : await currentAcademicYear(tx, today);
   if (!year) return { students: [], total: 0 };
-  const pattern = input.search?.trim()
-    ? `%${input.search.trim().replace(/[\\%_]/g, (c) => `\\${c}`)}%`
-    : null;
+  const pattern = input.search?.trim() ? likeContains(input.search.trim()) : null;
   const rows = await tx<
     {
       student_id: string;

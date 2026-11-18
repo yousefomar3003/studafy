@@ -66,13 +66,17 @@ export class ErpNextClient {
     body?: unknown,
   ): Promise<ErpNextResponse<T>> {
     let lastError: unknown;
+    // Only reads are retried (QA-022). ERPNext does not deduplicate writes: a POST that timed out
+    // or came back 5xx may already have created its document, and sending it again bills twice.
+    // A failed write is surfaced to the caller, which reconciles by idempotency key before retrying.
+    const attempts = method === "GET" ? MAX_ATTEMPTS : 1;
 
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
       try {
         return await this.attempt<T>(method, path, body);
       } catch (error) {
         lastError = error;
-        if (!isTransientErpNextFailure(error) || attempt === MAX_ATTEMPTS) throw error;
+        if (!isTransientErpNextFailure(error) || attempt === attempts) throw error;
         await sleep(backoffDelayMs(attempt));
       }
     }

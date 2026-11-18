@@ -47,6 +47,14 @@ export interface PromoteOptions {
  * describe the object that was actually uploaded rather than what the client claimed.
  */
 export async function readStagedSize(storage: StorageService, tempKey: string): Promise<number> {
+  return (await readStagedSizeAndEtag(storage, tempKey)).sizeBytes;
+}
+
+/** readStagedSize plus the ETag the size was read from, for a conditional copy (QA-036). */
+export async function readStagedSizeAndEtag(
+  storage: StorageService,
+  tempKey: string,
+): Promise<{ sizeBytes: number; etag?: string }> {
   const metadata = await storage.head(tempKey);
   if (!metadata) {
     throw new CodedHttpException(
@@ -58,7 +66,7 @@ export async function readStagedSize(storage: StorageService, tempKey: string): 
   if (metadata.sizeBytes <= 0) {
     throw new CodedHttpException(400, ERROR_CODES.VALIDATION_FAILED, "Staged upload is empty");
   }
-  return metadata.sizeBytes;
+  return { sizeBytes: metadata.sizeBytes, ...(metadata.etag ? { etag: metadata.etag } : {}) };
 }
 
 /**
@@ -103,10 +111,21 @@ export async function copyStagedObject(
   storage: StorageService,
   tempKey: string,
   permanentKey: string,
+  etag?: string,
 ): Promise<void> {
   try {
-    await storage.copy(tempKey, permanentKey);
+    // QA-036: copy only the object that was inspected. The client still holds a presigned PUT for
+    // the temp key and could replace it between the HEAD and this copy.
+    await storage.copy(tempKey, permanentKey, etag ? { ifMatch: etag } : undefined);
   } catch (error) {
+    const status = (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode;
+    if (error instanceof Error && (error.name === "PreconditionFailed" || status === 412)) {
+      throw new CodedHttpException(
+        409,
+        ERROR_CODES.STORAGE_OBJECT_CHANGED,
+        "The upload changed while it was being confirmed. Upload the file again.",
+      );
+    }
     // The staged object was read moments ago but is gone now (aged out of temp/, or a concurrent
     // confirm of the same key already discarded it): the same answer as never uploaded.
     if (error instanceof Error && (error.name === "NoSuchKey" || error.name === "NotFound")) {

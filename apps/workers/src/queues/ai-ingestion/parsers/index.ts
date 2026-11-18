@@ -2,6 +2,7 @@ import { UnsupportedFormatError } from "../errors";
 
 import { parseDocx } from "./docx";
 import { IMAGE_MIME_TYPES, parseImage } from "./image";
+import { assertZipWithinLimits, withParseTimeout } from "./limits";
 import { parsePdf } from "./pdf";
 import { parsePptx } from "./pptx";
 
@@ -45,13 +46,25 @@ export async function parseDocument(
   mimeType: string,
   options: ParseDocumentOptions = {},
 ): Promise<ParsedDocument> {
+  // Every parse runs under a wall-clock budget (QA-043); the per-format caps below and in each
+  // parser refuse oversized input before the expensive work starts.
+  return withParseTimeout(parseByType(bytes, mimeType, options));
+}
+
+async function parseByType(
+  bytes: Uint8Array,
+  mimeType: string,
+  options: ParseDocumentOptions,
+): Promise<ParsedDocument> {
   if (PDF_MIME_TYPES.has(mimeType)) {
     return parsePdf(bytes, options);
   }
   if (mimeType === DOCX_MIME_TYPE) {
+    assertZipWithinLimits(bytes);
     return parseDocx(bytes);
   }
   if (mimeType === PPTX_MIME_TYPE) {
+    assertZipWithinLimits(bytes);
     return parsePptx(bytes);
   }
   if (IMAGE_MIME_TYPES.has(mimeType)) {

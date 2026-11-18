@@ -1,0 +1,9 @@
+# QA-014 work list: tests that fail only when the app logs in as studafy_runtime (NOSUPERUSER,
+# NOBYPASSRLS, owns nothing; db/test-roles/runtime-role.sql). Each is a code path that works today
+# only because the production login can bypass RLS or holds table privileges outside the app's
+# own role switches. Checked by scripts/ci/least-privilege-check.ts in the least-privilege-db CI
+# job: a new failure fails the job, and so does a listed test that starts passing -- delete its
+# line when QA-014 fixes it. Format: "file > suite > test", optional trailing "# flaky".
+# Generated 2026-11-16 from the full API suite (4558 pass / 21 fail under studafy_runtime).
+
+# (empty: every QA-014 dependency on RLS bypass found by this job is fixed, 2026-11-16)

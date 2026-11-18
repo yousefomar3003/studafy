@@ -659,6 +659,44 @@ describeDb("custom lists: the link picker", () => {
   }, 60_000);
 });
 
+describeDb("custom lists: the parent picker is scoped (QA-059)", () => {
+  // Users, roles and member codes are isolated by school only, so the picker listed every parent
+  // in the school to any staff member on a staff-audience list. Without user:read it now offers
+  // only parents of students the caller can already read.
+  test("a teacher sees only parents of students they can read; an administrator sees all", async () => {
+    const w = await world();
+    const list = await createList(w.admin, {
+      name_en: "Volunteers",
+      audience: "staff",
+      links: { student: true, parent: true, staff: false, class: true },
+    });
+    const parentsFound = async (who: Actor) => {
+      const response = await call(
+        who,
+        "GET",
+        `/api/custom-lists/${list.id}/link-candidates?kind=parent&q=Rana`,
+      );
+      expect(response.status).toBe(200);
+      return (await json<{ candidates: { id: string }[] }>(response)).candidates.map((c) => c.id);
+    };
+
+    expect(await parentsFound(w.teacher)).toEqual([]);
+    expect(await parentsFound(w.admin)).toEqual([w.parent.userId]);
+
+    const [family] = await database!.sql<{ id: string }[]>`
+      INSERT INTO app.families (school_id, display_name, primary_parent_user_id)
+      VALUES (${w.schoolId}::uuid, 'Family', ${w.parent.userId}::uuid)
+      RETURNING id
+    `;
+    await database!.sql`
+      INSERT INTO app.parent_child_links (school_id, family_id, parent_user_id, student_id, relationship)
+      VALUES (${w.schoolId}::uuid, ${family!.id}::uuid, ${w.parent.userId}::uuid,
+              ${w.studentId}::uuid, 'mother')
+    `;
+    expect(await parentsFound(w.teacher)).toEqual([w.parent.userId]);
+  }, 60_000);
+});
+
 // ---------------------------------------------------------------------------
 // Table, export, linked rows, search
 // ---------------------------------------------------------------------------

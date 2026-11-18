@@ -242,7 +242,7 @@ export async function listAnnouncements(
     WHERE a.school_id = ${schoolId}::uuid
       AND (${params.status ?? null}::text IS NULL OR a.status = ${params.status ?? null}::text)
       AND (${position?.created_at ?? null}::timestamptz IS NULL
-        OR (a.created_at, a.id) < (${position?.created_at ?? null}::timestamptz, ${position?.id ?? null}::uuid))
+        OR (a.created_at, a.id) < (COALESCE((SELECT k.created_at FROM app.announcements k WHERE k.id = ${position?.id ?? null}::uuid), ${position?.created_at ?? null}::timestamptz), ${position?.id ?? null}::uuid))
     ORDER BY a.created_at DESC, a.id DESC
     LIMIT ${params.limit + 1}
   `;

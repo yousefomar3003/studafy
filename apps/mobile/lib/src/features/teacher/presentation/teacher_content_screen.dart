@@ -1259,18 +1259,9 @@ class _MaterialComposerState extends ConsumerState<_MaterialComposer> {
           dayOfWeek: _day,
         ),
       );
-      // The initiate endpoint currently returns only the storage key. The material row is
-      // created synchronously as part of that endpoint, so resolve its id before confirmation.
-      final materials = await api.academics.listMaterials(
-        classId: widget.classId,
-        limit: 100,
-      );
-      final pending = materials.materials
-          .where((item) => item.storageKey == upload.storageKey)
-          .firstOrNull;
-      if (pending == null) {
-        throw StateError('The material upload could not be resolved.');
-      }
+      // The initiate response names the material it created (QA-009). The storage key is the
+      // temp/ staging key, which no longer matches the material's own (permanent) key, so the
+      // old lookup by storage key could not find it.
       await Dio().put<void>(
         upload.uploadUrl,
         data: File(file.path).openRead(),
@@ -1286,7 +1277,7 @@ class _MaterialComposerState extends ConsumerState<_MaterialComposer> {
       );
       // New materials are AI-visible by default; the clean scan hands them to AI ingestion.
       await api.academics.confirmMaterialUpload(
-        materialId: pending.id,
+        materialId: upload.materialId,
         body: ConfirmUploadBody(storageKey: upload.storageKey),
       );
       if (mounted) Navigator.of(context).pop(true);
