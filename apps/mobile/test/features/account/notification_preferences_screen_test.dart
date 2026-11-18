@@ -53,7 +53,6 @@ Widget _app({
   PushPermission permission = PushPermission.granted,
   FakePushService? push,
   List<(String?, String?)>? quietSaves,
-  void Function()? onTest,
 }) {
   final pushService = (push ?? FakePushService())..permission = permission;
   return ProviderScope(
@@ -72,7 +71,6 @@ Widget _app({
         quietSaves?.add((start, end));
         return NotificationQuietHours(start: start, end: end, timezone: 'Asia/Amman');
       }),
-      sendTestNotificationProvider.overrideWithValue(() async => onTest?.call()),
     ],
     child: accountScreenApp(const NotificationPreferencesScreen()),
   );
@@ -153,35 +151,12 @@ void main() {
     expect(find.text('Lessons'), findsNothing);
   });
 
-  testWidgets('allowed: sends a test notification', (tester) async {
-    var tests = 0;
-    await pumpAccountScreen(tester, _app(roles: const ['STUDENT'], onTest: () => tests++));
+  testWidgets('allowed: shows On, with no test-notification button', (tester) async {
+    await pumpAccountScreen(tester, _app(roles: const ['STUDENT']));
 
-    await tester.tap(find.byKey(const Key('notificationSendTest')));
-    await tester.pumpAndSettle();
-
-    expect(tests, 1);
-    expect(find.textContaining('Sent.'), findsOneWidget);
-  });
-
-  testWidgets('a phone that could not register says why instead of claiming the test was sent', (
-    tester,
-  ) async {
-    var tests = 0;
-    final push = FakePushService()
-      ..registrationError = const PushRegistrationException('no push token: FIS_AUTH_ERROR');
-    await pumpAccountScreen(
-      tester,
-      _app(roles: const ['STUDENT'], onTest: () => tests++, push: push),
-    );
-
-    await tester.tap(find.byKey(const Key('notificationSendTest')));
-    await tester.pumpAndSettle();
-
-    expect(tests, 0);
-    expect(find.textContaining('Sent.'), findsNothing);
-    expect(find.textContaining("This phone couldn't sign up for notifications"), findsOneWidget);
-    expect(find.textContaining('FIS_AUTH_ERROR'), findsOneWidget);
+    expect(find.textContaining('On. Notices show'), findsOneWidget);
+    expect(find.byKey(const Key('notificationSendTest')), findsNothing);
+    expect(find.byIcon(Icons.send_outlined), findsNothing);
   });
 
   testWidgets('turned off in the phone: offers Settings', (tester) async {
@@ -230,8 +205,6 @@ void main() {
       'Reason: PlatformException: NullPointerException: FirebaseCrashlytics component is not '
       'present.',
     );
-    // No token, so a test could not reach this phone.
-    expect(find.byKey(const Key('notificationSendTest')), findsNothing);
 
     await tester.tap(find.byKey(const Key('notificationRetrySetup')));
     await tester.pumpAndSettle();
@@ -240,19 +213,6 @@ void main() {
     expect(find.byKey(const Key('notificationPhoneProblem')), findsNothing);
     expect(find.byKey(const Key('notificationRetrySetup')), findsNothing);
     expect(find.textContaining('On. Notices show'), findsOneWidget);
-    expect(find.byKey(const Key('notificationSendTest')), findsOneWidget);
-  });
-
-  testWidgets('unavailable but this phone has a token: the test stays available', (tester) async {
-    final push = FakePushService()..problem = 'FirebaseException(core/not-initialized)';
-    await pumpAccountScreen(
-      tester,
-      _app(roles: const ['STUDENT'], permission: PushPermission.unavailable, push: push),
-    );
-
-    expect(find.byKey(const Key('notificationPhoneProblem')), findsOneWidget);
-    expect(find.byKey(const Key('notificationRetrySetup')), findsOneWidget);
-    expect(find.byKey(const Key('notificationSendTest')), findsOneWidget);
   });
 
   testWidgets('allowed but not registered: says why, with Try again', (tester) async {
@@ -261,7 +221,6 @@ void main() {
 
     expect(find.text('Reason: the server did not accept this phone: HTTP 500'), findsOneWidget);
     expect(find.byKey(const Key('notificationRetrySetup')), findsOneWidget);
-    expect(find.byKey(const Key('notificationSendTest')), findsOneWidget);
   });
 
   testWidgets('turned off in the phone: no failure reason, only Settings', (tester) async {
