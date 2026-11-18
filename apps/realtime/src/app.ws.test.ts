@@ -192,7 +192,9 @@ describe("cross-tenant room authorization (probe test)", () => {
 describe("re-auth protocol", () => {
   test("a connection is warned and closed with the re-auth code when its session expires", async () => {
     const { baseUrl } = startServer();
-    const nearFutureSessionExp = Math.floor(Date.now() / 1000) + 1;
+    // `sexp` is whole seconds: floor(now) + 1 can land only milliseconds ahead, so the handshake
+    // refuses an already-expired session. ceil(now) + 1 keeps 1-2 s of headroom.
+    const nearFutureSessionExp = Math.ceil(Date.now() / 1000) + 1;
 
     const client = await connect(
       `${baseUrl}/ws?ticket=${token("school-a", "user-a", { sexp: nearFutureSessionExp })}`,
@@ -211,15 +213,17 @@ describe("re-auth protocol", () => {
 
   test("the ticket's own expiry bounds the handshake only, not the open socket", async () => {
     const { baseUrl } = startServer();
-    const now = Math.floor(Date.now() / 1000);
+    const iat = Math.floor(Date.now() / 1000);
+    // As above: at least a full second ahead, so the handshake itself never sees an expired ticket.
+    const exp = Math.ceil(Date.now() / 1000) + 1;
 
     const client = await connect(
-      `${baseUrl}/ws?ticket=${token("school-a", "user-a", { iat: now, exp: now + 1 })}`,
+      `${baseUrl}/ws?ticket=${token("school-a", "user-a", { iat, exp })}`,
     );
     await waitUntil(() => client.received.data.length >= 3, "the three join acks");
 
     // Past the ticket's exp, well before the session's.
-    await new Promise((resolve) => setTimeout(resolve, 1200));
+    await new Promise((resolve) => setTimeout(resolve, exp * 1000 - Date.now() + 200));
     expect(client.received.closeCode).toBeUndefined();
 
     client.socket.close();
