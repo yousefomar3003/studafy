@@ -27,12 +27,20 @@ forbids, so ST-304 removed it.
 | School fees / invoices                         | Real-world service  | "Pay on website" on an outstanding invoice opens `pay_online_url` in the system browser       | The school's payment page (Tap / redirect), `FinanceInvoiceTile` |
 | Per-student AI add-on                          | Digital             | Unsubscribed shows `AiNotActiveCard`, then `AiStoreOfferCard`: App Store / Google Play in-app purchase with the store's own price | In the app through the store (`features/ai/store/`); on the web through Tap/Stripe at `/account/ai` |
 | School's Studafy plan (checkout, portal, cancel) | Digital (B2B)     | Not present                                                                                   | `apps/web` `/portal/billing`, org admins                         |
+| Student AI offered by the school (opt-in)      | Digital, school-billed | `/parent/student-ai`: "offered by your school", what it includes, the commitment, "your school will tell you the price", a confirmation box and Join. **No price, total, amount or way to pay**; the Finance tab says "included in your school fees" without an amount | The school, with its fees (it tells parents the price) |
 
 The AI add-on is one store product, `studafy_ai_monthly`, the same id in App Store Connect and the
 Play Console (`docs/runbooks/in-app-purchase-setup.md`). The app never shows a price of its own: it
 shows the store's localized price, and never mentions the web price or the website. A student who
 bought on the web sees the add-on active in the app, and the reverse — both feed the same
 `ai_subscriptions` entitlement.
+
+A family chooses (owner, 2026-11-18): the school's Student AI offer, or the in-app purchase at the
+store's price. A student **without** a school seat is always offered the in-app purchase, and the
+offer never mentions the school option. A student **with** a school seat is never sold it: the
+server's store config answers `covered_by_school` and the app shows "Provided by (school)" with no
+store sheet; the parent's per-child button is hidden. The school's offer screen never shows a price
+(`test/store_compliance/payment_routing_test.dart` checks its code and copy).
 
 ## How it's enforced
 

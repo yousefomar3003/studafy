@@ -122,11 +122,13 @@ export function portalParentPath(routes: readonly RouteObject[], pathname: strin
 
 /**
  * Tabs that are routed as pages of their own but are the sidebar page itself, seen through its tab
- * bar (License: Overview / Seats / Quotes / Invoices / Storage). A quote or an invoice below them is
+ * bar (License: Overview / Seats / Student AI / Student AI results / Quotes / Invoices / Storage). A quote or an invoice below them is
  * a page of its own again.
  */
 const SIDEBAR_TABS: ReadonlySet<string> = new Set([
   "/portal/license/seats",
+  "/portal/license/student-ai",
+  "/portal/license/student-ai/results",
   "/portal/license/quotes",
   "/portal/license/invoices",
   "/portal/license/storage",

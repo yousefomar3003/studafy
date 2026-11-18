@@ -114,6 +114,10 @@ function Facts({ license }: { license: SchoolLicense }) {
           })}
         </dd>
       </div>
+      <div>
+        <dt>{t("schoolLicense.commitment.label")}</dt>
+        <dd>{t(`schoolLicense.commitment.${license.commitment}`)}</dd>
+      </div>
       {isLicensableAudience("parent") || license.includeFamilyPlus ? (
         <div>
           <dt>{t("schoolLicense.overview.familyPlus")}</dt>
@@ -316,6 +320,13 @@ function OpenRequests({ requests }: { requests: readonly ChangeRequest[] }) {
       <ul className="license-list">
         {requests.map((request) => (
           <li key={request.id}>
+            {request.source === "ai_optin" ? (
+              <>
+                <span className="license-pill" data-testid="request-automatic">
+                  {t("schoolLicense.requests.automatic")}
+                </span>{" "}
+              </>
+            ) : null}
             {requestSummary(request, t)}{" "}
             <span className="license-muted">
               ({formatDate(new Date(request.createdAt), { dateStyle: "medium" })}): “{request.note}”

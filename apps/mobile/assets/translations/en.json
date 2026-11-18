@@ -602,6 +602,9 @@
     "activated": "Studafy AI is on.",
     "activatedFor": "Studafy AI is on for {name}.",
     "thisStudent": "this student",
+    "providedBy": "Provided by {school}.",
+    "providedByFor": "Studafy AI for {name} is provided by {school}.",
+    "yourSchool": "your school",
     "childButton": "Studafy AI for {name}",
     "unavailable": {
       "loadFailed": "We couldn't load this right now. Pull down to try again.",
@@ -1978,6 +1981,12 @@
           "settled": "All fees settled.",
           "asOf": "As of {date}"
         },
+        "studentAi": {
+          "title": "Student AI",
+          "line": "Student AI — included in your school fees",
+          "from": "From {month}",
+          "stoppedFrom": "Stopped from {month}"
+        },
         "invoices": {
           "title": "Invoices",
           "empty": "No invoices yet.",
@@ -2373,7 +2382,7 @@
         },
         "fees": {
           "title": "Fees and billing",
-          "subtitle": "Invoices, payments and reminders"
+          "subtitle": "Invoices, payments, reminders and Student AI"
         },
         "schoolUpdates": {
           "title": "School updates",
@@ -2634,6 +2643,69 @@
     "otherSchools": "Children at other schools aren't covered by the {school} seat: they need your own Family+, or a seat from their school.",
     "askSchool": "{school} offers Family+ through its license. Ask the school for a parent seat.",
     "notCovered": "Family+ isn't active for your account at this school."
+  },
+  "studentAiOptIn": {
+    "title": "Student AI",
+    "home": {
+      "intro": "Your school offers Student AI for the school year, as part of your school fees.",
+      "open": "See Student AI"
+    },
+    "status": {
+      "available": "Available",
+      "confirmed": "Confirmed",
+      "waitingSeat": "Waiting for the school",
+      "ended": "Ended",
+      "closed": "Closed"
+    },
+    "screen": {
+      "intro": "Student AI is a study helper your school offers for the school year. It's part of your school fees, and your school will tell you the price.",
+      "empty": "Student AI isn't offered for your children at this school.",
+      "loadError": "Couldn't load Student AI.",
+      "retry": "Try again"
+    },
+    "offer": {
+      "title": "Student AI for {child}",
+      "offeredBy": "Offered by your school",
+      "period": "From {start} to {end}",
+      "closesOn": "Join by {date}",
+      "includesTitle": "What it includes",
+      "includesHelper": "A study helper for {child} in the Studafy app.",
+      "includesClasses": "Explanations and practice on {child}'s school subjects.",
+      "includesYear": "Available for the rest of the school year.",
+      "termsTitle": "Before you confirm",
+      "termsCommitted": "It's committed for the school year and can't be cancelled mid-year.",
+      "termsFees": "It's part of your school fees.",
+      "termsFromSchool": "Your school will tell you the price.",
+      "termsFinal": "Once you confirm, it can't be undone in the app.",
+      "accept": "I understand: Student AI for {child} is committed for the school year, can't be cancelled mid-year, and is part of my school fees.",
+      "confirm": "Join",
+      "confirmed": "{child} has joined Student AI.",
+      "errors": {
+        "windowClosed": "Joining Student AI has just closed at the school.",
+        "alreadyOptedIn": "Student AI is already confirmed for {child}.",
+        "notEligible": "{child} can't join right now. Contact the school.",
+        "termsChanged": "The terms have changed. Read them and confirm again.",
+        "generic": "Couldn't join Student AI. Check your connection and try again."
+      }
+    },
+    "optedIn": {
+      "headline": "{child} has joined Student AI.",
+      "inFees": "Included in your school fees",
+      "recordedBySchool": "Recorded by the school on your behalf.",
+      "transferred": "The school moved a place to {child}.",
+      "waitingSeat": "Waiting for the school to add a place. Student AI starts once it's added.",
+      "seatReady": "The school has a place for {child}, so Student AI is on.",
+      "committed": "Committed for the school year. For any questions, contact the school."
+    },
+    "ended": {
+      "headline": "Student AI for {child} has ended.",
+      "released": "The school ended it. It stops from {month}.",
+      "transferred": "The school moved the place to another student."
+    },
+    "closed": {
+      "body": "Joining Student AI is closed at {school} for now.",
+      "yourSchool": "your school"
+    }
   },
   "launch": {
     "guide": {

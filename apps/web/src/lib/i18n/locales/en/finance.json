@@ -61,7 +61,9 @@
       "reports": "Reports →",
       "expenses": "Expenses →",
       "families": "Families →",
-      "tax": "Sales tax (VAT)"
+      "tax": "Sales tax (VAT)",
+      "studentAi": "Student AI on tuition",
+      "studentAiEarnings": "Student AI earnings →"
     }
   },
   "overdue": {
@@ -717,5 +719,75 @@
     "savedToast": "Tax settings saved",
     "saveError": "The tax settings could not be saved.",
     "loadError": "Unable to load the tax settings."
+  },
+  "studentAi": {
+    "title": "Student AI on tuition",
+    "intro": "Each student whose family chose Student AI has a Student AI fee: the monthly price times the months left in the school's academic year. Parents see it in the app as paid with tuition.",
+    "billingTitle": "Billing",
+    "autoBilling": "Add Student AI to the fee schedule",
+    "autoOn": "On: the fee is spread over each student's tuition instalments and added to the invoices generated for them.",
+    "autoOff": "Off: Studafy adds nothing to invoices. Bill Student AI with tuition yourself; parents still see the line as paid with tuition.",
+    "notRetroactive": "Changes apply only to what is not yet invoiced. Invoiced amounts never change; turning billing back on starts from this month.",
+    "readOnly": "You can view this page, but changing billing needs the billing:update permission.",
+    "recalculate": "Recalculate lines",
+    "savedToast": "Student AI billing saved",
+    "saveError": "The Student AI billing setting could not be saved.",
+    "recalculatedToast": "Student AI lines recalculated",
+    "recalculateError": "The Student AI lines could not be recalculated.",
+    "syncSummary": "{{created}} added, {{updated}} changed, {{removed}} removed.",
+    "loadError": "Unable to load the Student AI settings.",
+    "linesTitle": "Student AI lines",
+    "linesError": "Unable to load the Student AI lines.",
+    "empty": "No student has Student AI on their fees yet.",
+    "columns": {
+      "student": "Student",
+      "line": "Fee",
+      "period": "Period",
+      "invoiced": "Invoiced",
+      "planned": "Still to invoice"
+    },
+    "line_one": "{{price}}/month × {{count}} month = {{total}}",
+    "line_other": "{{price}}/month × {{count}} months = {{total}}",
+    "period": "{{start}} to {{end}}",
+    "stoppedFrom": "From {{start}}, stopped from {{stop}}",
+    "billedBySchool": "Billed by the school"
+  },
+  "studentAiEarnings": {
+    "title": "Student AI earnings",
+    "intro": "What the school owes and has paid Studafy for its licence, the revenue share Studafy gives back on each payment, and what the school earns from Student AI this year.",
+    "billingLink": "Student AI on tuition (auto-billing and lines)",
+    "loadError": "Student AI earnings could not be loaded.",
+    "earningsTitle": "This year's earnings",
+    "periodsTitle": "Revenue share per period",
+    "periodsIntro": "Each payment to Studafy earns a share of its Student AI part: collected → conversion % + bonus % = total % → amount.",
+    "empty": "No revenue share yet: it starts with the school's first payment to Studafy once Student AI opt-in is open.",
+    "paidOn": "Paid {{date}}",
+    "instalment": "Invoice {{number}}, instalment {{position}}",
+    "reversal": "Reversal of a share whose payment was voided",
+    "payoutsTitle": "Payouts from Studafy",
+    "noPayouts": "No payouts yet. Shares are credited on the school's next invoice unless Studafy pays them out.",
+    "stats": {
+      "label": "Student AI money",
+      "owed": "Owed to Studafy",
+      "owedHint": "Open licence invoices",
+      "overdue": "{{amount}} overdue",
+      "paid": "Paid to Studafy",
+      "paidHint": "Of {{invoiced}} invoiced",
+      "share": "Revenue share earned",
+      "shareFor": "Revenue share, {{year}}",
+      "shareHint": "On {{collected}} collected for Student AI seats",
+      "total": "Total earnings",
+      "totalFor": "Total earnings, {{year}}"
+    },
+    "columns": {
+      "period": "Period",
+      "payment": "Payment",
+      "share": "Share",
+      "status": "Status",
+      "destination": "Where it went",
+      "paidOn": "Paid on",
+      "reference": "Reference",
+      "amount": "Amount"
+    }
   }
 }

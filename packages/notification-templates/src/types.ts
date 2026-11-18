@@ -200,4 +200,26 @@ export interface NotificationTypeVars {
     subjectName: string;
     released: string;
   };
+  /** `price` is the formatted monthly price parents see, e.g. "6.00 USD". */
+  /**
+   * Parent-facing: never a price. The school tells parents the price (2026-11-18), so the
+   * notification only says it is offered, for the school year, as part of the school fees.
+   */
+  AI_OPTIN_AVAILABLE: {
+    childName: string;
+    schoolName: string;
+    closesOn: string;
+  };
+  /** Parent-facing, never a price or total; `startMonth` is "YYYY-MM". */
+  AI_OPTIN_CONFIRMED: {
+    childName: string;
+    schoolName: string;
+    startMonth: string;
+  };
+  /** Counts, as strings: new since the last summary, active in all, and waiting for a seat. */
+  AI_OPTIN_SUMMARY: {
+    newCount: string;
+    totalCount: string;
+    waitingCount: string;
+  };
 }

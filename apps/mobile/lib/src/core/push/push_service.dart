@@ -26,7 +26,9 @@ const _permissionRequestedKey = 'push_permission_requested';
 /// attendance-alert notification's metadata carries a student id, not a course id, so the
 /// template placeholder is never filled in and `route` arrives empty. `notification_type` itself
 /// is always present (see `buildDataPayload` on the delivery worker), so routing on it directly
-/// reaches the parent's alert center regardless of what `route` says.
+/// reaches the parent's alert center regardless of what `route` says. The parent's Student AI
+/// notices (`AI_OPTIN_AVAILABLE`, `AI_OPTIN_CONFIRMED`) always open their Student AI screen the
+/// same way.
 ///
 /// Any other route is followed only when the app can open it on its own
 /// ([isOpenableNotificationRoute]); otherwise the tap opens the notification inbox, where the
@@ -36,6 +38,9 @@ String? resolveNotificationTapRoute(Map<String, dynamic> data) {
   final type = data['notification_type'];
   if (type == 'ATTENDANCE_ALERT' || type == 'ATTENDANCE_MARKED') {
     return RoutePaths.parentAlerts;
+  }
+  if (type == 'AI_OPTIN_AVAILABLE' || type == 'AI_OPTIN_CONFIRMED') {
+    return RoutePaths.parentStudentAi;
   }
   final route = data['route'];
   if (route is String && isOpenableNotificationRoute(route)) return route;

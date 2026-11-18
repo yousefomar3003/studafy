@@ -553,6 +553,55 @@ export const ERROR_CODES = {
   LICENSE_PAYMENT_VOIDED: "LICENSE_PAYMENT_VOIDED",
   LICENSE_RECEIPT_NOT_FOUND: "LICENSE_RECEIPT_NOT_FOUND",
   LICENSE_RECEIPT_ALREADY_MATCHED: "LICENSE_RECEIPT_ALREADY_MATCHED",
+  // The Student AI revenue share (000237), the super admin's. AI_REVENUE_SHARE_CONVERSION_LOCKED: the
+  // licence period's conversion is locked, so it is not measured again. AI_REVENUE_SHARE_NOTHING_DUE:
+  // no share is due to be paid out in that currency. AI_REVENUE_SHARE_PAYOUT_CHANGED: the amount due
+  // is no longer the one the payout was recorded for -- reload and check it.
+  AI_REVENUE_SHARE_CONVERSION_LOCKED: "AI_REVENUE_SHARE_CONVERSION_LOCKED",
+  AI_REVENUE_SHARE_NOTHING_DUE: "AI_REVENUE_SHARE_NOTHING_DUE",
+  AI_REVENUE_SHARE_PAYOUT_CHANGED: "AI_REVENUE_SHARE_PAYOUT_CHANGED",
+  // The Student AI programme's settings (000234), the super admin's. AI_PROGRAMME_VALUE_OUT_OF_RANGE:
+  // a price, percentage, seat count or day count outside its bounds. AI_PROGRAMME_TIERS_INVALID: a
+  // tier table must start at 0%, raise its threshold on every row, never lower a share, and have at
+  // most 20 rows. AI_PROGRAMME_SHARE_ABOVE_MAX: a tier share, the large-school floor or a bonus is
+  // above the maximum revenue share. AI_PROGRAMME_CURRENCY_INVALID: no prices, a currency twice or
+  // not in use, or school prices without the school's currency. AI_PROGRAMME_REASON_REQUIRED: every
+  // change says why. AI_PROGRAMME_VERSION_CONFLICT: someone saved a newer version since this one was
+  // opened -- reload and try again.
+  AI_PROGRAMME_VALUE_OUT_OF_RANGE: "AI_PROGRAMME_VALUE_OUT_OF_RANGE",
+  AI_PROGRAMME_TIERS_INVALID: "AI_PROGRAMME_TIERS_INVALID",
+  AI_PROGRAMME_SHARE_ABOVE_MAX: "AI_PROGRAMME_SHARE_ABOVE_MAX",
+  AI_PROGRAMME_CURRENCY_INVALID: "AI_PROGRAMME_CURRENCY_INVALID",
+  AI_PROGRAMME_REASON_REQUIRED: "AI_PROGRAMME_REASON_REQUIRED",
+  AI_PROGRAMME_VERSION_CONFLICT: "AI_PROGRAMME_VERSION_CONFLICT",
+  // Student AI opt-in and programme seats (000235). AI_OPTIN_NO_LICENCE: no licence with student seats
+  // (active or awaiting payment) to open a window on. AI_OPTIN_PRICE_MISSING: no parent price in the
+  // licence's currency. AI_OPTIN_WINDOW_INVALID: dates out of order or past the academic year, or a
+  // grade/section not of that year. AI_OPTIN_MINIMUM_NOT_ACKNOWLEDGED: opening the window needs the
+  // school to accept the programme's minimum seats. AI_OPTIN_WINDOW_CLOSED: no window open today.
+  // AI_OPTIN_WINDOW_ALREADY_OPEN: close the current window before opening another.
+  // AI_OPTIN_NOT_ELIGIBLE: not an enrolled student of the window's grades/sections (or not the
+  // caller's child). AI_OPTIN_ALREADY_OPTED_IN: one per student per year. AI_OPTIN_YEAR_OVER: no
+  // months left. AI_OPTIN_TERMS_REQUIRED: the terms were not accepted. AI_OPTIN_TERMS_CHANGED: the
+  // parent accepted an older version of the terms (show the current ones). AI_OPTIN_ENDED: already
+  // released or transferred. AI_OPTIN_STUDENT_NOT_LEFT: a seat is transferred or released only for a
+  // student who left. LICENSE_SEAT_PROGRAMME_LOCKED: a programme seat cannot be unassigned.
+  AI_OPTIN_NO_LICENCE: "AI_OPTIN_NO_LICENCE",
+  AI_OPTIN_PRICE_MISSING: "AI_OPTIN_PRICE_MISSING",
+  AI_OPTIN_WINDOW_INVALID: "AI_OPTIN_WINDOW_INVALID",
+  AI_OPTIN_MINIMUM_NOT_ACKNOWLEDGED: "AI_OPTIN_MINIMUM_NOT_ACKNOWLEDGED",
+  AI_OPTIN_WINDOW_CLOSED: "AI_OPTIN_WINDOW_CLOSED",
+  AI_OPTIN_WINDOW_ALREADY_OPEN: "AI_OPTIN_WINDOW_ALREADY_OPEN",
+  AI_OPTIN_WINDOW_NOT_FOUND: "AI_OPTIN_WINDOW_NOT_FOUND",
+  AI_OPTIN_NOT_ELIGIBLE: "AI_OPTIN_NOT_ELIGIBLE",
+  AI_OPTIN_ALREADY_OPTED_IN: "AI_OPTIN_ALREADY_OPTED_IN",
+  AI_OPTIN_YEAR_OVER: "AI_OPTIN_YEAR_OVER",
+  AI_OPTIN_TERMS_REQUIRED: "AI_OPTIN_TERMS_REQUIRED",
+  AI_OPTIN_TERMS_CHANGED: "AI_OPTIN_TERMS_CHANGED",
+  AI_OPTIN_NOT_FOUND: "AI_OPTIN_NOT_FOUND",
+  AI_OPTIN_ENDED: "AI_OPTIN_ENDED",
+  AI_OPTIN_STUDENT_NOT_LEFT: "AI_OPTIN_STUDENT_NOT_LEFT",
+  LICENSE_SEAT_PROGRAMME_LOCKED: "LICENSE_SEAT_PROGRAMME_LOCKED",
 
   // Third-party AI data-sharing consent (ST-305). AI_CONSENT_REQUIRED is the consent gate's refusal:
   // the caller has no live consent for the current disclosure, so nothing was sent to the model

@@ -154,14 +154,14 @@ void main() {
     );
 
     test(
-      'not covered, the school sells a seat that includes it: ask the school',
+      'not covered and no seat, though the school sells seats: the store (the family chooses)',
       () {
+        // Owner, 2026-11-18: a family may take Student AI from the school or buy it in the app.
+        // A school that merely sells seats no longer replaces the purchase.
         final state = gate(
           featureJson(reason: 'not_included', schoolOffers: true),
         );
-        expect(state, isA<FeatureAskSchool>());
-        expect((state as FeatureAskSchool).hasSeat, isFalse);
-        expect(state.schoolName, 'Alpha Academy');
+        expect(state, isA<FeaturePurchasable>());
       },
     );
 
@@ -173,6 +173,12 @@ void main() {
         );
         expect(state, isA<FeatureAskSchool>());
         expect((state as FeatureAskSchool).hasSeat, isTrue);
+        expect(state.schoolName, 'Alpha Academy');
+        // Selling seats as well changes nothing: still never a purchase.
+        expect(
+          gate(featureJson(reason: 'not_included', schoolSeat: true, schoolOffers: true)),
+          isA<FeatureAskSchool>(),
+        );
       },
     );
 

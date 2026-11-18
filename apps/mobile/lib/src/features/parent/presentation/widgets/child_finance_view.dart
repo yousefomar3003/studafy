@@ -9,13 +9,14 @@ import 'child_detail_placeholders.dart';
 import 'finance_installment_tile.dart';
 import 'finance_invoice_tile.dart';
 import 'finance_receipt_tile.dart';
+import 'finance_student_ai_tile.dart';
 import '../../../../design/layout/bottom_inset_padding.dart';
 
-/// The Finance tab of `ChildDetailScreen`: the selected child's balance, invoices,
-/// fee-schedule installments and payment receipts, drawn from the same household
-/// [familyFinanceProvider] the parent home's `ChildFeesCard` watches — so a finance-service
-/// outage (the endpoint can 429/503) shows here with its own retry, never blanking the other
-/// tabs. Read-only per architecture: nothing on this tab writes anything back.
+/// The Finance tab of `ChildDetailScreen`: the selected child's balance, Student AI line
+/// (when opted in), invoices, fee-schedule installments and payment receipts, drawn from the same
+/// household [familyFinanceProvider] the parent home's `ChildFeesCard` watches — so a
+/// finance-service outage (the endpoint can 429/503) shows here with its own retry, never blanking
+/// the other tabs. Read-only per architecture: nothing on this tab writes anything back.
 class ChildFinanceView extends ConsumerWidget {
   const ChildFinanceView({required this.studentId, super.key});
 
@@ -47,6 +48,17 @@ class ChildFinanceView extends ConsumerWidget {
             children: [
               _BalanceCard(totals: section.totals, dataAsOf: view.dataAsOf),
               const SizedBox(height: AppSpacing.space16),
+              if (section.studentAiLines.isNotEmpty) ...[
+                _FinanceSection(
+                  titleKey: 'parent.childDetail.finance.studentAi.title',
+                  emptyKey: 'parent.childDetail.finance.studentAi.title',
+                  icon: Icons.auto_awesome_outlined,
+                  itemCount: section.studentAiLines.length,
+                  itemBuilder: (context, i) =>
+                      FinanceStudentAiTile(line: section.studentAiLines[i]),
+                ),
+                const SizedBox(height: AppSpacing.space16),
+              ],
               _FinanceSection(
                 titleKey: 'parent.childDetail.finance.invoices.title',
                 emptyKey: 'parent.childDetail.finance.invoices.empty',

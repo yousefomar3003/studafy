@@ -15,6 +15,7 @@ void main() {
         expect(isOpenableNotificationRoute('/courses/c-1/grades'), isTrue);
         expect(isOpenableNotificationRoute('/parent/alerts'), isTrue);
         expect(isOpenableNotificationRoute('/classes/k-1/materials'), isTrue);
+        expect(isOpenableNotificationRoute('/parent/student-ai'), isTrue);
       },
     );
 
@@ -160,6 +161,46 @@ void main() {
         );
         expect(target.route, '/parent/alerts', reason: type);
       }
+    });
+
+    test("a parent's Student AI notices open their Student AI screen", () {
+      for (final type in ['AI_OPTIN_AVAILABLE', 'AI_OPTIN_CONFIRMED']) {
+        for (final metadata in [
+          {'route': '/parent/student-ai'},
+          const <String, dynamic>{},
+        ]) {
+          final target = notificationTargetFor(
+            type: type,
+            metadata: metadata,
+            role: ShellRole.parent,
+          );
+          expect(target.route, '/parent/student-ai', reason: '$type $metadata');
+        }
+      }
+    });
+
+    test("Student AI notices open nothing outside the parent's shell", () {
+      for (final role in [
+        ShellRole.student,
+        ShellRole.teacher,
+        ShellRole.viewer,
+      ]) {
+        final target = notificationTargetFor(
+          type: 'AI_OPTIN_CONFIRMED',
+          metadata: {'route': '/parent/student-ai'},
+          role: role,
+        );
+        expect(target.isNone, isTrue, reason: '$role');
+      }
+    });
+
+    test("the leadership's Student AI summary shows its text in place", () {
+      final target = notificationTargetFor(
+        type: 'AI_OPTIN_SUMMARY',
+        metadata: {'route': '/'},
+        role: ShellRole.teacher,
+      );
+      expect(target.isNone, isTrue);
     });
 
     test('a message opens the Messages tab for teachers and parents', () {

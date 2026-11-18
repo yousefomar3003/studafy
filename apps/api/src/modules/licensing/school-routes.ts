@@ -123,12 +123,14 @@ const unassignSeatRoute = createRoute({
   operationId: "unassignSchoolLicenseSeat",
   summary: "Unassign a seat",
   description:
-    "Frees the seat for someone else. The holder's personal subscription, if any, is not touched.",
+    "Frees the seat for someone else. The holder's personal subscription, if any, is not touched. " +
+    "409 LICENSE_SEAT_PROGRAMME_LOCKED for a Student AI programme seat: transfer or release it " +
+    "through the opt-in when the student leaves.",
   security: [{ bearerAuth: [] }],
   request: { params: schoolSeatParamsSchema },
   responses: standardResponses(
     { 200: { description: "The freed seat", schema: unassignSeatResponseSchema } },
-    [401, 403, 404],
+    [401, 403, 404, 409],
   ),
 });
 

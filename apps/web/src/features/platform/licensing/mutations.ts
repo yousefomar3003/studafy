@@ -93,7 +93,14 @@ export function useSaveBankDetails() {
 
 export function useCreateQuote() {
   return useLicensingMutation(
-    async (input: { schoolId: string; body: QuoteCalculateBody & { notes?: string | null } }) => {
+    async (input: {
+      schoolId: string;
+      body: QuoteCalculateBody & {
+        notes?: string | null;
+        /** Unset keeps the licence's commitment (full year for a new licence). */
+        commitment?: Schemas["LicenseCommitment"];
+      };
+    }) => {
       const { schoolId: _ignored, ...body } = input.body;
       const { data } = await api.POST("/api/platform/schools/{schoolId}/license-quotes", {
         params: { path: { schoolId: input.schoolId } },
@@ -379,4 +386,60 @@ export async function fileUrl(
     { params: { path: input } },
   );
   return required(data, "Payment file").url;
+}
+
+// ---------------------------------------------------------------------------------------------------
+// The Student AI programme's settings (000234)
+// ---------------------------------------------------------------------------------------------------
+
+export type AiProgrammeVersionBody = Schemas["AiProgrammeVersionBody"];
+export type AiProgrammeOverrideBody = Schemas["AiProgrammeOverrideBody"];
+
+export function useSaveAiProgrammeVersion() {
+  return useLicensingMutation(async (body: AiProgrammeVersionBody) => {
+    const { data } = await api.POST("/api/platform/ai-programme/versions", { body });
+    return required(data, "Programme version");
+  });
+}
+
+export function useSaveSchoolAiProgrammeOverride() {
+  return useLicensingMutation(
+    async (input: { schoolId: string; body: AiProgrammeOverrideBody }) => {
+      const { data } = await api.PUT("/api/platform/schools/{schoolId}/ai-programme/override", {
+        params: { path: { schoolId: input.schoolId } },
+        body: input.body,
+      });
+      return required(data, "School programme override");
+    },
+  );
+}
+
+export function useClearSchoolAiProgrammeOverride() {
+  return useLicensingMutation(
+    async (input: { schoolId: string; reason: string; basedOnOverrideId: string | null }) => {
+      const { data } = await api.POST(
+        "/api/platform/schools/{schoolId}/ai-programme/override/clear",
+        {
+          params: { path: { schoolId: input.schoolId } },
+          body: { reason: input.reason, basedOnOverrideId: input.basedOnOverrideId },
+        },
+      );
+      return required(data, "School programme override");
+    },
+  );
+}
+
+export function useReapplyLicenseAiProgramme() {
+  return useLicensingMutation(
+    async (input: { schoolId: string; licenseId: string; reason: string }) => {
+      const { data } = await api.POST(
+        "/api/platform/schools/{schoolId}/licenses/{licenseId}/ai-programme/reapply",
+        {
+          params: { path: { schoolId: input.schoolId, licenseId: input.licenseId } },
+          body: { reason: input.reason },
+        },
+      );
+      return required(data, "Licence programme");
+    },
+  );
 }

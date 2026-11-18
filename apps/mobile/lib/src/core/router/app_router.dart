@@ -16,6 +16,7 @@ import '../../features/shell/presentation/app_shell.dart';
 import '../../features/notifications/presentation/notification_destination_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/parent/presentation/parent_communication_screen.dart';
+import '../../features/parent/presentation/student_ai_opt_in_screen.dart';
 import '../../features/student/presentation/assignment_detail_screen.dart';
 import '../../features/student/presentation/grades_screen.dart';
 import '../../features/student/presentation/materials_screen.dart';
@@ -129,6 +130,13 @@ GoRouter createAppRouter({required AppConfig appConfig, Listenable? refreshListe
       GoRoute(
         path: RoutePaths.parentAlerts,
         builder: (context, state) => const ParentCommunicationScreen(initialTabIndex: 1),
+      ),
+
+      // Student AI for the signed-in parent's children: opt in, or see what was confirmed. Deep-
+      // linked from the `AI_OPTIN_AVAILABLE` / `AI_OPTIN_CONFIRMED` notifications.
+      GoRoute(
+        path: RoutePaths.parentStudentAi,
+        builder: (context, state) => const StudentAiOptInScreen(),
       ),
 
       // The notification inbox, for every role (the app bar's bell).

@@ -7,6 +7,7 @@ import { requireAuth } from "../../../middleware/authContext";
 import { requirePermission } from "../../../middleware/authz";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
+import { resyncStudentAiAfterCommit } from "../student-ai/service";
 
 import {
   generateFeeScheduleBodySchema,
@@ -148,6 +149,18 @@ export function installmentRoutes(
         acceptLanguage,
       );
     });
+
+    // The students' Student AI lines (000238) follow their instalments: re-spread what is not yet
+    // invoiced over the new due dates. Best effort, after the schedule is committed -- ERPNext has
+    // it already; a failure is logged at error level with the school and students, and
+    // `POST /api/finance/student-ai/sync` (idempotent) redoes it.
+    await resyncStudentAiAfterCommit(
+      database,
+      { schoolId: auth.schoolId, userId: auth.userId, requestId: c.get("requestId") },
+      body.student_ids,
+      c.get("log"),
+      "fee_schedule_generated",
+    );
 
     return c.json({ installments: rows.map(toResponse), total: rows.length }, 201);
   });

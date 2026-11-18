@@ -19,6 +19,22 @@ const ALL_CHANNELS: NotificationChannel[] = [
 const ALL_TYPES = Object.values(NOTIFICATION_TYPES);
 
 describe("notification catalog", () => {
+  test("a parent's Student AI notices never name a price or a total (the school tells parents)", () => {
+    const parentTypes = [
+      NOTIFICATION_TYPES.AI_OPTIN_AVAILABLE,
+      NOTIFICATION_TYPES.AI_OPTIN_CONFIRMED,
+    ];
+    for (const templates of [EN_TEMPLATES, AR_TEMPLATES]) {
+      for (const type of parentTypes) {
+        for (const channel of ALL_CHANNELS) {
+          const text = templates[type][channel];
+          expect(text).not.toMatch(/\{(price|total|months|amount|monthly\w*)\}/i);
+          expect(text).not.toMatch(/[$€£]|\bUSD\b|\bJOD\b|\bSAR\b|د\.ا|ر\.س|\d/);
+        }
+      }
+    }
+  });
+
   test("every NOTIFICATION_TYPE has a catalog entry", () => {
     for (const type of ALL_TYPES) {
       expect(NOTIFICATION_CATALOG).toHaveProperty(type);
@@ -98,6 +114,15 @@ describe("templates — completeness", () => {
                       "subjectName",
                       "released",
                       "stopDate",
+                      "childName",
+                      "price",
+                      "closesOn",
+                      "months",
+                      "total",
+                      "startMonth",
+                      "newCount",
+                      "totalCount",
+                      "waitingCount",
                     ].includes(varName),
                 ).toBe(true);
               }
@@ -262,6 +287,21 @@ describe("renderNotification — snapshot tests", () => {
       who: "Amina Tazi · ",
       subjectName: "Mathematics",
       released: "First exam marks are out for Mathematics",
+    },
+    [NOTIFICATION_TYPES.AI_OPTIN_AVAILABLE]: {
+      childName: "Amina Tazi",
+      schoolName: "Amman Academy",
+      closesOn: "2026-12-15",
+    },
+    [NOTIFICATION_TYPES.AI_OPTIN_CONFIRMED]: {
+      childName: "Amina Tazi",
+      schoolName: "Amman Academy",
+      startMonth: "2026-11",
+    },
+    [NOTIFICATION_TYPES.AI_OPTIN_SUMMARY]: {
+      newCount: "12",
+      totalCount: "48",
+      waitingCount: "3",
     },
   } as const;
 

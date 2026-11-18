@@ -414,6 +414,10 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/finance/scholarship-awards/{awardId}/approve",
   "POST /api/finance/scholarship-awards/{awardId}/reject",
   "POST /api/finance/scholarship-awards/{awardId}/revoke",
+  // The Student AI line on tuition (000238): the auto-billing switch and the recalculation, audited
+  // by the middleware and per line in the service.
+  "PUT /api/finance/student-ai/settings",
+  "POST /api/finance/student-ai/sync",
   // Family finance (finance/family-accounts): one payment split across a family's invoices (each
   // share audited by the payment forwarder too), and reminders and statements to its guardians.
   "POST /api/finance/families/{familyId}/payments",
@@ -582,11 +586,30 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/school/license/seats",
   "DELETE /api/school/license/seats/{seatId}",
   "POST /api/school/license/change-requests",
+  // Student AI opt-in (000235): windows, opt-ins, transfers and releases are audited from inside the
+  // service transaction (ai_optin_windows, ai_optins, license_seats, license_change_requests).
+  "POST /api/school/license/student-ai/windows",
+  "POST /api/school/license/student-ai/windows/{windowId}/close",
+  "POST /api/school/license/student-ai/opt-ins",
+  "POST /api/school/license/student-ai/opt-ins/{optInId}/transfer",
+  "POST /api/school/license/student-ai/opt-ins/{optInId}/release",
+  "POST /api/parent/student-ai/opt-ins",
   // License billing (session 3). Quotes, invoices, payments and receipts are audited from inside the
   // service transaction (the console's two rows for a super admin); price settings and bank details
   // in the operator's home school. The calculator and the upload URL write nothing (declared for
   // this gate, as the other upload-url routes are).
   "PUT /api/platform/licenses/price-settings/{currencyCode}",
+  // Student AI programme settings (000234): every save is a new version, audited in the service; the preview writes nothing (declared for this gate, like the calculator).
+  "POST /api/platform/ai-programme/versions",
+  "PUT /api/platform/schools/{schoolId}/ai-programme/override",
+  "POST /api/platform/schools/{schoolId}/ai-programme/override/clear",
+  "POST /api/platform/schools/{schoolId}/ai-programme/preview",
+  "POST /api/platform/schools/{schoolId}/licenses/{licenseId}/ai-programme/reapply",
+  // Student AI revenue share (000237): every change (a re-measure, a recompute, a payout) is audited
+  // in the service, entry by entry.
+  "POST /api/platform/schools/{schoolId}/licenses/{licenseId}/ai-revenue-share/measure",
+  "POST /api/platform/schools/{schoolId}/ai-revenue-share/recompute",
+  "POST /api/platform/schools/{schoolId}/ai-revenue-share/payouts",
   "PUT /api/platform/licenses/bank-details",
   "POST /api/platform/licenses/quote",
   "POST /api/platform/schools/{schoolId}/license-quotes",

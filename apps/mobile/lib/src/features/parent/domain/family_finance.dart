@@ -181,6 +181,39 @@ class FamilyReceipt {
   String get amountLabel => moneyLabel(amount, currency);
 }
 
+/// A child's "Student AI" line for one academic year, as `GET /api/finance/families/{familyId}`
+/// reports it (`student_ai_lines`): included in the school fees, from [startMonth], stopped from
+/// [stoppedFrom] once the seat was released or transferred. The API sends no price, total or amount
+/// for it -- the school tells parents the price -- and the app shows none. It never carries what the
+/// school pays for its licence or any revenue share either.
+class FamilyStudentAiLine {
+  const FamilyStudentAiLine({
+    required this.academicYearName,
+    required this.startMonth,
+    required this.lateStart,
+    required this.stoppedFrom,
+  });
+
+  factory FamilyStudentAiLine.fromJson(Map<String, Object?> json) => FamilyStudentAiLine(
+        academicYearName: json['academic_year_name']! as String,
+        startMonth: _month(json['start_month']! as String),
+        lateStart: json['late_start'] as bool? ?? false,
+        stoppedFrom: json['stopped_from'] == null ? null : _month(json['stopped_from']! as String),
+      );
+
+  /// `"2026-09"` → the first day of that month.
+  static DateTime _month(String value) => DateTime.parse('$value-01');
+
+  final String academicYearName;
+
+  /// The first month it runs; shown when the child joined after the year began ([lateStart]).
+  final DateTime startMonth;
+  final bool lateStart;
+
+  /// The first month it no longer runs, once the seat was released or transferred.
+  final DateTime? stoppedFrom;
+}
+
 /// One linked child's full finance detail, as the family financial view scopes it.
 class FamilyStudentFinance {
   const FamilyStudentFinance({
@@ -189,6 +222,7 @@ class FamilyStudentFinance {
     required this.installments,
     required this.receipts,
     required this.totals,
+    this.studentAiLines = const [],
   });
 
   final String studentId;
@@ -197,7 +231,11 @@ class FamilyStudentFinance {
   final List<FamilyReceipt> receipts;
   final List<MoneyTotal> totals;
 
-  bool get isEmpty => invoices.isEmpty && installments.isEmpty && receipts.isEmpty;
+  /// The child's Student AI line per academic year, newest first; empty when not opted in.
+  final List<FamilyStudentAiLine> studentAiLines;
+
+  bool get isEmpty =>
+      invoices.isEmpty && installments.isEmpty && receipts.isEmpty && studentAiLines.isEmpty;
 }
 
 /// The parent-facing slice of `GET /api/finance/families/{familyId}`: read-only per

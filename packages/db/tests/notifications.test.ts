@@ -71,6 +71,10 @@ const NOTIFICATION_TYPES = [
   // Licence AI cutoff for unpaid instalments. Appended by 000233, in that order; sort last.
   "LICENSE_AI_STOP_WARNING",
   "LICENSE_AI_STOPPED",
+  // Student AI opt-in notices. Appended by 000239, in that order; sort last.
+  "AI_OPTIN_AVAILABLE",
+  "AI_OPTIN_CONFIRMED",
+  "AI_OPTIN_SUMMARY",
 ] as const;
 const NOTIFICATION_CHANNELS = ["in_app", "email", "push"] as const;
 const DEFAULT_PREFERENCES = NOTIFICATION_TYPES.length * NOTIFICATION_CHANNELS.length;

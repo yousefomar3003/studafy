@@ -165,6 +165,7 @@ describe("store setup", () => {
       accountToken: null,
       profileId: null,
       purchaseConfirmation: null,
+      schoolName: null,
     });
   });
 });

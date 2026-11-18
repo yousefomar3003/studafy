@@ -36,14 +36,24 @@ export function isAllowedLicensePaymentLink(value: string): boolean {
  * A licence's AI stops once an instalment is still unpaid this many days after its due date
  * (db/migrations/000233): due 1 March, the AI stops on 31 March (UTC) and resumes when it is paid.
  * Every instalment counts, so a later one going unpaid stops it again.
+ *
+ * The default only: since 000234 the grace period is a Student AI programme setting the super admin
+ * can change (globally or per school), and each licence keeps the value it was signed with in
+ * app.school_licenses.nonpayment_grace_days. Code that knows the licence uses that column.
  */
 export const LICENSE_NONPAYMENT_GRACE_DAYS = 30;
 
 /** Days before the cutoff the school is warned. */
 export const LICENSE_AI_STOP_WARNING_DAYS = 7;
 
-/** The UTC date (YYYY-MM-DD) the AI stops if an instalment due on `dueDate` is still unpaid. */
-export function licenseAiStopDate(dueDate: string): string {
+/**
+ * The UTC date (YYYY-MM-DD) the AI stops if an instalment due on `dueDate` is still unpaid, for a
+ * licence with `graceDays` of grace (its own nonpayment_grace_days).
+ */
+export function licenseAiStopDate(
+  dueDate: string,
+  graceDays: number = LICENSE_NONPAYMENT_GRACE_DAYS,
+): string {
   const due = Date.parse(`${dueDate.slice(0, 10)}T00:00:00Z`);
-  return new Date(due + LICENSE_NONPAYMENT_GRACE_DAYS * 86_400_000).toISOString().slice(0, 10);
+  return new Date(due + graceDays * 86_400_000).toISOString().slice(0, 10);
 }
