@@ -174,6 +174,12 @@ export const NOTIFICATION_CATALOG = {
       route: "/",
     },
   },
+  [NOTIFICATION_TYPES.AI_REVENUE_SHARE_STATEMENTS_READY]: {
+    channels: [NOTIFICATION_CHANNELS.IN_APP, NOTIFICATION_CHANNELS.PUSH],
+    metadataDefaults: {
+      route: "/portal/platform/ai-programme/statements",
+    },
+  },
   [NOTIFICATION_TYPES.LICENSE_AI_STOP_WARNING]: {
     channels: [NOTIFICATION_CHANNELS.IN_APP, NOTIFICATION_CHANNELS.PUSH],
     metadataDefaults: {

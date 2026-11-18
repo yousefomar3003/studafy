@@ -91,11 +91,13 @@ export const revenueShareTotalsSchema = z
     minorUnit: int,
     baseMinor: minor,
     pendingMinor: minor,
+    awaitingApprovalMinor: minor,
     owedMinor: minor,
     creditedMinor: minor,
     payoutDueMinor: minor,
     paidOutMinor: minor,
     forfeitedMinor: minor,
+    rejectedMinor: minor,
     earnedMinor: minor,
   })
   .openapi("AiRevenueShareTotals");

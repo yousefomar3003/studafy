@@ -13,7 +13,11 @@
  * period the payment covers are all in the past, as they are for a real school mid-year.
  */
 
-import { REVENUE_SHARE_MEASURES, lockDueConversionSnapshots } from "@studafy/billing";
+import {
+  REVENUE_SHARE_MEASURES,
+  approveShares,
+  lockDueConversionSnapshots,
+} from "@studafy/billing";
 import { ROLES } from "@studafy/constants";
 import { academicYearMonths, monthCount, monthsBetween } from "@studafy/license-pricing";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
@@ -131,7 +135,7 @@ afterAll(async () => {
 
 describe("the Student AI programme, end to end", () => {
   integrationTest(
-    "window -> opt-ins -> seats -> tuition lines -> day-30 conversion -> payment -> share with the real bonus -> credit",
+    "window -> opt-ins -> seats -> tuition lines -> month 1's conversion -> payment -> share with the real bonus -> approval -> credit",
     async () => {
       // ---- The school: a year that began on the 1st two months ago, every day a school day (UTC+0). ----
       const now = new Date();
@@ -408,8 +412,9 @@ describe("the Student AI programme, end to end", () => {
       const uploadBps = Math.floor(((daysInFirstMonth - 3) * 10_000) / daysInFirstMonth);
       expect(uploadBps).toBeGreaterThanOrEqual(8000);
 
-      // ---- Phase 5: the hourly job locks the conversion on day 30 -- 2 of 3 enrolled, 66.66%. ----
-      const measureDay = new Date(start.getTime() + 30 * DAY);
+      // ---- Phase 5: the hourly job locks month 1's conversion on its first day -- 2 of 3 enrolled
+      // hold Student AI from the school, 66.66%. Conversion is monthly (owner, 2026-11-18). ----
+      const measureDay = start;
       const locked = await asAdmin(schoolId, (tx) =>
         lockDueConversionSnapshots(tx, {
           schoolId,
@@ -424,7 +429,8 @@ describe("the Student AI programme, end to end", () => {
         optedInCount: 2,
         conversionBps: 6666,
         conversionShareBps: 800,
-        seats: 30,
+        // The large-school floor's test: the students the school provides Student AI to.
+        seats: 2,
       });
 
       // ---- The school pays its first instalment on day 5: $120. ----
@@ -443,11 +449,12 @@ describe("the Student AI programme, end to end", () => {
       )) as { licenseActivated: boolean };
       expect(paid.licenseActivated).toBe(true);
 
-      // Its share: 8% conversion + 3% content bonus (the real upload consistency) = 11% of $120.
+      // Its share: 8% conversion + 3% content bonus (the real upload consistency) = 11% of $120,
+      // final (month 1 is locked and over), waiting for the super admin's approval.
       const [entry] = await asAdmin(schoolId, (tx) => listRevenueShareEntries(tx, { licenseId }));
       expect(entry).toMatchObject({
         kind: "share",
-        status: "owed",
+        status: "awaiting_approval",
         collectedMinor: 12_000,
         baseMinor: 12_000,
         periodFrom: ISO(start),
@@ -461,6 +468,14 @@ describe("the Student AI programme, end to end", () => {
         conversionPending: false,
         bonusPending: false,
       });
+
+      // ---- A super admin approves it on the school's weekly statement: owed. ----
+      await asAdmin(schoolId, (tx) =>
+        approveShares(tx, { schoolId, now: new Date(), audit: async () => undefined }, [entry!.id]),
+      );
+      expect(
+        (await asAdmin(schoolId, (tx) => listRevenueShareEntries(tx, { licenseId })))[0]!.status,
+      ).toBe("owed");
 
       // ---- The school's next invoice (more seats) carries the credit. ----
       const increase = await as(schoolId, operator, async (tx) => {

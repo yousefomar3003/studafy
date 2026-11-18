@@ -10,7 +10,11 @@ import {
   useCurrencyMoney,
   useDay,
 } from "../../ai-programme/components";
-import { useSchoolLedgerQuery, useSchoolProgrammeQuery } from "../../ai-programme/queries";
+import {
+  useSchoolLedgerQuery,
+  useSchoolProgrammeQuery,
+  useSchoolStatementsQuery,
+} from "../../ai-programme/queries";
 import { useMoney } from "../../platform/licensing/format";
 
 import type { StatItem } from "../../ai-programme/components";
@@ -18,6 +22,7 @@ import type {
   ProgrammeDashboard,
   RevenueShareEntry,
   RevenueShareLedger,
+  StatementStatus,
 } from "../../ai-programme/queries";
 
 const P = "finance.studentAiEarnings";
@@ -67,6 +72,7 @@ export default function StudentAiEarningsPage() {
         {ledger.data ? <SharePeriods ledger={ledger.data} /> : null}
       </section>
       {ledger.data ? <Payouts ledger={ledger.data} /> : null}
+      <Statements />
     </div>
   );
 }
@@ -230,6 +236,72 @@ function Payouts({ ledger }: { ledger: RevenueShareLedger }) {
           </table>
         </div>
       )}
+    </section>
+  );
+}
+
+/**
+ * The weekly statements (000251): each week, the Student AI months the school collected from
+ * parents, what it owes Studafy for them less its share, and Studafy's decision. An approved one is
+ * billed on the invoice shown; the months turn on for the students once that invoice is paid.
+ */
+function Statements() {
+  const { t } = useTranslation();
+  const { formatNumber } = useFormatters();
+  const money = useMoney();
+  const day = useDay();
+  const statements = useSchoolStatementsQuery();
+  return (
+    <section className="aip-section" aria-labelledby="earnings-statements">
+      <h2 id="earnings-statements">{t(`${P}.statementsTitle`)}</h2>
+      <p className="aip-muted">{t(`${P}.statementsIntro`)}</p>
+      {statements.isPending ? <p role="status">{t("finance.common.loading")}</p> : null}
+      {statements.isError ? <p role="alert">{t(`${P}.loadError`)}</p> : null}
+      {statements.data && statements.data.length === 0 ? (
+        <p className="aip-muted">{t(`${P}.noStatements`)}</p>
+      ) : null}
+      {statements.data && statements.data.length > 0 ? (
+        <div className="aip-table-scroll">
+          <table className="aip-table" data-testid="statements">
+            <caption className="sf-visually-hidden">{t(`${P}.statementsTitle`)}</caption>
+            <thead>
+              <tr>
+                <th scope="col">{t(`${P}.columns.week`)}</th>
+                <th scope="col" className="aip-num">
+                  {t(`${P}.columns.months`)}
+                </th>
+                <th scope="col" className="aip-num">
+                  {t(`${P}.columns.owed`)}
+                </th>
+                <th scope="col" className="aip-num">
+                  {t(`${P}.columns.yourShare`)}
+                </th>
+                <th scope="col" className="aip-num">
+                  {t(`${P}.columns.net`)}
+                </th>
+                <th scope="col">{t(`${P}.columns.decision`)}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {statements.data.map((s) => (
+                <tr key={s.id}>
+                  <td>{day(s.weekStart)}</td>
+                  <td className="aip-num">{formatNumber(s.monthsCount)}</td>
+                  <td className="aip-num">{money(s.grossMinor, s.currencyCode, s.minorUnit)}</td>
+                  <td className="aip-num">{money(s.shareMinor, s.currencyCode, s.minorUnit)}</td>
+                  <td className="aip-num">
+                    <strong>{money(s.netMinor, s.currencyCode, s.minorUnit)}</strong>
+                  </td>
+                  <td>
+                    {t(`${P}.statementStatus.${s.status as StatementStatus}`)}
+                    {s.invoiceNumber ? ` · ${s.invoiceNumber}` : ""}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
     </section>
   );
 }

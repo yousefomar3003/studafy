@@ -21,6 +21,9 @@
  * system tenant transaction.
  */
 
+import { ERROR_CODES } from "@studafy/constants";
+
+import { CodedHttpException } from "../../../coded-http-exception";
 import { setTenantScope, withSystemTx } from "../../../db/tenant-tx";
 import { schoolToday } from "../../../lib/school-today";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
@@ -127,6 +130,23 @@ export async function setStudentAiAutoBilling(
   autoBilling: boolean,
 ): Promise<{ settings: StudentAiBillingSettings; results: StudentAiSyncResult[] }> {
   const before = await readSettings(tx, schoolId);
+  if (!autoBilling && before.auto_billing) {
+    // Studafy sees what parents paid only when it bills Student AI on their tuition: not while
+    // students hold Student AI from opt-ins on programme seats (000252).
+    const [held] = await tx<{ n: number }[]>`
+      SELECT count(*)::int AS n
+      FROM app.ai_optins AS o
+      JOIN app.license_seats AS s ON s.id = o.seat_id AND s.school_id = o.school_id
+      WHERE o.school_id = ${schoolId}::uuid AND o.status = 'active' AND s.programme
+    `;
+    if ((held?.n ?? 0) > 0) {
+      throw new CodedHttpException(
+        409,
+        ERROR_CODES.AI_OPTIN_AUTO_BILLING_REQUIRED,
+        "Student AI auto-billing cannot be turned off while students hold Student AI from opt-ins",
+      );
+    }
+  }
   if (before.auto_billing !== autoBilling || before.updated_at === null) {
     const turningOn = autoBilling && !before.auto_billing;
     await tx`

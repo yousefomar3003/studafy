@@ -61,6 +61,13 @@ class FeatureGateNotice extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (icon, title, body) = switch (state) {
+      FeatureAskSchool(:final schoolName, awaitingPayment: true) => (
+        Icons.hourglass_top_outlined,
+        'features.askSchool.awaitingPaymentTitle'.tr(),
+        'features.askSchool.awaitingPayment'.tr(
+          namedArgs: {'school': schoolName},
+        ),
+      ),
       FeatureAskSchool(:final schoolName, :final hasSeat) => (
         Icons.school_outlined,
         'features.askSchool.title'.tr(),

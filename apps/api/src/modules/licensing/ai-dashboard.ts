@@ -1,10 +1,15 @@
-import { licenceInProgramme, measurementPeriods, periodFor, utcDay } from "@studafy/billing";
+import {
+  licenceInProgramme,
+  measurementDayOf,
+  measurementPeriods,
+  periodFor,
+  utcDay,
+} from "@studafy/billing";
 import {
   academicYearMonths,
   computeRevenueShare,
   contentBonusAimBps,
   conversionStanding,
-  measurementDateOf,
   monthCount,
   paidPartOf,
   studafyNetOf,
@@ -301,7 +306,7 @@ async function dashboardConversion(
     ORDER BY locked DESC, measured_at DESC
     LIMIT 1
   `;
-  const measureOn = measurementDateOf(periodStart, values.measurementOffsetDays);
+  const measureOn = await measurementDayOf(tx, license.id, periodStart);
   if (snapshot) {
     return {
       periodStart,
@@ -316,7 +321,8 @@ async function dashboardConversion(
       floorApplied: snapshot.floor_applied,
     };
   }
-  const standing = conversionStanding(values, { ...live, seats: license.studentSeats });
+  // The large-school floor is tested on the students the school provides Student AI to.
+  const standing = conversionStanding(values, { ...live, seats: live.optedIn });
   return {
     periodStart,
     measureOn,
@@ -324,7 +330,7 @@ async function dashboardConversion(
     enrolled: live.enrolled,
     optedIn: live.optedIn,
     conversionBps: standing.conversionBps,
-    seats: license.studentSeats,
+    seats: live.optedIn,
     tierFromBps: standing.tier?.fromBps ?? null,
     shareBps: standing.shareBps,
     floorApplied: standing.floorApplied,
@@ -572,14 +578,17 @@ export async function aiProgrammeDashboard(
 
   const measures = revenueShareMeasures();
   const enrolled = await measures.countEnrolledStudents(tx, schoolId, today);
+  // Students the school provides Student AI to this month (opt-ins and assigned seats).
   const optedIn = license
-    ? await measures.countOptedInStudents(tx, schoolId, license.id, today)
+    ? await measures.countStudentAiHolders(
+        tx,
+        schoolId,
+        license.id,
+        `${today.slice(0, 7)}-01`,
+        today,
+      )
     : 0;
-  const standing = conversionStanding(values, {
-    enrolled,
-    optedIn,
-    seats: license?.studentSeats ?? 0,
-  });
+  const standing = conversionStanding(values, { enrolled, optedIn, seats: optedIn });
 
   const conversion = license
     ? await dashboardConversion(tx, license, values, { enrolled, optedIn }, today)

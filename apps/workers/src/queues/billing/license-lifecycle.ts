@@ -38,6 +38,7 @@ import {
   activateLicence,
   licencesToPutInForce,
   personalSubscriptionsOnLicence,
+  recordCollectedStudentAiMonths,
   runRevenueShareTick,
   withTransactionRetry,
 } from "@studafy/billing";
@@ -64,6 +65,8 @@ export interface LicenseLifecycleResult {
   conversionsLocked: number;
   sharesResolved: number;
   sharesSettled: number;
+  /** Student AI months parents paid for on their tuition, recorded for the weekly statements. */
+  studentAiMonthsCollected: number;
   /** Schools whose revenue share pass failed (the lifecycle steps for them still committed). */
   failedRevenueShareSchools: number;
   /** Licences a revenue share credit put in force (activated). */
@@ -244,6 +247,8 @@ export async function stopForNonPayment(
         ON grace.id = i.license_id AND grace.school_id = i.school_id
       WHERE inst.school_id = current_setting('app.school_id')::uuid
         AND i.status IN ('issued', 'partially_paid')
+        -- A Student AI weekly statement's invoice never stops a licence (000251).
+        AND i.kind = 'licence'
         AND inst.status <> 'paid'
         AND inst.due_date + grace.nonpayment_grace_days <= ${today}::date
       ORDER BY i.license_id, inst.due_date, inst.position
@@ -312,6 +317,7 @@ export async function resumePaidLicenses(
             WHERE inst.school_id = c.school_id
               AND i.license_id = c.id
               AND i.status IN ('issued', 'partially_paid')
+              AND i.kind = 'licence'
               AND inst.status <> 'paid'
               AND inst.due_date + c.nonpayment_grace_days <= ${today}::date
           )
@@ -348,6 +354,7 @@ export async function revenueShareStep(
   snapshotsLocked: number;
   sharesResolved: number;
   settled: number;
+  studentAiMonthsCollected: number;
   activated: number;
   resumed: number;
   bumped: number;
@@ -355,6 +362,8 @@ export async function revenueShareStep(
 }> {
   const audit = (entries: Parameters<typeof emitAuditLogs>[1]) => emitAuditLogs(tx, entries);
   const tick = await runRevenueShareTick(tx, { schoolId, now, audit });
+  // The Student AI months parents paid for on their tuition (000251), for the weekly statements.
+  const collected = await recordCollectedStudentAiMonths(tx, { schoolId, now, audit });
   const due = await licencesToPutInForce(tx, now, { creditedOnly: true });
   let activated = 0;
   let bumped = 0;
@@ -376,6 +385,7 @@ export async function revenueShareStep(
     snapshotsLocked: tick.snapshotsLocked,
     sharesResolved: tick.sharesResolved,
     settled: tick.changes.length,
+    studentAiMonthsCollected: collected.recorded,
     activated,
     resumed: resumed.resumed,
     bumped: bumped + resumed.bumped,
@@ -402,6 +412,7 @@ export async function runLicenseLifecycle(
     conversionsLocked: 0,
     sharesResolved: 0,
     sharesSettled: 0,
+    studentAiMonthsCollected: 0,
     failedRevenueShareSchools: 0,
     licensesActivatedByCredit: 0,
     licensesAwaitingApiActivation: 0,
@@ -432,6 +443,7 @@ export async function runLicenseLifecycle(
       result.conversionsLocked += step.snapshotsLocked;
       result.sharesResolved += step.sharesResolved;
       result.sharesSettled += step.settled;
+      result.studentAiMonthsCollected += step.studentAiMonthsCollected;
       result.licensesActivatedByCredit += step.activated;
       result.licensesResumed += step.resumed;
       result.entitlementBumps += step.bumped;

@@ -176,8 +176,31 @@ void main() {
         expect(state.schoolName, 'Alpha Academy');
         // Selling seats as well changes nothing: still never a purchase.
         expect(
-          gate(featureJson(reason: 'not_included', schoolSeat: true, schoolOffers: true)),
+          gate(
+            featureJson(
+              reason: 'not_included',
+              schoolSeat: true,
+              schoolOffers: true,
+            ),
+          ),
           isA<FeatureAskSchool>(),
+        );
+      },
+    );
+
+    test(
+      'a seat holder whose month is not paid for yet waits for the school, never a purchase',
+      () {
+        // A Student AI programme seat covers the months the school paid Studafy for (owner,
+        // 2026-11-18): the month in progress reads expired until the school pays.
+        final state = gate(featureJson(reason: 'expired', schoolSeat: true));
+        expect(state, isA<FeatureAskSchool>());
+        expect((state as FeatureAskSchool).awaitingPayment, isTrue);
+        expect(
+          (gate(featureJson(reason: 'not_included', schoolSeat: true))
+                  as FeatureAskSchool)
+              .awaitingPayment,
+          isFalse,
         );
       },
     );

@@ -69,10 +69,18 @@ class FeatureCovered extends FeatureGateState {
 /// feature: "Ask your school". Never a purchase for someone with a seat. ([hasSeat] is always true
 /// now; a school merely selling seats no longer replaces the purchase.)
 class FeatureAskSchool extends FeatureGateState {
-  const FeatureAskSchool({required this.schoolName, required this.hasSeat});
+  const FeatureAskSchool({
+    required this.schoolName,
+    required this.hasSeat,
+    this.awaitingPayment = false,
+  });
 
   final String schoolName;
   final bool hasSeat;
+
+  /// The seat covers months the school has paid Studafy for, and this one is not paid yet (a Student
+  /// AI programme seat, paid month by month as parents pay; or a licence stopped for non-payment).
+  final bool awaitingPayment;
 }
 
 /// Not covered and no school seat: the existing store purchase / paywall, whether or not the school
@@ -153,7 +161,11 @@ FeatureGateState featureGateStateOf(
   }
 
   if (feature.schoolSeat) {
-    return FeatureAskSchool(schoolName: features.schoolName, hasSeat: true);
+    return FeatureAskSchool(
+      schoolName: features.schoolName,
+      hasSeat: true,
+      awaitingPayment: feature.reason == FeatureReason.expired,
+    );
   }
   return FeaturePurchasable(
     expiredOn: feature.reason == FeatureReason.expired

@@ -595,6 +595,11 @@
       "where": "Studafy platform › Student AI › Schools",
       "keywords": "student ai, revenue share, conversion, upload consistency, payouts, owed, forfeited, studafy net per seat, ledger"
     },
+    "platform-ai-programme-statements": {
+      "title": "Student AI weekly statements",
+      "where": "Studafy platform › Student AI › Statements",
+      "keywords": "student ai, weekly statement, approve, hold, reject, revenue share, collected months, opt-in, billing, net"
+    },
     "license-student-ai-results": {
       "title": "Student AI results",
       "where": "License › Student AI results",

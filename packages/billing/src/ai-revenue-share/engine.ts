@@ -1,10 +1,15 @@
 import {
+  academicYearMonths,
   allocatePayments,
   computeRevenueShare,
+  conversionMeasureDay,
   instalmentPeriods,
-  measurementDateOf,
+  monthIndex,
+  monthSlices,
+  monthStart,
   ratioBps,
   scheduleMonths,
+  splitByWeight,
   studentPartOf,
 } from "@studafy/license-pricing";
 
@@ -17,6 +22,7 @@ import type {
   PaymentPlan,
   ResolvedAiProgramme,
   LicenseCommitment,
+  MonthRange,
   RevenueShareResult,
 } from "@studafy/license-pricing";
 import type { TransactionSql } from "postgres";
@@ -54,6 +60,9 @@ export interface RevenueShareContext {
 
 export const REVENUE_SHARE_STATUSES = [
   "pending",
+  // Final figures, waiting for a super admin's approval on the school's weekly statement (owner,
+  // 2026-11-18: nothing is credited or paid before it is approved).
+  "awaiting_approval",
   "owed",
   "zero",
   "credited",
@@ -61,6 +70,8 @@ export const REVENUE_SHARE_STATUSES = [
   "paid_out",
   "forfeited",
   "void",
+  // A super admin rejected it on a weekly statement: never credited or paid.
+  "rejected",
 ] as const;
 export type RevenueShareStatus = (typeof REVENUE_SHARE_STATUSES)[number];
 
@@ -75,7 +86,7 @@ export function utcDay(date: Date): string {
 // Licences and their measurement periods
 // ---------------------------------------------------------------------------------------------------
 
-interface LicenceFacts {
+export interface LicenceFacts {
   id: string;
   status: string;
   startsOn: string;
@@ -88,7 +99,10 @@ interface LicenceFacts {
   stamp: ProgrammeStamp;
 }
 
-async function readLicence(tx: TransactionSql, licenseId: string): Promise<LicenceFacts | null> {
+export async function readLicence(
+  tx: TransactionSql,
+  licenseId: string,
+): Promise<LicenceFacts | null> {
   const [row] = await tx<
     {
       id: string;
@@ -151,10 +165,43 @@ export async function licenceInProgramme(tx: TransactionSql, licenseId: string):
 }
 
 /**
- * A licence's measurement periods, by their first day: its start, and the first day of every term
- * an accepted extension (a renewal) added. Conversion is measured and locked once per period.
+ * The months a licence counts over its whole span, renewals included (an accepted extension moves
+ * its end): THE month rule (`academicYearMonths`). Null for a span too short to count a month.
+ */
+function countedMonthsOf(licence: Pick<LicenceFacts, "startsOn" | "endsOn">): MonthRange | null {
+  return academicYearMonths(licence.startsOn, addDays(licence.endsOn, -1));
+}
+
+/**
+ * A licence's measurement periods, by their first day: one per month it counts (owner,
+ * 2026-11-18: conversion is measured and locked every month). A licence too short to count a month
+ * has the one period of the month it starts in.
  */
 export async function measurementPeriods(tx: TransactionSql, licenseId: string): Promise<string[]> {
+  const licence = await readLicence(tx, licenseId);
+  if (!licence) return [];
+  const counted = countedMonthsOf(licence);
+  if (!counted) return [monthStart(monthIndex(licence.startsOn))];
+  const months: string[] = [];
+  for (let index = counted.first; index <= counted.last; index += 1) months.push(monthStart(index));
+  return months;
+}
+
+/** The day a period's conversion is measured: its month's first day, or the licence's when later. */
+export async function measurementDayOf(
+  tx: TransactionSql,
+  licenseId: string,
+  periodStart: string,
+): Promise<string> {
+  const licence = await readLicence(tx, licenseId);
+  return conversionMeasureDay(periodStart, licence?.startsOn ?? periodStart);
+}
+
+/**
+ * The first day of a licence's terms: its start, and the first day of every term an accepted
+ * extension (a renewal) added -- the stretch `recordEarlierPaymentShares` looks back over.
+ */
+async function licenceTermStarts(tx: TransactionSql, licenseId: string): Promise<string[]> {
   const rows = await tx<{ start: string }[]>`
     SELECT ((l.starts_at AT TIME ZONE 'UTC')::date)::text AS start
     FROM app.school_licenses AS l
@@ -187,15 +234,20 @@ export interface ConversionMeasurement {
   measureOn: string;
   asOf: string;
   enrolledCount: number;
+  /**
+   * Enrolled students with Student AI from the school that month: an opt-in covering the month, or
+   * a student seat the school assigned on the licence (owner, 2026-11-18). Not in-app purchases.
+   */
   optedInCount: number;
   conversionBps: number;
+  /** The same count: the large-school floor's test is on the students the school provides for. */
   seats: number;
   conversionShareBps: number;
   floorApplied: boolean;
   stamp: ProgrammeStamp;
 }
 
-/** Measure a licence period's conversion as of a day, under the values the licence carries now. */
+/** Measure a licence month's conversion as of a day, under the values the licence carries now. */
 export async function measureConversion(
   tx: TransactionSql,
   ctx: RevenueShareContext,
@@ -208,24 +260,30 @@ export async function measureConversion(
   const values = await readProgrammeValues(tx, licence.stamp, licence.currencyCode);
   const measures = measuresOf(ctx);
   const enrolledCount = await measures.countEnrolledStudents(tx, ctx.schoolId, asOf);
-  const optedInCount = await measures.countOptedInStudents(tx, ctx.schoolId, licenseId, asOf);
-  const conversionBps = ratioBps(optedInCount, enrolledCount);
+  const holders = await measures.countStudentAiHolders(
+    tx,
+    ctx.schoolId,
+    licenseId,
+    periodStart,
+    asOf,
+  );
+  const conversionBps = ratioBps(holders, enrolledCount);
   const share = computeRevenueShare(values, {
     conversionBps,
     uploadConsistencyBps: 0,
-    seats: licence.studentSeats,
+    seats: holders,
     commitment: "full_year",
     baseMinor: 0,
   });
   return {
     licenseId,
     periodStart,
-    measureOn: measurementDateOf(periodStart, values.measurementOffsetDays),
+    measureOn: conversionMeasureDay(periodStart, licence.startsOn),
     asOf,
     enrolledCount,
-    optedInCount,
+    optedInCount: holders,
     conversionBps,
-    seats: licence.studentSeats,
+    seats: holders,
     conversionShareBps: share.conversionShareBps,
     floorApplied: share.floorApplied,
     stamp: licence.stamp,
@@ -299,13 +357,13 @@ export async function insertSnapshot(
   };
 }
 
-interface LockedSnapshot {
+export interface LockedSnapshot {
   id: string;
   conversionBps: number;
   seats: number;
 }
 
-async function lockedSnapshot(
+export async function lockedSnapshot(
   tx: TransactionSql,
   licenseId: string,
   periodStart: string,
@@ -329,7 +387,7 @@ export const LOCK_CATCH_UP_DAYS = 31;
 /**
  * Lock every measurement that is due: for each licence period whose measurement day has come and
  * that has no locked measurement yet, measure as of that day and lock it. Only licences that can
- * still earn (awaiting payment, active, suspended) with student seats, for a measurement day in the
+ * still earn (awaiting payment, active, suspended) in the programme, for a measurement day in the
  * last LOCK_CATCH_UP_DAYS days, and any period that has shares waiting for its conversion.
  * Idempotent: a locked period is never measured again.
  */
@@ -344,7 +402,7 @@ export async function lockDueConversionSnapshots(
     FROM app.school_licenses AS l
     WHERE l.school_id = current_setting('app.school_id')::uuid
       AND (
-        (l.status IN ('awaiting_payment', 'active', 'suspended') AND l.student_seats > 0
+        (l.status IN ('awaiting_payment', 'active', 'suspended')
          AND (
            EXISTS (SELECT 1 FROM app.ai_optin_windows AS w
                    WHERE w.school_id = l.school_id AND w.license_id = l.id)
@@ -362,7 +420,6 @@ export async function lockDueConversionSnapshots(
   const locked: SnapshotRecord[] = [];
   for (const { id } of licences) {
     const licence = (await readLicence(tx, id))!;
-    const values = await readProgrammeValues(tx, licence.stamp, licence.currencyCode);
     const periods = await measurementPeriods(tx, id);
     const waiting = new Set(
       (
@@ -376,7 +433,7 @@ export async function lockDueConversionSnapshots(
     );
     const earning = ["awaiting_payment", "active", "suspended"].includes(licence.status);
     for (const periodStart of periods) {
-      const measureOn = measurementDateOf(periodStart, values.measurementOffsetDays);
+      const measureOn = conversionMeasureDay(periodStart, licence.startsOn);
       if (measureOn > today) continue;
       const relevant =
         waiting.has(periodStart) ||
@@ -408,8 +465,17 @@ interface Figures {
   snapshot: LockedSnapshot | null;
   uploadConsistencyBps: number | null;
   result: RevenueShareResult;
-  /** Where a final share goes: owed (credit on the next invoice), payout_due, or zero (nothing). */
-  finalStatus: "owed" | "payout_due" | "zero";
+  /**
+   * Nothing is left to wait for: the month's conversion is locked and the share is final. A share
+   * waits for its month's locked conversion even when it cannot change the amount (a month-to-month
+   * licence at 0%), so every final entry records the conversion it was given.
+   */
+  final: boolean;
+  /**
+   * Where a final share goes: awaiting the super admin's approval on the school's weekly statement
+   * (approved, it becomes owed or payout due by the programme's payout mode), or zero (nothing).
+   */
+  finalStatus: "awaiting_approval" | "zero";
 }
 
 async function figuresFor(
@@ -437,8 +503,8 @@ async function figuresFor(
     snapshot,
     uploadConsistencyBps,
     result,
-    finalStatus:
-      result.amountMinor === 0 ? "zero" : values.payoutMode === "payout" ? "payout_due" : "owed",
+    final: result.final && snapshot !== null,
+    finalStatus: result.amountMinor === 0 ? "zero" : "awaiting_approval",
   };
 }
 
@@ -456,7 +522,7 @@ function figureColumns(f: Figures) {
     multiplier_bps: f.result.multiplierBps,
     total_bps: f.result.totalBps,
     amount_minor: f.result.amountMinor,
-    conversion_pending: f.result.conversionPending,
+    conversion_pending: f.snapshot === null,
     bonus_pending: f.result.bonusPending,
   };
 }
@@ -564,7 +630,7 @@ export async function recordPaymentShares(
     months: term ? scheduleMonths(term.months, term.prorate_days) : 1,
     instalments: instalments.map((i) => ({ position: i.position, dueDate: i.due_date })),
   });
-  const measurement = await measurementPeriods(tx, licence.id);
+  const licenceTerm = { startsOn: licence.startsOn, lastDay: addDays(licence.endsOn, -1) };
 
   const recorded: RecordedShare[] = [];
   for (const portion of paid) {
@@ -573,78 +639,87 @@ export async function recordPaymentShares(
     const period = periods.find((p) => p.position === instalment.position)!;
     const cutoff = addDays(instalment.due_date, licence.graceDays);
     const late = payment.received_on >= cutoff;
-    const base = studentPartOf(portion.amountMinor, studentLines, Number(payment.seat_lines));
-    const measurementPeriodStart = periodFor(measurement, period.from);
-    const figures = await figuresFor(tx, ctx, {
-      licence,
-      stamp: licence.stamp,
-      measurementPeriodStart,
-      periodFrom: period.from,
-      periodTo: period.to,
-      commitment,
-      baseMinor: base,
-    });
-    const status: RevenueShareStatus = late
-      ? "forfeited"
-      : figures.result.final
-        ? figures.finalStatus
-        : "pending";
-    const [row] = await tx<{ id: string }[]>`
-      INSERT INTO app.ai_programme_revenue_share_entries ${tx({
-        school_id: ctx.schoolId,
-        kind: "share",
-        license_id: licence.id,
-        invoice_id: payment.invoice_id,
-        payment_id: paymentId,
-        instalment_id: instalment.id,
-        received_on: payment.received_on,
-        period_from: period.from,
-        period_to: period.to,
-        measurement_period_start: measurementPeriodStart,
-        currency_id: payment.currency_id,
-        collected_minor: portion.amountMinor,
-        base_minor: base,
+    // One entry per month the instalment pays for, each under that month's conversion (owner,
+    // 2026-11-18): the money split by month, the Student AI part taken of each month's money.
+    const slices = monthSlices(period.from, period.to, licenceTerm);
+    const collectedParts = splitByWeight(portion.amountMinor, slices);
+    for (const [index, slice] of slices.entries()) {
+      const collected = collectedParts.at(index) ?? 0;
+      if (collected <= 0) continue;
+      const base = studentPartOf(collected, studentLines, Number(payment.seat_lines));
+      const figures = await figuresFor(tx, ctx, {
+        licence,
+        stamp: licence.stamp,
+        measurementPeriodStart: slice.month,
+        periodFrom: slice.from,
+        periodTo: slice.to,
         commitment,
-        ai_programme_version_id: licence.stamp.versionId,
-        ai_programme_override_id: licence.stamp.overrideId,
-        ...figureColumns(figures),
-        status,
-        forfeited_at: late ? ctx.now : null,
-        forfeit_reason: late ? "late_payment" : null,
-      })}
-      RETURNING id::text AS id
-    `;
-    await ctx.audit([
-      {
-        action: "insert",
-        targetTable: "ai_programme_revenue_share_entries",
-        targetId: row!.id,
-        oldValues: null,
-        newValues: {
+        baseMinor: base,
+      });
+      const status: RevenueShareStatus = late
+        ? "forfeited"
+        : figures.final
+          ? figures.finalStatus
+          : "pending";
+      const [row] = await tx<{ id: string }[]>`
+        INSERT INTO app.ai_programme_revenue_share_entries ${tx({
+          school_id: ctx.schoolId,
+          kind: "share",
           license_id: licence.id,
           invoice_id: payment.invoice_id,
           payment_id: paymentId,
           instalment_id: instalment.id,
-          period_from: period.from,
-          period_to: period.to,
-          collected_minor: portion.amountMinor,
+          received_on: payment.received_on,
+          period_from: slice.from,
+          period_to: slice.to,
+          measurement_period_start: slice.month,
+          currency_id: payment.currency_id,
+          collected_minor: collected,
           base_minor: base,
           commitment,
           ai_programme_version_id: licence.stamp.versionId,
           ai_programme_override_id: licence.stamp.overrideId,
-          ...figureAudit(figures),
+          ...figureColumns(figures),
           status,
-          ...(late ? { forfeit_reason: "late_payment" } : {}),
+          final_at: status === "awaiting_approval" ? ctx.now : null,
+          forfeited_at: late ? ctx.now : null,
+          forfeit_reason: late ? "late_payment" : null,
+        })}
+        RETURNING id::text AS id
+      `;
+      await ctx.audit([
+        {
+          action: "insert",
+          targetTable: "ai_programme_revenue_share_entries",
+          targetId: row!.id,
+          oldValues: null,
+          newValues: {
+            license_id: licence.id,
+            invoice_id: payment.invoice_id,
+            payment_id: paymentId,
+            instalment_id: instalment.id,
+            period_from: slice.from,
+            period_to: slice.to,
+            measurement_period_start: slice.month,
+            collected_minor: collected,
+            base_minor: base,
+            commitment,
+            ai_programme_version_id: licence.stamp.versionId,
+            ai_programme_override_id: licence.stamp.overrideId,
+            ...figureAudit(figures),
+            status,
+            ...(late ? { forfeit_reason: "late_payment" } : {}),
+          },
         },
-      },
-    ]);
-    recorded.push({
-      id: row!.id,
-      instalmentId: instalment.id,
-      status,
-      amountMinor: figures.result.amountMinor,
-      totalBps: figures.result.totalBps,
-    });
+      ]);
+      recorded.push({
+        id: row!.id,
+        instalmentId: instalment.id,
+        status,
+        amountMinor: figures.result.amountMinor,
+        totalBps: figures.result.totalBps,
+      });
+    }
   }
   return recorded;
 }
@@ -669,7 +744,7 @@ export async function recordEarlierPaymentShares(
   licenseId: string,
 ): Promise<RecordedShare[]> {
   if (!(await licenceInProgramme(tx, licenseId))) return [];
-  const periods = await measurementPeriods(tx, licenseId);
+  const periods = await licenceTermStarts(tx, licenseId);
   if (periods.length === 0) return [];
   const current = periodFor(periods, utcDay(ctx.now));
   const next = periods.find((start) => start > current) ?? null;
@@ -739,7 +814,7 @@ export interface ResolvedShare {
 
 /**
  * Work out the school's pending entries again (one licence's, when given): with conversion locked
- * and the upload consistency known they become final, owed or payout due. Each keeps the values it
+ * and the upload consistency known they become final -- awaiting the super admin's approval, or zero. Each keeps the values it
  * was recorded under (the licence's stamp at the time of the payment).
  */
 export async function resolvePendingShares(
@@ -796,7 +871,7 @@ export async function resolvePendingShares(
     });
     const columns = figureColumns(figures);
     const unchanged =
-      !figures.result.final &&
+      !figures.final &&
       columns.snapshot_id === entry.snapshot_id &&
       columns.upload_consistency_bps === entry.upload_consistency_bps &&
       columns.amount_minor === Number(entry.amount_minor) &&
@@ -804,10 +879,11 @@ export async function resolvePendingShares(
       columns.conversion_pending === entry.conversion_pending &&
       columns.bonus_pending === entry.bonus_pending;
     if (unchanged) continue;
-    const status: RevenueShareStatus = figures.result.final ? figures.finalStatus : "pending";
+    const status: RevenueShareStatus = figures.final ? figures.finalStatus : "pending";
+    const finalAt = status === "awaiting_approval" ? ctx.now : null;
     await tx`
       UPDATE app.ai_programme_revenue_share_entries
-      SET ${tx({ ...columns, status })}, computed_at = ${ctx.now},
+      SET ${tx({ ...columns, status, final_at: finalAt })}, computed_at = ${ctx.now},
           updated_at = GREATEST(CURRENT_TIMESTAMP, updated_at)
       WHERE school_id = current_setting('app.school_id')::uuid AND id = ${entry.id}::uuid
     `;
@@ -860,6 +936,7 @@ export async function voidPaymentShares(
   for (const entry of entries) {
     if (
       entry.status === "pending" ||
+      entry.status === "awaiting_approval" ||
       entry.status === "owed" ||
       entry.status === "zero" ||
       entry.status === "payout_due"
@@ -950,6 +1027,117 @@ export async function restoreCreditsOfVoidedInvoice(
     })),
   );
   return restored.map((entry) => entry.id);
+}
+
+export interface DecidedShare {
+  id: string;
+  to: RevenueShareStatus;
+  amountMinor: number;
+}
+
+interface AwaitingRow {
+  id: string;
+  version_id: string;
+  override_id: string | null;
+  currency_code: string;
+  amount_minor: string;
+}
+
+async function lockAwaiting(
+  tx: TransactionSql,
+  entryIds: readonly string[],
+): Promise<AwaitingRow[]> {
+  if (entryIds.length === 0) return [];
+  return tx<AwaitingRow[]>`
+    SELECT e.id::text AS id, e.ai_programme_version_id::text AS version_id,
+           e.ai_programme_override_id::text AS override_id, c.code AS currency_code,
+           e.amount_minor::text AS amount_minor
+    FROM app.ai_programme_revenue_share_entries AS e
+    JOIN app.currencies AS c ON c.id = e.currency_id
+    WHERE e.school_id = current_setting('app.school_id')::uuid
+      AND e.id = ANY(${entryIds as string[]}::uuid[]) AND e.status = 'awaiting_approval'
+    ORDER BY e.id
+    FOR UPDATE OF e
+  `;
+}
+
+/**
+ * A super admin approved these shares: each one still awaiting approval becomes owed (credited on
+ * the school's next licence invoice by settling) or payout due, by the payout mode of the programme
+ * values it was recorded under. Shares no longer awaiting approval (forfeited or voided since) are
+ * left alone and not returned. The caller settles afterwards.
+ */
+export async function approveShares(
+  tx: TransactionSql,
+  ctx: RevenueShareContext,
+  entryIds: readonly string[],
+): Promise<DecidedShare[]> {
+  const rows = await lockAwaiting(tx, entryIds);
+  const modes = new Map<string, ResolvedAiProgramme["payoutMode"]>();
+  const decided: DecidedShare[] = [];
+  for (const row of rows) {
+    const key = `${row.version_id}|${row.override_id ?? ""}|${row.currency_code}`;
+    let mode = modes.get(key);
+    if (!mode) {
+      const values = await readProgrammeValues(
+        tx,
+        { versionId: row.version_id, overrideId: row.override_id },
+        row.currency_code,
+      );
+      mode = values.payoutMode;
+      modes.set(key, mode);
+    }
+    const to: RevenueShareStatus = mode === "payout" ? "payout_due" : "owed";
+    await tx`
+      UPDATE app.ai_programme_revenue_share_entries
+      SET status = ${to}, updated_at = GREATEST(CURRENT_TIMESTAMP, updated_at)
+      WHERE school_id = current_setting('app.school_id')::uuid AND id = ${row.id}::uuid
+    `;
+    decided.push({ id: row.id, to, amountMinor: Number(row.amount_minor) });
+  }
+  await ctx.audit(
+    decided.map((share) => ({
+      action: "update" as const,
+      targetTable: "ai_programme_revenue_share_entries",
+      targetId: share.id,
+      oldValues: { status: "awaiting_approval" },
+      newValues: { status: share.to, approved: true },
+    })),
+  );
+  return decided;
+}
+
+/**
+ * A super admin rejected these shares, with a reason: each one still awaiting approval is rejected
+ * and never credited or paid. Shares no longer awaiting approval are left alone and not returned.
+ */
+export async function rejectShares(
+  tx: TransactionSql,
+  ctx: RevenueShareContext,
+  entryIds: readonly string[],
+  reason: string,
+): Promise<DecidedShare[]> {
+  const rows = await lockAwaiting(tx, entryIds);
+  const decided: DecidedShare[] = [];
+  for (const row of rows) {
+    await tx`
+      UPDATE app.ai_programme_revenue_share_entries
+      SET status = 'rejected', rejected_at = ${ctx.now},
+          updated_at = GREATEST(CURRENT_TIMESTAMP, updated_at)
+      WHERE school_id = current_setting('app.school_id')::uuid AND id = ${row.id}::uuid
+    `;
+    decided.push({ id: row.id, to: "rejected", amountMinor: Number(row.amount_minor) });
+  }
+  await ctx.audit(
+    decided.map((share) => ({
+      action: "update" as const,
+      targetTable: "ai_programme_revenue_share_entries",
+      targetId: share.id,
+      oldValues: { status: "awaiting_approval" },
+      newValues: { status: "rejected", reason },
+    })),
+  );
+  return decided;
 }
 
 export interface SettleChange {

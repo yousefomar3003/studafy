@@ -160,6 +160,13 @@ export const EN_TEMPLATES = {
     [NOTIFICATION_CHANNELS.EMAIL]:
       "{schoolName} uploaded a bank transfer receipt for invoice {invoiceNumber}. Record the payment and match the receipt to it in the license console.",
   },
+  [NOTIFICATION_TYPES.AI_REVENUE_SHARE_STATEMENTS_READY]: {
+    [NOTIFICATION_CHANNELS.IN_APP]:
+      "{statements} Student AI weekly statements from {schools} schools (week of {weekStart}) are waiting for your approval.",
+    [NOTIFICATION_CHANNELS.PUSH]: "{statements} Student AI statements to approve",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      "The Student AI weekly statements for the week of {weekStart} are ready: {statements} statements from {schools} schools. Approve, hold or reject each one in the console; nothing is billed or credited before you approve it.",
+  },
   [NOTIFICATION_TYPES.LICENSE_AI_STOP_WARNING]: {
     [NOTIFICATION_CHANNELS.IN_APP]:
       "{schoolName}'s Studafy AI stops on {stopDate}, in {daysLeft} days, unless invoice {invoiceNumber} (due {dueDate}) is paid. Balance: {balance}.",

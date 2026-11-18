@@ -143,7 +143,8 @@ const iso = (date: Date) => date.toISOString().slice(0, 10);
 describe("conversion measurement", () => {
   jobTest("taken and locked on the measurement day, not the day before, and once", async () => {
     const schoolId = await school("Measured School");
-    // Starts tomorrow: measured 30 days later (the defaults' measurement offset).
+    // Starts tomorrow. Conversion is monthly (owner, 2026-11-18): the licence's first month is
+    // measured on its first day -- the licence's first day when it starts inside that month.
     const start = utcMidnight(new Date(Date.now() + DAY));
     const lic = await license(schoolId, {
       startsAt: start,
@@ -190,7 +191,16 @@ describe("conversion measurement", () => {
       }
     });
 
-    const measureDay = new Date(start.getTime() + 30 * DAY);
+    // THE month rule: the start's month counts when the licence covers at least half of it.
+    const daysInMonth = new Date(
+      Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 0),
+    ).getUTCDate();
+    const firstMonthDate =
+      (daysInMonth - start.getUTCDate() + 1) * 2 >= daysInMonth
+        ? new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1))
+        : new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 1));
+    const firstMonth = iso(firstMonthDate);
+    const measureDay = firstMonthDate > start ? firstMonthDate : start;
     const before = await runLicenseLifecycle(
       db!,
       new Date(measureDay.getTime() - 60_000),
@@ -226,10 +236,10 @@ describe("conversion measurement", () => {
         WHERE school_id = ${schoolId}::uuid AND license_id = ${lic}::uuid
       `,
     );
-    // 3 of 4 enrolled students opted in: 75%, the 70-84% tier (10%).
+    // 3 of 4 enrolled students hold a seat the school gave them: 75%, the 70-84% tier (10%).
     expect([...snapshots]).toEqual([
       {
-        period_start: iso(start),
+        period_start: firstMonth,
         measure_on: iso(measureDay),
         enrolled_count: 4,
         opted_in_count: 3,
@@ -242,7 +252,7 @@ describe("conversion measurement", () => {
 
     const again = await runLicenseLifecycle(
       db!,
-      new Date(measureDay.getTime() + 2 * DAY),
+      new Date(measureDay.getTime() + 2 * 3_600_000),
       silentLogger,
       [schoolId],
     );

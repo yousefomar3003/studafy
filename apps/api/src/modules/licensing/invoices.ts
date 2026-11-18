@@ -25,6 +25,7 @@ import postgres from "postgres";
 
 import { CodedHttpException } from "../../coded-http-exception";
 import { pipelinePerSchool, withSystemTx } from "../../db/tenant-tx";
+import { publishUserEntitlementChanges } from "../subscriptions/entitlements/entitlement-change-publisher";
 
 import { auditLicenseChange, licenseError } from "./context";
 import { resumeIfSettled } from "./nonpayment";
@@ -193,6 +194,8 @@ export interface InvoiceRecord {
   voidReason: string | null;
   /** How the invoice is paid: at once, monthly, or on a custom schedule (000221). */
   paymentPlan: PaymentPlan;
+  /** licence: seats and terms; ai_statement: a Student AI weekly statement's net (000251). */
+  kind: InvoiceKind;
   /**
    * The online payment link (Revolut) of the instalment to pay now, while the invoice can still be
    * paid; null when it has none or the invoice is paid or void. Each instalment's own link is in
@@ -201,6 +204,9 @@ export interface InvoiceRecord {
   paymentLink: string | null;
   createdAt: string;
 }
+
+/** A licence invoice's kind (000251). */
+export type InvoiceKind = "licence" | "ai_statement";
 
 interface InvoiceRow {
   id: string;
@@ -225,6 +231,7 @@ interface InvoiceRow {
   voided_at: Date | null;
   void_reason: string | null;
   payment_plan: PaymentPlan;
+  kind: InvoiceKind;
   payment_link: string | null;
   created_at: Date;
 }
@@ -238,6 +245,7 @@ const INVOICE_COLUMNS = (tx: TransactionSql) => tx`
   i.total_minor::text AS total_minor, i.paid_minor::text AS paid_minor,
   i.balance_minor::text AS balance_minor, i.status, i.overdue_at, i.voided_at, i.void_reason,
   i.payment_plan,
+  i.kind,
   (SELECT inst.payment_link FROM app.license_invoice_instalments AS inst
    WHERE inst.school_id = i.school_id AND inst.invoice_id = i.id AND inst.status <> 'paid'
    ORDER BY inst.position LIMIT 1) AS payment_link,
@@ -268,6 +276,7 @@ function toInvoice(row: InvoiceRow): InvoiceRecord {
     voidedAt: row.voided_at?.toISOString() ?? null,
     voidReason: row.void_reason,
     paymentPlan: row.payment_plan,
+    kind: row.kind,
     paymentLink: isPayable(row.status) ? row.payment_link : null,
     createdAt: row.created_at.toISOString(),
   };
@@ -308,7 +317,7 @@ async function requireInvoice(
 export interface InvoiceLineView {
   position: number;
   /** ai_share_credit: Student AI revenue share credited on this invoice (000237). */
-  kind: "seats" | "overlap_credit" | "adjustment" | "ai_share_credit";
+  kind: "seats" | "overlap_credit" | "adjustment" | "ai_share_credit" | "student_ai_months";
   description: string;
   audience: Audience | null;
   planId: string | null;
@@ -1021,6 +1030,107 @@ export interface IssueInvoiceInput {
   planIds: Partial<Record<Audience, string | null>>;
   /** How it is paid; paid at once when omitted. */
   schedule?: InvoiceSchedule;
+  /**
+   * A Student AI weekly statement's invoice (000251): the student-months the school collected from
+   * parents, and the school's revenue share on them credited. It never starts or stops a licence.
+   */
+  statement?: {
+    monthsDescription: string;
+    monthsMinor: number;
+    shareDescription: string;
+    shareMinor: number;
+  };
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Student AI weekly statements: activation and voids (000251)
+// ---------------------------------------------------------------------------------------------------
+
+/**
+ * A statement invoice paid in full (by a payment, or by credits at issue): its billed months are
+ * activated -- the students have Student AI for those months (their programme seats cover them,
+ * 000252), and their entitlements are refreshed. Returns the new entitlement versions. Nothing for
+ * another invoice, or one not paid in full.
+ */
+export async function activatePaidStatement(
+  tx: TransactionSql,
+  schoolId: string,
+  invoiceId: string,
+  actor: LicenseActor,
+  now: Date = new Date(),
+): Promise<Map<string, number>> {
+  const activated = await tx<{ id: string; student_id: string }[]>`
+    UPDATE app.student_ai_months AS m
+    SET status = 'activated', activated_at = ${now},
+        updated_at = GREATEST(CURRENT_TIMESTAMP, m.updated_at)
+    FROM app.ai_programme_weekly_statements AS s
+    JOIN app.license_invoices AS i ON i.id = s.invoice_id AND i.school_id = s.school_id
+    WHERE m.school_id = current_setting('app.school_id')::uuid
+      AND s.school_id = m.school_id AND s.id = m.statement_id
+      AND s.invoice_id = ${invoiceId}::uuid AND i.kind = 'ai_statement' AND i.status = 'paid'
+      AND m.status = 'billed'
+    RETURNING m.id::text AS id, m.student_id::text AS student_id
+  `;
+  if (activated.length > 0) {
+    await auditLicenseChange(tx, schoolId, actor, {
+      action: "update",
+      targetTable: "student_ai_months",
+      targetId: activated[0]!.id,
+      oldValues: { status: "billed" },
+      newValues: {
+        status: "activated",
+        invoice_id: invoiceId,
+        student_ai_months: activated.map((m) => m.id),
+      },
+    });
+  }
+  if (activated.length === 0) return new Map();
+  const users = await tx<{ user_id: string }[]>`
+    SELECT DISTINCT user_id::text AS user_id FROM app.students
+    WHERE school_id = current_setting('app.school_id')::uuid
+      AND id = ANY(${[...new Set(activated.map((m) => m.student_id))]}::uuid[])
+      AND user_id IS NOT NULL
+  `;
+  return publishUserEntitlementChanges(tx, {
+    schoolId,
+    userIds: users.map((u) => u.user_id),
+  });
+}
+
+/**
+ * A statement invoice voided before it was paid: its billed months were never paid for, so they
+ * go back to wait for a later statement. Months already activated stay (the school paid).
+ */
+export async function releaseVoidedStatementMonths(
+  tx: TransactionSql,
+  schoolId: string,
+  invoiceId: string,
+  actor: LicenseActor,
+): Promise<number> {
+  const released = await tx<{ id: string }[]>`
+    UPDATE app.student_ai_months AS m
+    SET status = 'collected', statement_id = NULL, share_bps = NULL, share_minor = NULL,
+        billed_at = NULL, updated_at = GREATEST(CURRENT_TIMESTAMP, m.updated_at)
+    FROM app.ai_programme_weekly_statements AS s
+    WHERE m.school_id = current_setting('app.school_id')::uuid
+      AND s.school_id = m.school_id AND s.id = m.statement_id
+      AND s.invoice_id = ${invoiceId}::uuid AND m.status = 'billed'
+    RETURNING m.id::text AS id
+  `;
+  if (released.length > 0) {
+    await auditLicenseChange(tx, schoolId, actor, {
+      action: "update",
+      targetTable: "student_ai_months",
+      targetId: released[0]!.id,
+      oldValues: { status: "billed", invoice_id: invoiceId },
+      newValues: {
+        status: "collected",
+        reason: "statement_invoice_voided",
+        student_ai_months: released.map((m) => m.id),
+      },
+    });
+  }
+  return released.length;
 }
 
 /**
@@ -1046,8 +1156,13 @@ export async function issueInvoice(
   const lines = input.lines.filter(
     (line) => line.kind !== "overlap_credit" || line.amountMinor < 0,
   );
-  const subtotal = lines.reduce((s, l) => s + (l.kind === "seats" ? l.amountMinor : 0), 0);
-  const credits = -lines.reduce((s, l) => s + (l.kind === "overlap_credit" ? l.amountMinor : 0), 0);
+  const statement = input.statement ?? null;
+  const subtotal =
+    lines.reduce((s, l) => s + (l.kind === "seats" ? l.amountMinor : 0), 0) +
+    (statement?.monthsMinor ?? 0);
+  const credits =
+    -lines.reduce((s, l) => s + (l.kind === "overlap_credit" ? l.amountMinor : 0), 0) +
+    (statement?.shareMinor ?? 0);
   const adjustment = lines.reduce((s, l) => s + (l.kind === "adjustment" ? l.amountMinor : 0), 0);
   const total = subtotal - credits + adjustment;
   const status: InvoiceStatus = total === 0 ? "paid" : "issued";
@@ -1077,12 +1192,12 @@ export async function issueInvoice(
           INSERT INTO app.license_invoices (
             school_id, license_id, quote_id, number, payment_reference, currency_id, issue_date,
             due_date, subtotal_minor, credit_total_minor, adjustment_minor, total_minor, status,
-            payment_plan, issued_by
+            payment_plan, issued_by, kind
           ) VALUES (
             ${schoolId}::uuid, ${input.licenseId}::uuid, ${input.quoteId}::uuid, ${number},
             ${newPaymentReference()}, ${input.currencyId}::uuid, ${issueDate}::date,
             ${firstDue}::date, ${subtotal}, ${credits}, ${adjustment}, ${total}, ${status},
-            ${plan}, ${actor.userId}::uuid
+            ${plan}, ${actor.userId}::uuid, ${statement ? "ai_statement" : "licence"}
           )
           RETURNING id::text AS id
         `,
@@ -1101,7 +1216,7 @@ export async function issueInvoice(
       school_id: schoolId,
       invoice_id: invoiceId,
       position: index + 1,
-      kind: line.kind,
+      kind: line.kind as string,
       audience: null as string | null,
       plan_id: null as string | null,
       seats: null as number | null,
@@ -1139,6 +1254,38 @@ export async function issueInvoice(
     }
     return { ...base, description: `Adjustment: ${line.reason}` };
   });
+  if (statement) {
+    const statementLine = (kind: string, description: string, amountMinor: number) => ({
+      school_id: schoolId,
+      invoice_id: invoiceId,
+      position: lineRows.length + 1,
+      kind,
+      description,
+      audience: null as string | null,
+      plan_id: null as string | null,
+      seats: null as number | null,
+      months: null as number | null,
+      prorate_days: null as number | null,
+      list_price_per_seat_month_minor: null as number | null,
+      list_amount_minor: null as number | null,
+      volume_discount_bps: null as number | null,
+      volume_discount_minor: null as number | null,
+      duration_discount_bps: null as number | null,
+      duration_discount_minor: null as number | null,
+      amount_minor: amountMinor,
+      overlap_id: null as string | null,
+    });
+    if (statement.monthsMinor > 0) {
+      lineRows.push(
+        statementLine("student_ai_months", statement.monthsDescription, statement.monthsMinor),
+      );
+    }
+    if (statement.shareMinor > 0) {
+      lineRows.push(
+        statementLine("ai_share_credit", statement.shareDescription, -statement.shareMinor),
+      );
+    }
+  }
   if (lineRows.length > 0) {
     await tx`INSERT INTO app.license_invoice_lines ${tx(lineRows)}`;
   }
@@ -1355,12 +1502,22 @@ export async function recordPayment(
   const credits = await settleShares(tx, schoolId, actor, now);
 
   const after = (await readInvoice(tx, invoiceId))!;
+  const unchanged = { versions: new Map<string, number>(), pending: [] };
+  // A Student AI weekly statement's invoice (000251) never starts or resumes a licence: paid in
+  // full, it activates the student-months it billed.
+  const activatedMonths =
+    after.kind === "ai_statement"
+      ? await activatePaidStatement(tx, schoolId, after.id, actor, now)
+      : new Map<string, number>();
+  const licence = after.kind === "licence";
   const activation =
-    after.status === "paid" || (await firstInstalmentPaid(tx, after.id))
+    licence && (after.status === "paid" || (await firstInstalmentPaid(tx, after.id)))
       ? await activateLicenseFor(tx, schoolId, after, actor, now)
-      : { activated: false, versions: new Map<string, number>(), pending: [] };
+      : { activated: false, ...unchanged };
   // A licence whose AI stopped for an unpaid instalment resumes once nothing is past the cutoff.
-  const resumed = await resumeIfSettled(tx, schoolId, after.licenseId, actor, now);
+  const resumed = licence
+    ? await resumeIfSettled(tx, schoolId, after.licenseId, actor, now)
+    : { resumed: false, ...unchanged };
 
   const payment = (await listPayments(tx, invoiceId)).find((p) => p.id === paymentId)!;
   return {
@@ -1371,7 +1528,12 @@ export async function recordPayment(
       licenseActivated: activation.activated || credits.activated.includes(after.licenseId),
       licenseResumed: resumed.resumed || credits.resumed.includes(after.licenseId),
     },
-    versions: new Map([...credits.versions, ...activation.versions, ...resumed.versions]),
+    versions: new Map([
+      ...credits.versions,
+      ...activation.versions,
+      ...resumed.versions,
+      ...activatedMonths,
+    ]),
     pending: [...credits.pending, ...activation.pending, ...resumed.pending],
   };
 }
@@ -1567,6 +1729,11 @@ export async function voidInvoice(
     oldValues: { status: invoice.status },
     newValues: { status: "void", void_reason: reason.trim() },
   });
+  // A weekly statement's invoice voided unpaid: its months were never paid for, and wait for a
+  // later statement (000251).
+  if (invoice.kind === "ai_statement") {
+    await releaseVoidedStatementMonths(tx, schoolId, invoiceId, actor);
+  }
   // Revenue share credited on it is owed again, and goes on the next open invoice if there is one.
   const ctx = shareContext(tx, schoolId, actor, new Date());
   if ((await restoreCreditsOfVoidedInvoice(tx, ctx, invoiceId)).length > 0) {

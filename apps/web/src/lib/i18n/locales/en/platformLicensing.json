@@ -8,7 +8,8 @@
     "pricing": "Pricing",
     "grants": "Manual grants",
     "aiProgramme": "Student AI",
-    "aiProgrammeSchools": "Student AI schools"
+    "aiProgrammeSchools": "Student AI schools",
+    "aiProgrammeStatements": "Student AI statements"
   },
   "common": {
     "actions": "Actions",
@@ -771,7 +772,7 @@
     },
     "help": {
       "iap": "For display and calculations only. The stores set the real price.",
-      "minSeats": "The school pays for at least this many seats.",
+      "minSeats": "No longer used: opt-ins take programme seats with no minimum and are billed per student, month by month, on the weekly statements.",
       "largeSchool": "A licence with this many seats or more gets at least the floor share. A floor of 0% turns it off.",
       "conversionTiers": "Conversion is students opted in divided by students enrolled. Each tier applies from its percentage up.",
       "contentBonusTiers": "Upload consistency is the share of school days with lessons or materials uploaded. The bonus is added to the conversion share.",
@@ -861,6 +862,71 @@
     "label": "Commitment",
     "full_year": "Full year committed",
     "month_to_month": "Month to month"
+  },
+  "statements": {
+    "title": "Student AI weekly statements",
+    "description": "Each week, what every school collected from parents for Student AI: what it owes Studafy for those months less its share, and its licence shares. Nothing is billed or credited before you approve it.",
+    "schoolsLink": "Student AI schools",
+    "statusFilter": "Status",
+    "allStatuses": "All",
+    "empty": "No statements here.",
+    "open": "Open {{school}}'s statement for the week of {{week}}",
+    "weekOf": "{{start}} – {{end}}",
+    "columns": {
+      "school": "School",
+      "week": "Week",
+      "months": "Student-months",
+      "gross": "Owed for months",
+      "share": "Share",
+      "net": "Net to bill",
+      "licenceShares": "Licence shares",
+      "status": "Status",
+      "student": "Student",
+      "month": "Month",
+      "collectedOn": "Paid by the parent",
+      "price": "Seat price",
+      "invoice": "Invoice",
+      "period": "Period",
+      "rate": "Rate"
+    },
+    "status": {
+      "awaiting_approval": "Awaiting approval",
+      "held": "On hold",
+      "approved": "Approved",
+      "rejected": "Rejected"
+    },
+    "monthStatus": {
+      "collected": "Collected",
+      "billed": "Billed",
+      "activated": "Active",
+      "void": "Void"
+    },
+    "detailTitle": "Statement for the week of {{week}}",
+    "back": "All statements",
+    "schoolLink": "The school's programme",
+    "invoice": "Invoice {{number}}",
+    "statsLabel": "Statement figures",
+    "stats": {
+      "months": "Student-months",
+      "gross": "Owed for the months",
+      "share": "School's share on them",
+      "net": "Net to bill the school",
+      "licenceShares": "Licence shares to credit"
+    },
+    "decisionTitle": "Decision",
+    "approveExplainer": "Approving bills the school {{net}} for these months (they turn on for the students once it pays) and credits {{shares}} of licence shares on its next invoice.",
+    "note": "Note or reason",
+    "noteHint": "Needed to hold or reject; optional when approving.",
+    "approve": "Approve",
+    "hold": "Hold",
+    "reject": "Reject",
+    "approved": "Statement approved",
+    "held": "Statement on hold",
+    "rejected": "Statement rejected",
+    "monthsTitle": "Student-months collected",
+    "noMonths": "No student-months on this statement.",
+    "sharesTitle": "Licence shares",
+    "noShares": "No licence shares on this statement."
   },
   "programmeSchools": {
     "title": "Student AI schools",

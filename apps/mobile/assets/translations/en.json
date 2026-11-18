@@ -2591,7 +2591,9 @@
     "askSchool": {
       "title": "Ask your school for a seat",
       "body": "{school} provides this through its Studafy license. Ask your school to give you a seat — there's nothing to buy.",
-      "bodyOtherTier": "Your seat from {school} doesn't include this. Ask your school whether it can move you to a plan that does."
+      "bodyOtherTier": "Your seat from {school} doesn't include this. Ask your school whether it can move you to a plan that does.",
+      "awaitingPaymentTitle": "Waiting for your school's payment",
+      "awaitingPayment": "Your Student AI for this month turns on as soon as {school} has paid Studafy for it."
     },
     "schoolInactive": {
       "title": "Your school's Studafy plan isn't active",

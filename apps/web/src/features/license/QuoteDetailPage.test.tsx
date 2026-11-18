@@ -309,44 +309,13 @@ describe("QuoteDetailPage", () => {
     ).toBeTruthy();
   });
 
-  test("warns that the school pays for Student AI's minimum seats before it accepts", async () => {
+  test("no Student AI minimum-seat warning: opt-ins take programme seats with no minimum", async () => {
     await renderPage();
-    const warning = await screen.findByTestId("quote-minimum");
-    expect(warning.textContent).toContain(
-      "Student AI: the school pays for at least 30 student seats",
-    );
-    expect(warning.textContent).toContain("Even if fewer students opt in");
-
+    await screen.findByRole("table", { name: "Price breakdown" });
+    expect(screen.queryByTestId("quote-minimum")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Accept quote" }));
     const dialog = await screen.findByRole("dialog", { name: "Accept this quote?" });
-    expect(within(dialog).getByTestId("quote-minimum").textContent).toContain(
-      "at least 30 student seats",
-    );
-  });
-
-  test("no minimum warning without student seats or before the programme is set up", async () => {
-    minSeats = null;
-    await renderPage();
-    await screen.findByRole("table", { name: "Price breakdown" });
-    await waitFor(() =>
-      expect(getMock.mock.calls.some(([path]) => path === "/api/school/license/student-ai")).toBe(
-        true,
-      ),
-    );
-    expect(screen.queryByTestId("quote-minimum")).toBeNull();
-    cleanup();
-
-    minSeats = 30;
-    const base = quote();
-    current = quote({
-      breakdown: {
-        ...base.breakdown,
-        lines: [{ ...base.breakdown.lines[0], audience: "teacher" }],
-      },
-    });
-    await renderPage();
-    await screen.findByRole("table", { name: "Price breakdown" });
-    expect(screen.queryByTestId("quote-minimum")).toBeNull();
+    expect(within(dialog).queryByTestId("quote-minimum")).toBeNull();
   });
 
   test("an expired or accepted quote cannot be accepted", async () => {
