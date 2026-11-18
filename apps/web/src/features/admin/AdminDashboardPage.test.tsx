@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { MemoryRouter } from "react-router-dom";
@@ -183,5 +183,34 @@ describe("AdminDashboardPage", () => {
     expect(screen.getByText("School admin")).toBeTruthy();
     expect(screen.getByText("Al-Noor Academy")).toBeTruthy();
     expect(screen.getByRole("heading", { level: 1, name: "School overview" })).toBeTruthy();
+  });
+
+  test("sorts the twelve shortcuts into three groups on one line, each opening its links", async () => {
+    getMock.mockImplementation(emptyResponsesFor);
+    const { container } = await renderPage(await loadAdminDashboardPage());
+    await screen.findByText("Nothing needs your attention right now.");
+
+    const people = screen.getByRole("button", { name: /Users & students/ });
+    expect(screen.getByRole("button", { name: /Academics/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Administration/ })).toBeTruthy();
+    // Closed groups show no links, so the row stays one line.
+    expect(screen.queryByRole("link", { name: "Manage users" })).toBeNull();
+    expect(people.getAttribute("aria-expanded")).toBe("false");
+
+    fireEvent.click(people);
+    expect(people.getAttribute("aria-expanded")).toBe("true");
+    for (const [name, href] of [
+      ["Manage users", "/portal/admin/users"],
+      ["Manage students", "/portal/admin/students"],
+      ["Teachers' employment", "/portal/admin/teachers"],
+      ["Import data", "/portal/admin/import"],
+    ] as const) {
+      expect(screen.getByRole("link", { name }).getAttribute("href")).toBe(href);
+    }
+    await expectNoA11yViolations(container);
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("link", { name: "Manage users" })).toBeNull();
+    expect(people.getAttribute("aria-expanded")).toBe("false");
   });
 });

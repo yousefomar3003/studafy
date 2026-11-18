@@ -49,6 +49,15 @@ describe("Modal", () => {
     expect(dialog().hasAttribute("aria-describedby")).toBe(false);
   });
 
+  test("is the default width unless asked to be wide", () => {
+    const { unmount } = renderModal();
+    expect(dialog().className).toBe("sf-modal");
+    unmount();
+
+    renderModal({ size: "wide" });
+    expect(dialog().classList.contains("sf-modal--wide")).toBe(true);
+  });
+
   test("renders into a portal on document.body, not in place", () => {
     const { container } = renderModal();
 

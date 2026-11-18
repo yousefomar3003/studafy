@@ -34,6 +34,10 @@
   animation: sf-modal-enter var(--duration-base) var(--easing-emphasized);
 }
 
+.sf-modal--wide {
+  max-width: 720px;
+}
+
 .sf-modal:focus-visible {
   outline: var(--focus-ring-width) solid var(--focus-ring-color);
   outline-offset: var(--focus-ring-offset);
@@ -82,7 +86,9 @@
 
 .sf-modal__description {
   margin: 0;
-  padding: var(--space-16) var(--space-16) 0;
+  /* It stays put while the body scrolls, so it is divided from the body like the header is. */
+  padding: var(--space-16);
+  border-bottom: 1px solid var(--color-border);
   font-size: var(--font-size-sm);
   line-height: var(--line-height-base);
   color: var(--color-muted-foreground);

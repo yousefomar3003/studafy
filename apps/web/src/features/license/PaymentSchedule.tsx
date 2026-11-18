@@ -3,6 +3,8 @@ import { useMoney } from "../platform/licensing/format";
 
 import type { ReactNode } from "react";
 
+import "./license-tables.css";
+
 /** One row of a schedule: a quote's preview has only these; an invoice's instalments have more. */
 export interface ScheduleRow {
   position: number;
@@ -44,17 +46,21 @@ export function PaymentSchedule({
   const m = (amount: number) => money(amount, currencyCode, minorUnit);
 
   return (
-    <div className="platform-table-scroll">
-      <table className="platform-table license-schedule">
+    <div className="license-table-scroll">
+      <table className="license-table license-schedule">
         <caption className="sf-visually-hidden">{caption}</caption>
         <thead>
           <tr>
             <th scope="col">{t("schoolLicense.schedule.columns.number")}</th>
             <th scope="col">{t("schoolLicense.schedule.columns.dueDate")}</th>
-            <th scope="col">{t("schoolLicense.schedule.columns.amount")}</th>
+            <th scope="col" className="license-amount">
+              {t("schoolLicense.schedule.columns.amount")}
+            </th>
             {withStatus ? (
               <>
-                <th scope="col">{t("schoolLicense.schedule.columns.paid")}</th>
+                <th scope="col" className="license-amount">
+                  {t("schoolLicense.schedule.columns.paid")}
+                </th>
                 <th scope="col">{t("schoolLicense.schedule.columns.status")}</th>
               </>
             ) : null}
@@ -67,10 +73,10 @@ export function PaymentSchedule({
             <tr key={row.position} data-current={row.current ? "true" : undefined}>
               <td>{row.position}</td>
               <td>{formatDate(new Date(`${row.dueDate}T00:00:00Z`), { dateStyle: "medium" })}</td>
-              <td className="licensing-amount">{m(row.amountMinor)}</td>
+              <td className="license-amount">{m(row.amountMinor)}</td>
               {withStatus ? (
                 <>
-                  <td className="licensing-amount">{m(row.paidMinor ?? 0)}</td>
+                  <td className="license-amount">{m(row.paidMinor ?? 0)}</td>
                   <td>
                     <span
                       className="platform-pill"

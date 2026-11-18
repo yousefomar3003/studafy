@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { MemoryRouter } from "react-router-dom";
@@ -69,6 +69,14 @@ afterEach(() => {
   cleanup();
   getMock.mockReset();
 });
+
+/** Opens every shortcut group, so the test can see all of the home's links at once. */
+function openShortcutGroups(): void {
+  const nav = screen.getByRole("navigation", { name: "Shortcuts" });
+  for (const button of within(nav).getAllByRole("button")) {
+    if (button.getAttribute("aria-expanded") === "false") fireEvent.click(button);
+  }
+}
 
 describe("PrincipalDashboardPage", () => {
   test("renders live data from every tile's endpoint", async () => {
@@ -210,6 +218,7 @@ describe("PrincipalDashboardPage", () => {
     getMock.mockImplementation(emptyResponsesFor);
 
     await renderPage(await loadPrincipalDashboardPage());
+    openShortcutGroups();
 
     for (const [name, href] of [
       ["Grades", "/portal/principal/grades"],

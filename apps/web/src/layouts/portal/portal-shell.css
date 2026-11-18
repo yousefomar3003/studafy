@@ -198,6 +198,11 @@
    * `--z-sticky` as the header) stay beneath the pill instead of painting over it. Modals and toasts
    * portal to <body>, so they are unaffected. */
   isolation: isolate;
+  /* The containing block for everything absolutely positioned on a page. Without it, an element
+   * with no positioned ancestor (`.sf-visually-hidden` table captions, for one) is placed against
+   * the document, outside this scroller: it lengthens the document past the viewport, the window
+   * scrolls, and the whole shell slides up off the screen, leaving the page below it blank. */
+  position: relative;
   padding: var(--space-24);
   padding-top: calc(64px + var(--space-24));
   scroll-padding-top: calc(64px + var(--space-24));

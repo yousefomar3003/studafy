@@ -2,7 +2,7 @@ import { PERMISSIONS } from "@studafy/constants";
 
 import { useApprovalQueueQuery } from "../../components/ApprovalQueueBadge";
 import { HomeHeader, useSummarySentence } from "../../components/home/HomeHeader";
-import { HomeShortcuts, SummaryStrip } from "../../components/home/SummaryStrip";
+import { HomeShortcutGroups, SummaryStrip } from "../../components/home/SummaryStrip";
 import { usePermissions } from "../../lib/auth";
 import { useFormatters, useTranslation } from "../../lib/i18n";
 import { LicenseTile } from "../license/LicenseTile";
@@ -27,64 +27,81 @@ import type { UseQueryResult } from "@tanstack/react-query";
 import "../../components/dashboard-tile.css";
 import "./principal-dashboard.css";
 
-/** Every area of the principal's work, in the order a principal reaches for them. A link with a
- * `permission` is shown only to sessions holding it (its route is gated on the same one). */
-const PRINCIPAL_LINKS: readonly {
+interface PrincipalLink {
   key: string;
   to: string;
+  /** Shown only to sessions holding it (its route is gated on the same one). */
   permission?: Permission;
   /** A translation key outside `principal.dashboard.links`, for links owned by another area. */
   labelKey?: string;
-}[] = [
-  { key: "grades", to: "/portal/principal/grades" },
-  { key: "calendar", to: "/portal/principal/calendar" },
-  { key: "timetable", to: "/portal/principal/timetable" },
-  { key: "classes", to: "/portal/principal/classes" },
+}
+
+/** Every area of the principal's work, sorted into three groups that fit on one line. */
+const PRINCIPAL_LINK_GROUPS: readonly { key: string; links: readonly PrincipalLink[] }[] = [
   {
-    key: "sections",
-    to: "/portal/principal/sections",
-    permission: PERMISSIONS.TIMETABLE_MANAGE,
+    key: "academics",
+    links: [
+      { key: "grades", to: "/portal/principal/grades" },
+      { key: "timetable", to: "/portal/principal/timetable" },
+      { key: "classes", to: "/portal/principal/classes" },
+      { key: "calendar", to: "/portal/principal/calendar" },
+      {
+        key: "sections",
+        to: "/portal/principal/sections",
+        permission: PERMISSIONS.TIMETABLE_MANAGE,
+      },
+      {
+        key: "years",
+        to: "/portal/principal/years",
+        permission: PERMISSIONS.TIMETABLE_MANAGE,
+      },
+      {
+        key: "catalog",
+        to: "/portal/principal/catalog",
+        permission: PERMISSIONS.TIMETABLE_MANAGE,
+      },
+      {
+        key: "academicSetup",
+        to: "/portal/principal/academic-setup",
+        permission: PERMISSIONS.ACADEMIC_CONFIG_READ,
+      },
+    ],
   },
   {
-    key: "years",
-    to: "/portal/principal/years",
-    permission: PERMISSIONS.TIMETABLE_MANAGE,
+    key: "studentsFamilies",
+    links: [
+      { key: "students", to: "/portal/principal/students" },
+      { key: "attendance", to: "/portal/principal/attendance" },
+      { key: "discipline", to: "/portal/principal/discipline" },
+      {
+        key: "parents",
+        to: "/portal/principal/parents",
+        permission: PERMISSIONS.USER_READ,
+        labelKey: "recordTemplates.links.parents",
+      },
+      // School-defined student and parent records (features/records).
+      {
+        key: "recordTemplates",
+        to: "/portal/principal/school/records",
+        permission: PERMISSIONS.RECORD_TEMPLATE_MANAGE,
+        labelKey: "recordTemplates.links.templates",
+      },
+      {
+        key: "missingRecords",
+        to: "/portal/principal/records/missing",
+        permission: PERMISSIONS.STUDENT_RECORD_READ,
+        labelKey: "recordTemplates.links.missing",
+      },
+    ],
   },
   {
-    key: "catalog",
-    to: "/portal/principal/catalog",
-    permission: PERMISSIONS.TIMETABLE_MANAGE,
-  },
-  {
-    key: "academicSetup",
-    to: "/portal/principal/academic-setup",
-    permission: PERMISSIONS.ACADEMIC_CONFIG_READ,
-  },
-  { key: "students", to: "/portal/principal/students" },
-  { key: "attendance", to: "/portal/principal/attendance" },
-  { key: "discipline", to: "/portal/principal/discipline" },
-  { key: "messageReports", to: "/portal/principal/message-reports" },
-  { key: "evaluations", to: "/portal/principal/evaluations" },
-  { key: "approvals", to: "/portal/approvals" },
-  { key: "announcements", to: "/portal/admin/announcements" },
-  // School-defined student and parent records (features/records).
-  {
-    key: "recordTemplates",
-    to: "/portal/principal/school/records",
-    permission: PERMISSIONS.RECORD_TEMPLATE_MANAGE,
-    labelKey: "recordTemplates.links.templates",
-  },
-  {
-    key: "parents",
-    to: "/portal/principal/parents",
-    permission: PERMISSIONS.USER_READ,
-    labelKey: "recordTemplates.links.parents",
-  },
-  {
-    key: "missingRecords",
-    to: "/portal/principal/records/missing",
-    permission: PERMISSIONS.STUDENT_RECORD_READ,
-    labelKey: "recordTemplates.links.missing",
+    key: "oversight",
+    links: [
+      { key: "approvals", to: "/portal/approvals" },
+      { key: "evaluations", to: "/portal/principal/evaluations" },
+      { key: "messageReports", to: "/portal/principal/message-reports" },
+      { key: "announcements", to: "/portal/admin/announcements" },
+    ],
   },
 ];
 
@@ -179,13 +196,17 @@ export default function PrincipalDashboardPage() {
     <>
       <HomeHeader title={t("principal.dashboard.title")} summary={summary} />
 
-      <HomeShortcuts
-        links={PRINCIPAL_LINKS.filter(
-          (link) => link.permission === undefined || permissions.has(link.permission),
-        ).map((link) => ({
-          key: link.key,
-          to: link.to,
-          label: t(link.labelKey ?? `principal.dashboard.links.${link.key}`),
+      <HomeShortcutGroups
+        groups={PRINCIPAL_LINK_GROUPS.map((group) => ({
+          key: group.key,
+          label: t(`principal.dashboard.groups.${group.key}`),
+          links: group.links
+            .filter((link) => link.permission === undefined || permissions.has(link.permission))
+            .map((link) => ({
+              key: link.key,
+              to: link.to,
+              label: t(link.labelKey ?? `principal.dashboard.links.${link.key}`),
+            })),
         }))}
       />
 
