@@ -701,7 +701,9 @@
       "noPrice": "Not set yet",
       "today": "Opting in today",
       "todayRange": "{{from}} to {{to}}, paid with tuition",
-      "rules": "Parents commit for the rest of the school year and pay with tuition. They can't cancel mid-year. Seats can be added during the year but not removed. When a student leaves, transfer their seat to another student or release it."
+      "rules": "Parents commit for the rest of the school year and pay with tuition. They can't cancel mid-year. Seats can be added during the year but not removed. When a student leaves, transfer their seat to another student or release it.",
+      "billing": "How it's billed",
+      "billingValue": "Month by month, as parents pay — no minimum seats"
     },
     "priceSum_one": "{{price}} × {{months}} month = {{total}}",
     "priceSum_other": "{{price}} × {{months}} months = {{total}}",
@@ -860,7 +862,11 @@
       "done": "{{name}}'s seat was released. No longer charged from {{month}}."
     },
     "noteLabel": "Note",
-    "noteRequired": "Add a note."
+    "noteRequired": "Add a note.",
+    "programmeBilling": {
+      "title": "Billed month by month, as parents pay",
+      "body": "Every student who opts in gets Student AI from the school, with no minimum seats. The Student AI months go on the parent's tuition; each week you pay Studafy for the months parents have paid you, less your revenue share, and those months turn on for the students once you pay."
+    }
   },
   "commitment": {
     "label": "Commitment",

@@ -26,6 +26,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 
 import { createLogger } from "../../src/logger";
 import { AUTH_CHANNELS } from "../../src/modules/auth/channels";
+import { setStudentAiAutoBilling } from "../../src/modules/finance/student-ai/service";
 import {
   acceptQuote,
   createQuote,
@@ -38,6 +39,7 @@ import {
 import { instalmentsPastCutoff } from "../../src/modules/licensing/ai-stop";
 import { readInvoice, requireInvoiceDetail } from "../../src/modules/licensing/invoices";
 import { readLicense } from "../../src/modules/licensing/service";
+import { resolveUserEntitlement } from "../../src/modules/subscriptions/entitlements/resolve";
 import {
   assignRole,
   authenticatedRequest,
@@ -226,11 +228,23 @@ async function fixture(name: string): Promise<Fixture> {
 async function tuitionWithAiMonths(
   f: Fixture,
   input: { firstMonth: string; count: number; totalMinor: number; paidMinor: number },
-): Promise<{ studentId: string; docname: string }> {
+  programme = true,
+): Promise<{ studentId: string; userId: string; docname: string }> {
   const student = await createStudent(db.sql, f.schoolId);
   const docname = `ACC-SINV-${crypto.randomUUID().slice(0, 8)}`;
   await asAdmin(f.schoolId, async (tx) => {
+    // A programme seat (000252): what an opt-in holds since, paid month by month on statements.
+    const [seat] = await tx<{ id: string }[]>`
+      INSERT INTO app.license_seats (
+        school_id, license_id, audience, user_id, student_id, assigned_by, programme
+      ) VALUES (
+        ${f.schoolId}::uuid, ${f.licenseId}::uuid, 'student', ${student.userId}::uuid,
+        ${student.id}::uuid, ${f.admin.userId}::uuid, ${programme}
+      )
+      RETURNING id::text AS id
+    `;
     await insertOptIn(tx, {
+      seatId: seat!.id,
       schoolId: f.schoolId,
       licenseId: f.licenseId,
       academicYearId: f.academicYearId,
@@ -275,7 +289,7 @@ async function tuitionWithAiMonths(
       )
     `;
   });
-  return { studentId: student.id, docname };
+  return { studentId: student.id, userId: student.userId, docname };
 }
 
 const ctxFor = (f: Fixture, now: Date) => ({
@@ -338,7 +352,7 @@ describe("collected months -> weekly statement -> approval -> payment -> activat
       // Month 2 has begun: its conversion is locked; the parent's invoice for months 2-4 is paid.
       await lockMonth(f, 2);
       const now = new Date(f.months[1]!.measureOn.getTime() + 10 * 3_600_000);
-      await tuitionWithAiMonths(f, {
+      const payer = await tuitionWithAiMonths(f, {
         firstMonth: f.months[1]!.month,
         count: 3,
         totalMinor: 25_000,
@@ -455,6 +469,25 @@ describe("collected months -> weekly statement -> approval -> payment -> activat
       const after = await asAdmin(f.schoolId, async (tx) => (await readLicense(tx, f.licenseId))!);
       expect(after.status).toBe(before.status);
 
+      // The student's programme seat now covers exactly those months (000252) -- once the licence
+      // is in force (its first instalment paid).
+      await as(f.schoolId, operator, (tx) =>
+        recordPayment(
+          tx,
+          f.schoolId,
+          f.licenceInvoiceId,
+          { amountMinor: 140_000, receivedAt: now, bankReference: "FT-LICENCE-1" },
+          operator,
+          now,
+        ).then((r) => r.result),
+      );
+      const entitlement = await asAdmin(f.schoolId, (tx) =>
+        resolveUserEntitlement(tx, f.schoolId, payer.userId),
+      );
+      expect(entitlement.seats.map((seat) => seat.activeMonths)).toEqual([
+        [f.months[1]!.month, f.months[2]!.month, f.months[3]!.month],
+      ]);
+
       // The school reads its statements; a teacher may not; the console is the super admin's.
       const finance = await createUser(db.sql, f.schoolId);
       await assignRole(db.sql, f.schoolId, finance.id, ROLES.FINANCE);
@@ -480,6 +513,36 @@ describe("collected months -> weekly statement -> approval -> payment -> activat
       expect(consoleForAdmin.status).toBe(403);
     },
     120_000,
+  );
+
+  integrationTest(
+    "an opt-in on a seat the school bought is never billed again; auto-billing stays on",
+    async () => {
+      const f = await fixture("Legacy Seat School");
+      await lockMonth(f, 2);
+      const now = new Date(f.months[1]!.measureOn.getTime() + 10 * 3_600_000);
+      await tuitionWithAiMonths(
+        f,
+        { firstMonth: f.months[1]!.month, count: 2, totalMinor: 9_000, paidMinor: 9_000 },
+        false,
+      );
+      expect(await collect(f, now)).toEqual({ recorded: 0, voided: 0 });
+
+      // With a programme opt-in, Student AI auto-billing cannot be turned off.
+      await tuitionWithAiMonths(f, {
+        firstMonth: f.months[1]!.month,
+        count: 1,
+        totalMinor: 2_000,
+        paidMinor: 2_000,
+      });
+      const refused = await asAdmin(f.schoolId, (tx) =>
+        setStudentAiAutoBilling(tx, f.schoolId, null, false).then(
+          () => "no refusal",
+          (err: { code?: string }) => err.code ?? String(err),
+        ),
+      );
+      expect(refused).toBe("AI_OPTIN_AUTO_BILLING_REQUIRED");
+    },
   );
 
   integrationTest("held, then rejected: its months come back on the next statement", async () => {

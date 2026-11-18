@@ -292,6 +292,14 @@ const PlatformAiProgrammeSchoolsPage = lazyWithCatalogs(
   [...PLATFORM_CATALOGS, "schoolLicense"],
   () => import("../features/platform/licensing/AiProgrammeSchoolsPage"),
 );
+const PlatformAiProgrammeStatementsPage = lazyWithCatalogs(
+  [...PLATFORM_CATALOGS, "schoolLicense"],
+  () => import("../features/platform/licensing/AiProgrammeStatementsPage"),
+);
+const PlatformAiProgrammeStatementPage = lazyWithCatalogs(
+  [...PLATFORM_CATALOGS, "schoolLicense"],
+  () => import("../features/platform/licensing/AiProgrammeStatementPage"),
+);
 const PlatformAiProgrammeSchoolPage = lazyWithCatalogs(
   [...PLATFORM_CATALOGS, "schoolLicense"],
   () => import("../features/platform/licensing/AiProgrammeSchoolPage"),
@@ -762,6 +770,15 @@ export const routes: RouteObject[] = [
               [
                 "platform/ai-programme/schools/:schoolId",
                 <PlatformAiProgrammeSchoolPage key="ai-programme-school" />,
+              ],
+              // The weekly statements (000251): the approval queue and one statement.
+              [
+                "platform/ai-programme/statements",
+                <PlatformAiProgrammeStatementsPage key="ai-programme-statements" />,
+              ],
+              [
+                "platform/ai-programme/statements/:schoolId/:statementId",
+                <PlatformAiProgrammeStatementPage key="ai-programme-statement" />,
               ],
               ["platform/quotes", <PlatformQuotesPage key="quotes" />],
               ["platform/licenses", <PlatformLicensesPage key="licenses" />],

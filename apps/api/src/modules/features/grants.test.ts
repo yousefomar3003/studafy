@@ -166,6 +166,43 @@ describe("school-license seats in the resolver", () => {
     expect(features.ai_tutor).toMatchObject({ active: false, reason: "not_included" });
   });
 
+  // A Student AI programme seat (000252): it covers its holder only in the months the school paid
+  // Studafy for (owner, 2026-11-18). NOW is in November 2026.
+  test("a programme seat covers its holder in a month the school paid for", async () => {
+    const features = await resolve({
+      seats: [seat({ activeMonths: ["2026-10-01", "2026-11-01"] })],
+    });
+
+    expect(features.ai_tutor).toMatchObject({
+      active: true,
+      source: "school_license",
+      periodStart: "2026-11-01T00:00:00.000Z",
+      periodEnd: "2026-12-01T00:00:00.000Z",
+    });
+  });
+
+  test("a programme seat whose month is not paid for yet reads expired, waiting for it", async () => {
+    const features = await resolve({ seats: [seat({ activeMonths: ["2026-10-01"] })] });
+
+    expect(features.ai_tutor).toMatchObject({
+      active: false,
+      reason: "expired",
+      periodEnd: "2026-11-01T00:00:00.000Z",
+    });
+  });
+
+  test("a programme seat with no month paid for covers nothing", async () => {
+    const features = await resolve({ seats: [seat({ activeMonths: [] })] });
+
+    expect(features.ai_tutor).toMatchObject({ active: false, reason: "not_included" });
+  });
+
+  test("a seat the school bought (no months) covers the whole licence period as before", async () => {
+    const features = await resolve({ seats: [seat({ activeMonths: null })] });
+
+    expect(features.ai_tutor).toMatchObject({ active: true, periodEnd: LICENSE_END });
+  });
+
   test("a personal subscription alone covers as a purchase", async () => {
     const features = await resolve({ subscriptions: [personal()] });
 

@@ -89,10 +89,10 @@ const openWindowRoute = createRoute({
   description:
     "Opens a window on the school's licence (active or awaiting payment, with a student tier and a " +
     "parent price in its currency: 409 AI_OPTIN_NO_LICENCE / AI_OPTIN_PRICE_MISSING otherwise) for " +
-    "an academic year, optionally for some grades or sections only. The school must accept the " +
-    "programme's minimum seats (`acknowledgeMinimumSeats`); when the licence has fewer, Studafy is " +
-    "asked for them (an automatic seat request). Parents of eligible children are notified. 409 " +
-    "AI_OPTIN_WINDOW_ALREADY_OPEN while another window is open.",
+    "an academic year, optionally for some grades or sections only. The school must bill Student " +
+    "AI on tuition through Studafy (409 AI_OPTIN_AUTO_BILLING_REQUIRED otherwise). Opt-ins take " +
+    "programme seats, with no minimum (`acknowledgeMinimumSeats` is no longer needed). Parents of " +
+    "eligible children are notified. 409 AI_OPTIN_WINDOW_ALREADY_OPEN while another window is open.",
   security: [{ bearerAuth: [] }],
   request: {
     body: { required: true, content: { "application/json": { schema: openWindowBodySchema } } },

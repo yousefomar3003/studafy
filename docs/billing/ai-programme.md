@@ -356,6 +356,25 @@ approves.
   is left out of activation, the non-payment stop and resume, and the AI-stop warnings. It still
   gets the invoice-due and overdue reminders.
 
+### Programme seats and access (000252)
+
+- **Programme seats.** Every parent opt-in gets a seat at once: a programme seat
+  (`license_seats.programme`), outside the seats the school bought on its licence -- neither
+  counted against nor capped by them, with **no minimum seats, no `ai_optin` seat request and no
+  waiting**. Opening a window no longer needs `acknowledgeMinimumSeats`. A student who already held
+  a seat the school bought keeps it (the school paid for it there).
+- **Access month by month.** A programme seat covers its holder only in the months the school has
+  paid Studafy for (`student_ai_months` activated, read through `app.student_ai_active_months`):
+  the feature resolver gives the seat's tier for the current month when it is paid for, reads
+  "expired" while a later month waits for payment, and gives nothing before the first paid month.
+  Activating months refreshes the students' entitlements.
+- **Auto-billing is required.** Studafy sees what parents paid only when it bills Student AI on
+  their tuition: a window is not opened while auto-billing is off, and auto-billing is not turned
+  off while students hold programme seats (409 `AI_OPTIN_AUTO_BILLING_REQUIRED`).
+- **Cutover.** Seats assigned before 000252 keep `programme = false`: the school paid for them on
+  its licence, they keep covering their holders for the licence period, and their months are never
+  collected or billed on a statement.
+
 ### Forfeiture (decision 11)
 
 An instalment is **forfeit** once it was not paid in full by its cutoff -- its due date + the

@@ -329,7 +329,7 @@ export async function approveStatement(
   input: ApproveStatementInput,
   actor: LicenseActor,
   now: Date = new Date(),
-): Promise<StatementDetail> {
+): Promise<{ detail: StatementDetail; versions: Map<string, number> }> {
   const live = await lockUndecided(tx, statementId, actor);
   const gross = live.months.reduce((sum, m) => sum + Number(m.price_minor), 0);
   const share = live.months.reduce((sum, m) => sum + Number(m.share_minor), 0);
@@ -411,9 +411,15 @@ export async function approveStatement(
     },
   });
   // The approved licence shares are credited on the school's next open invoice (this one included).
-  await settleShares(tx, schoolId, actor, now);
-  if (invoiceId) await activatePaidStatement(tx, schoolId, invoiceId, actor, now);
-  return (await statementDetail(tx, statementId))!;
+  const settled = await settleShares(tx, schoolId, actor, now);
+  // Nothing left to pay (credits covered it): its months are active at once.
+  const activated = invoiceId
+    ? await activatePaidStatement(tx, schoolId, invoiceId, actor, now)
+    : new Map<string, number>();
+  return {
+    detail: (await statementDetail(tx, statementId))!,
+    versions: new Map([...settled.versions, ...activated]),
+  };
 }
 
 /** Hold a statement, with a note: it waits, and can be approved or rejected later. */

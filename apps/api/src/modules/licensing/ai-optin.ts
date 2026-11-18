@@ -38,12 +38,11 @@ import type { TransactionSql } from "postgres";
  * transfers the seat to another student or releases it from the next month.
  *
  * Seats. Each active opt-in holds a seat on the licence (app.license_seats, through assignSeats, so
- * Student AI unlocks through the existing entitlement path). The licence's seat count is never raised
- * here: seats are what the super admin priced and the school accepted. When opt-ins need more seats
- * than the licence has -- the larger of the opt-ins and the programme's minimum seats -- an
- * 'ai_optin' change request asks the super admin for them (one open per licence, raised as more opt
- * in); the opt-ins wait for a seat and get one, oldest first, when a quote for more seats is accepted
- * or a seat frees up.
+ * Student AI unlocks through the entitlement path). Since 000252 (owner, 2026-11-18) that is a
+ * programme seat, outside the seats the school bought on its licence: no minimum, no seat request,
+ * no waiting. It covers the student only in the months the school has paid Studafy for, as parents
+ * pay their tuition (the weekly statements, 000251). A student who already held a seat the school
+ * bought keeps it, now held by the programme.
  */
 
 /** Statuses a window can be opened on, and opt-ins taken on: the licence takes seats. */
@@ -407,15 +406,16 @@ async function schoolLocale(tx: TransactionSql): Promise<TemplateLocale> {
 }
 
 // ---------------------------------------------------------------------------------------------------
-// Seats: fill waiting opt-ins, and ask for more seats when they run out
+// Seats: every opt-in gets one (a programme seat, 000252)
 // ---------------------------------------------------------------------------------------------------
 
 const NO_CHANGE = { versions: new Map<string, number>(), pending: [] as PendingRenewalStop[] };
 
 /**
- * Give a seat to every active opt-in on the licence that waits for one, oldest first, while the
- * licence has free student seats. A student who already holds a seat on the licence (assigned by the
- * school before) keeps that one, now held by the programme. Returns how many were seated.
+ * Give a seat to every active opt-in on the licence that waits for one, oldest first. A student who
+ * already holds a seat on the licence (assigned by the school before) keeps that one, now held by the
+ * programme -- the school paid for it on its licence. Everyone else gets a programme seat (000252):
+ * no minimum, no seat request, no waiting for capacity. Returns how many were seated.
  *
  * Runs as whoever acted: a parent's transaction sees only their own child's opt-ins (RLS), which is
  * all a parent's opt-in can seat; the school's and the super admin's see them all.
@@ -428,7 +428,7 @@ export async function fillWaitingOptInSeats(
   now: Date = new Date(),
 ): Promise<Changed<number>> {
   const license = await readLicense(tx, licenseId, { forUpdate: true });
-  if (!license || !OPEN_FOR_OPT_IN.has(license.status) || license.studentSeats === 0) {
+  if (!license || !OPEN_FOR_OPT_IN.has(license.status)) {
     return { result: 0, ...NO_CHANGE };
   }
   const waiting = await tx<{ id: string; user_id: string; seat_id: string | null }[]>`
@@ -470,20 +470,16 @@ export async function fillWaitingOptInSeats(
     seated += 1;
   }
 
-  const [counted] = await tx<{ assigned: number }[]>`
-    SELECT count(*)::int AS assigned FROM app.license_seats
-    WHERE school_id = current_setting('app.school_id')::uuid AND license_id = ${licenseId}::uuid
-      AND audience = 'student' AND unassigned_at IS NULL
-  `;
-  const free = license.studentSeats - (counted?.assigned ?? 0);
-  const toSeat = waiting.filter((w) => !w.seat_id).slice(0, Math.max(0, free));
+  // Everyone else gets a programme seat at once (000252): outside the licence's priced capacity,
+  // covering the student in the months the school pays for on its weekly statements.
+  const toSeat = waiting.filter((w) => !w.seat_id);
   if (toSeat.length === 0) return { result: seated, ...NO_CHANGE };
 
   const changed = await assignSeats(
     tx,
     schoolId,
     licenseId,
-    { audience: "student", userIds: toSeat.map((w) => w.user_id) },
+    { audience: "student", userIds: toSeat.map((w) => w.user_id), programme: true },
     actor,
     now,
   );
@@ -496,95 +492,6 @@ export async function fillWaitingOptInSeats(
     }
   }
   return { result: seated, versions: changed.versions, pending: changed.pending };
-}
-
-export interface SeatNeed {
-  activeOptIns: number;
-  waitingForSeat: number;
-  minSeats: number;
-  /** The seats the licence must have: the larger of the opt-ins and the minimum. */
-  seatsNeeded: number;
-}
-
-export async function seatNeed(
-  tx: TransactionSql,
-  license: LicenseRecord,
-  minSeats: number,
-): Promise<SeatNeed> {
-  const [counts] = await tx<{ active: number; waiting: number }[]>`
-    SELECT active, waiting FROM app.ai_optin_license_counts(${license.id}::uuid)
-  `;
-  const active = counts?.active ?? 0;
-  return {
-    activeOptIns: active,
-    waitingForSeat: counts?.waiting ?? 0,
-    minSeats,
-    seatsNeeded: Math.max(minSeats, active),
-  };
-}
-
-/**
- * Ask the super admin for the seats opt-ins need, when the licence has fewer: one open 'ai_optin'
- * change request per licence, raised to the new total as more students opt in. The super admin
- * prices it as a seat-increase quote. Not from the super admin's own actions (a request is the
- * school's; its requester must be a member of the school).
- */
-export async function ensureProgrammeSeatRequest(
-  tx: TransactionSql,
-  schoolId: string,
-  license: LicenseRecord,
-  minSeats: number,
-  actor: LicenseActor,
-): Promise<void> {
-  if (actor.kind !== "school") return;
-  const need = await seatNeed(tx, license, minSeats);
-  if (license.studentSeats >= need.seatsNeeded) return;
-  const note =
-    `Student AI: ${need.activeOptIns} students opted in (minimum ${need.minSeats} seats); ` +
-    `the licence has ${license.studentSeats} student seats. Requested automatically.`;
-  const [open] = await tx<{ id: string; student_seats: number | null }[]>`
-    SELECT id::text AS id, student_seats FROM app.license_change_requests
-    WHERE school_id = current_setting('app.school_id')::uuid AND license_id = ${license.id}::uuid
-      AND source = 'ai_optin' AND status = 'open'
-    FOR UPDATE
-  `;
-  if (open) {
-    if ((open.student_seats ?? 0) >= need.seatsNeeded) return;
-    await tx`
-      UPDATE app.license_change_requests
-      SET student_seats = ${need.seatsNeeded}, note = ${note},
-          updated_at = GREATEST(CURRENT_TIMESTAMP, updated_at)
-      WHERE school_id = current_setting('app.school_id')::uuid AND id = ${open.id}::uuid
-    `;
-    await auditLicenseChange(tx, schoolId, actor, {
-      action: "update",
-      targetTable: "license_change_requests",
-      targetId: open.id,
-      oldValues: { student_seats: open.student_seats },
-      newValues: { student_seats: need.seatsNeeded, source: "ai_optin" },
-    });
-    return;
-  }
-  const [row] = await tx<{ id: string }[]>`
-    INSERT INTO app.license_change_requests (
-      school_id, license_id, student_seats, note, requested_by, source
-    ) VALUES (
-      ${schoolId}::uuid, ${license.id}::uuid, ${need.seatsNeeded}, ${note}, ${actor.userId}::uuid,
-      'ai_optin'
-    )
-    RETURNING id::text AS id
-  `;
-  await auditLicenseChange(tx, schoolId, actor, {
-    action: "insert",
-    targetTable: "license_change_requests",
-    targetId: row!.id,
-    newValues: {
-      license_id: license.id,
-      student_seats: need.seatsNeeded,
-      source: "ai_optin",
-      note,
-    },
-  });
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -690,7 +597,6 @@ export async function schoolAiOptInOverview(
       `
     : [];
 
-  const need = license && programme ? await seatNeed(tx, license, programme.minSeats) : null;
   const [request] = license
     ? await tx<{ id: string; student_seats: number | null; created_at: Date }[]>`
         SELECT id::text AS id, student_seats, created_at FROM app.license_change_requests
@@ -702,7 +608,7 @@ export async function schoolAiOptInOverview(
     ? await tx<{ n: number }[]>`
         SELECT count(*)::int AS n FROM app.license_seats
         WHERE school_id = current_setting('app.school_id')::uuid AND license_id = ${license.id}::uuid
-          AND audience = 'student' AND unassigned_at IS NULL
+          AND audience = 'student' AND unassigned_at IS NULL AND NOT programme
       `
     : [];
   const period =
@@ -740,7 +646,8 @@ export async function schoolAiOptInOverview(
       released: counts?.released ?? 0,
       transferred: counts?.transferred ?? 0,
     },
-    seatsNeeded: need?.seatsNeeded ?? programme?.minSeats ?? 0,
+    // Opt-ins take programme seats outside the licence's (000252): the licence needs none for them.
+    seatsNeeded: 0,
     openSeatRequest: request
       ? {
           id: request.id,
@@ -761,15 +668,16 @@ export interface OpenWindowInput {
   gradeLevelIds?: string[];
   sectionIds?: string[];
   note?: string | null;
-  acknowledgeMinimumSeats: boolean;
+  /** No longer required (000252: opt-ins take programme seats, with no minimum). */
+  acknowledgeMinimumSeats?: boolean;
 }
 
 /**
  * Open a window on the school's current licence. The licence must take seats (awaiting payment or
- * active) and sell a student tier, with a parent price in its currency; the school must accept that
- * it pays for the programme's minimum seats even if fewer opt in -- the licence is then asked to
- * cover that minimum (an 'ai_optin' seat request). A window past its last day that was never closed
- * is closed now; one still current must be closed first.
+ * active) and sell a student tier, with a parent price in its currency, and the school must bill
+ * Student AI on tuition through Studafy (auto-billing). Opt-ins take programme seats, with no
+ * minimum (000252). A window past its last day that was never closed is closed now; one still
+ * current must be closed first.
  */
 export async function openWindow(
   tx: TransactionSql,
@@ -779,8 +687,13 @@ export async function openWindow(
   now: Date = new Date(),
 ): Promise<AiOptInWindowView> {
   const invalid = () => licenseError(422, ERROR_CODES.AI_OPTIN_WINDOW_INVALID, actor.locale);
-  if (!input.acknowledgeMinimumSeats) {
-    throw licenseError(422, ERROR_CODES.AI_OPTIN_MINIMUM_NOT_ACKNOWLEDGED, actor.locale);
+  // Studafy sees what parents paid only when it bills Student AI on their tuition (000252).
+  const [billing] = await tx<{ auto_billing: boolean }[]>`
+    SELECT auto_billing FROM app.student_ai_billing_settings
+    WHERE school_id = current_setting('app.school_id')::uuid
+  `;
+  if (billing && !billing.auto_billing) {
+    throw licenseError(409, ERROR_CODES.AI_OPTIN_AUTO_BILLING_REQUIRED, actor.locale);
   }
   const license = await currentLicense(tx, { forUpdate: true });
   if (!license || !OPEN_FOR_OPT_IN.has(license.status) || !license.studentPlanId) {
@@ -877,11 +790,8 @@ export async function openWindow(
       closes_on: input.closesOn,
       grade_level_ids: gradeLevelIds,
       section_ids: sectionIds,
-      min_seats_acknowledged: programme.minSeats,
     },
   });
-  // The school accepted the minimum: the licence must cover it.
-  await ensureProgrammeSeatRequest(tx, schoolId, license, programme.minSeats, actor);
   return toWindowView(tx, (await windowRow(tx, windowId))!, today);
 }
 
@@ -1084,7 +994,6 @@ async function afterOptIns(
   now: Date,
 ): Promise<Changed<AiOptInView[]>> {
   const filled = await fillWaitingOptInSeats(tx, schoolId, ctx.license.id, actor, now);
-  await ensureProgrammeSeatRequest(tx, schoolId, ctx.license, ctx.programme.minSeats, actor);
   const views: AiOptInView[] = [];
   for (const optIn of recorded) {
     const view = (await readOptIn(tx, optIn.id))!;

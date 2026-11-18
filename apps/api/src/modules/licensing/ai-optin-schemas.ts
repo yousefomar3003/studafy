@@ -147,11 +147,8 @@ export const openWindowBodySchema = z
     gradeLevelIds: z.array(uuid).max(100).optional(),
     sectionIds: z.array(uuid).max(500).optional(),
     note: note.optional(),
-    acknowledgeMinimumSeats: z.boolean().openapi({
-      description:
-        "The school accepts that it pays for the programme's minimum seats even if fewer students " +
-        "opt in. Must be true (422 AI_OPTIN_MINIMUM_NOT_ACKNOWLEDGED).",
-    }),
+    // No longer required (000252): opt-ins take programme seats, with no minimum. Accepted and ignored.
+    acknowledgeMinimumSeats: z.boolean().optional(),
   })
   .openapi("OpenAiOptInWindowBody");
 
