@@ -52,6 +52,11 @@
     "title": "Finance overview",
     "intro": "Collections vs due this term, receivables aging, overdue installments, and recent payments.",
     "readGuide": "Read the guide",
+    "groups": {
+      "billing": "Billing",
+      "reports": "Reports",
+      "settings": "Settings"
+    },
     "nav": {
       "fees": "Fee structures →",
       "invoices": "Invoices →",

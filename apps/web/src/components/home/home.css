@@ -177,63 +177,6 @@
   margin-block-end: var(--space-32);
 }
 
-.home-shortcuts__list {
-  display: grid;
-  /* Wide enough for the longest shortcut label on one line. */
-  grid-template-columns: repeat(auto-fill, minmax(min(210px, 100%), 1fr));
-  gap: var(--space-4) var(--space-16);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-/* Every cell in a row stretches to the tallest one, so the underlines line up even when a
-   label wraps onto a second line. */
-.home-shortcuts__list > li {
-  display: flex;
-}
-
-.home-shortcuts__link {
-  display: block;
-  flex: 1;
-  min-width: 0;
-  /* Shortcuts are always one line; a label too long for its column is cut with "…", never wrapped. */
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  padding: var(--space-8) 0;
-  border-block-end: 1px solid var(--color-border);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-foreground);
-  text-decoration: none;
-  transition: color var(--duration-fast) var(--easing-standard);
-}
-
-.home-shortcuts__link:hover {
-  color: var(--color-accent);
-  border-block-end-color: var(--color-accent);
-}
-
-/* The last word and the arrow never break apart (see ShortcutLabel). */
-.home-shortcuts__tail {
-  white-space: nowrap;
-}
-
-.home-shortcuts__arrow {
-  display: inline-block;
-}
-
-/* Forward in a right-to-left page points left. */
-[dir="rtl"] .home-shortcuts__arrow {
-  transform: scaleX(-1);
-}
-
-.home-shortcuts__link:focus-visible {
-  outline: var(--focus-ring-width) solid var(--focus-ring-color);
-  outline-offset: var(--focus-ring-offset);
-}
-
 /* Grouped shortcuts (HomeShortcutGroups): one row of group buttons, each opening its links. */
 .home-shortcut-groups {
   display: flex;
@@ -351,19 +294,23 @@
     grid-column: 1 / -1;
   }
 
-  /* One column on a phone: two would be too narrow to keep each label on one line. */
-  .home-shortcuts__list {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   .home-summary__cell {
     padding: var(--space-12) var(--space-16);
+  }
+
+  /* A group's list never runs off a phone screen: it is capped to the viewport and its labels wrap. */
+  .home-shortcut-group__panel {
+    min-width: min(240px, calc(100vw - 2 * var(--space-16)));
+    max-width: calc(100vw - 2 * var(--space-16));
+  }
+
+  .home-shortcut-group__link {
+    white-space: normal;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .home-summary__cell--link,
-  .home-shortcuts__link {
+  .home-summary__cell--link {
     transition: none;
   }
 }

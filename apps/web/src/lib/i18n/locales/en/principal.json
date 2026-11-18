@@ -6,6 +6,11 @@
   "dashboard": {
     "title": "Leadership overview",
     "description": "Everything you oversee as principal: grades, the school calendar, timetable, classes and students, plus what needs your attention today.",
+    "groups": {
+      "academics": "Academics",
+      "studentsFamilies": "Students & families",
+      "oversight": "Oversight"
+    },
     "links": {
       "grades": "Grades →",
       "calendar": "School calendar →",

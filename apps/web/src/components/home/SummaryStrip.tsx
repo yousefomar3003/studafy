@@ -77,59 +77,11 @@ export function SummaryStrip({ items }: { items: readonly SummaryItem[] }) {
   );
 }
 
-/** A labelled group of related links, rendered as a compact grid. */
-/** A trailing arrow some shortcut labels carry in their translation ("Grades →", "الدرجات ←"). */
-const TRAILING_ARROW = /\s*[→←]\s*$/u;
-
 /**
- * A shortcut's text with the arrow every shortcut shows. The arrow is drawn here rather than kept
- * in each translation, so no label can lack one, and it is glued to the label's last word so a
- * wrapping label never leaves it alone on the next line. It points forward in either direction
- * (the stylesheet mirrors it in right-to-left pages) and is hidden from screen readers.
+ * A trailing arrow some shortcut labels carry in their translation ("Grades →", "الدرجات ←"). A
+ * group's list is already a list of destinations, so it is dropped there.
  */
-export function ShortcutLabel({ label }: { label: string }) {
-  const text = label.replace(TRAILING_ARROW, "");
-  const split = text.lastIndexOf(" ");
-  const head = split === -1 ? "" : text.slice(0, split + 1);
-  const tail = split === -1 ? text : text.slice(split + 1);
-  return (
-    <>
-      {head}
-      <span className="home-shortcuts__tail">
-        {tail}
-        {"\u00a0"}
-        <span className="home-shortcuts__arrow" aria-hidden="true">
-          →
-        </span>
-      </span>
-    </>
-  );
-}
-
-export function HomeShortcuts({
-  links,
-}: {
-  links: readonly { key: string; to: string; label: string }[];
-}) {
-  const { t } = useTranslation();
-  return (
-    <nav className="home-shortcuts" aria-labelledby="home-shortcuts-heading">
-      {/* Named for screen readers only: on screen the links sit right under the page title. */}
-      <h2 id="home-shortcuts-heading" className="sf-visually-hidden">
-        {t("home.shortcuts")}
-      </h2>
-      <ul className="home-shortcuts__list">
-        {links.map((link) => (
-          <li key={link.key}>
-            <Link to={link.to} className="home-shortcuts__link">
-              <ShortcutLabel label={link.label} />
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </nav>
-  );
-}
+const TRAILING_ARROW = /\s*[→←]\s*$/u;
 
 export interface ShortcutGroup {
   key: string;
@@ -138,20 +90,24 @@ export interface ShortcutGroup {
 }
 
 /**
- * Shortcuts sorted into a few named groups on one line, each opening a short list of its links:
- * for a home with more shortcuts than fit on a row (the admin home has twelve). Each group is a
+ * A home's shortcuts, sorted into a few named groups on one line, each opening a short list of its
+ * links. Every role home with shortcuts uses it (admin, principal, finance). Each group is a
  * non-modal disclosure (useDisclosure): Escape closes it and returns focus to its button, a click
- * outside closes it, and the list holds ordinary links, so it is not an ARIA menu.
+ * outside closes it, and the list holds ordinary links, so it is not an ARIA menu. A group left
+ * with no links (every one filtered out by permission) is not shown.
  */
 export function HomeShortcutGroups({ groups }: { groups: readonly ShortcutGroup[] }) {
   const { t } = useTranslation();
+  const shown = groups.filter((group) => group.links.length > 0);
+  if (shown.length === 0) return null;
   return (
     <nav className="home-shortcuts" aria-labelledby="home-shortcuts-heading">
+      {/* Named for screen readers only: on screen the groups sit right under the page title. */}
       <h2 id="home-shortcuts-heading" className="sf-visually-hidden">
         {t("home.shortcuts")}
       </h2>
       <ul className="home-shortcut-groups">
-        {groups.map((group) => (
+        {shown.map((group) => (
           <li key={group.key}>
             <ShortcutGroupMenu group={group} />
           </li>

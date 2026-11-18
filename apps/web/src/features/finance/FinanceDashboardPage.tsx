@@ -1,7 +1,7 @@
 import { ROLES } from "@studafy/constants";
 
 import { HomeHeader, useSummarySentence } from "../../components/home/HomeHeader";
-import { HomeShortcuts, SummaryStrip } from "../../components/home/SummaryStrip";
+import { HomeShortcutGroups, SummaryStrip } from "../../components/home/SummaryStrip";
 import { useAuth } from "../../lib/auth";
 import { useFormatters, useTranslation } from "../../lib/i18n";
 import { helpPath } from "../help/content";
@@ -38,22 +38,37 @@ import "./finance-dashboard.css";
  * FINANCE does not hold). This is a UX split, not an
  * authorization boundary — both roles hold the same `billing:*` permissions and the API is unchanged.
  */
-const FINANCE_LINKS = [
-  { key: "fees", to: "/portal/finance/fees", managementOnly: true },
-  { key: "invoices", to: "/portal/finance/invoices", managementOnly: true },
-  { key: "payments", to: "/portal/finance/payments", managementOnly: true },
-  { key: "families", to: "/portal/finance/families", managementOnly: false },
-  { key: "refunds", to: "/portal/finance/adjustments/refunds", managementOnly: false },
-  { key: "scholarships", to: "/portal/finance/scholarships", managementOnly: false },
-  { key: "reports", to: "/portal/finance/reports", managementOnly: false },
-  { key: "expenses", to: "/portal/finance/expenses", managementOnly: true },
-  // VAT is the school admin's to set, so both audiences get the link.
-  { key: "tax", to: "/portal/finance/settings/tax", managementOnly: false },
-  // The Student AI line on tuition (000238): finance reads it, billing:update switches it.
-  { key: "studentAi", to: "/portal/finance/settings/student-ai", managementOnly: false },
-  // What the school earns from Student AI and owes Studafy (aiRevenueShare:read, which every role
-  // reaching this page holds).
-  { key: "studentAiEarnings", to: "/portal/finance/student-ai", managementOnly: false },
+const FINANCE_LINK_GROUPS = [
+  {
+    key: "billing",
+    links: [
+      { key: "fees", to: "/portal/finance/fees", managementOnly: true },
+      { key: "invoices", to: "/portal/finance/invoices", managementOnly: true },
+      { key: "payments", to: "/portal/finance/payments", managementOnly: true },
+      { key: "families", to: "/portal/finance/families", managementOnly: false },
+      { key: "refunds", to: "/portal/finance/adjustments/refunds", managementOnly: false },
+      { key: "scholarships", to: "/portal/finance/scholarships", managementOnly: false },
+    ],
+  },
+  {
+    key: "reports",
+    links: [
+      { key: "reports", to: "/portal/finance/reports", managementOnly: false },
+      { key: "expenses", to: "/portal/finance/expenses", managementOnly: true },
+      // What the school earns from Student AI and owes Studafy (aiRevenueShare:read, which every
+      // role reaching this page holds).
+      { key: "studentAiEarnings", to: "/portal/finance/student-ai", managementOnly: false },
+    ],
+  },
+  {
+    key: "settings",
+    links: [
+      // VAT is the school admin's to set, so both audiences get the link.
+      { key: "tax", to: "/portal/finance/settings/tax", managementOnly: false },
+      // The Student AI line on tuition (000238): finance reads it, billing:update switches it.
+      { key: "studentAi", to: "/portal/finance/settings/student-ai", managementOnly: false },
+    ],
+  },
 ] as const;
 
 export default function FinanceDashboardPage() {
@@ -61,7 +76,6 @@ export default function FinanceDashboardPage() {
   const { formatNumber } = useFormatters();
   const { roles } = useAuth();
   const canManage = roles.includes(ROLES.FINANCE);
-  const links = canManage ? FINANCE_LINKS : FINANCE_LINKS.filter((link) => !link.managementOnly);
 
   const collections = useCollectionsVsDueQuery();
   const status = collections.isPending ? "pending" : collections.isError ? "error" : "ready";
@@ -122,11 +136,17 @@ export default function FinanceDashboardPage() {
         </p>
       </HomeHeader>
 
-      <HomeShortcuts
-        links={links.map((link) => ({
-          key: link.key,
-          to: link.to,
-          label: t(`finance.dashboard.nav.${link.key}`),
+      <HomeShortcutGroups
+        groups={FINANCE_LINK_GROUPS.map((group) => ({
+          key: group.key,
+          label: t(`finance.dashboard.groups.${group.key}`),
+          links: group.links
+            .filter((link) => canManage || !link.managementOnly)
+            .map((link) => ({
+              key: link.key,
+              to: link.to,
+              label: t(`finance.dashboard.nav.${link.key}`),
+            })),
         }))}
       />
 
