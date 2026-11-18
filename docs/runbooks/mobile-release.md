@@ -137,8 +137,15 @@ end to end on 2026-10-26 (first build uploaded to TestFlight from a `macos-26` r
 
 Two build-environment requirements, both learned on that first run:
 
-- **macOS 26 runners** (`runs-on: macos-26`), for Xcode 26 — App Store Connect rejects uploads built
-  with an older SDK.
+- **Xcode 27 runners** (`runs-on: xcode-27`, Xcode pinned by `XCODE_VERSION` in the workflow) —
+  App Store Connect rejects uploads built with an older SDK. Moved off `macos-26` on 2026-11-18
+  after build 1974 drew ITMS-90725 ("built with the iOS 26.5 SDK; from April 2027 apps must be
+  built with the iOS 27 SDK"). `macos-26` only carries Xcode 26.x, so the next SDK bump means
+  the next `xcode-NN` image. Keep `XCODE_VERSION` on a release Xcode, never a beta: App Store
+  review refuses beta-SDK builds. The workflow's first iOS step fails the job if the SDK is older
+  than 27.
+  Xcode 27 also fails the archive on any pod whose deployment target is below iOS 15, so
+  `ios/Podfile`'s `post_install` lifts those pods to the app's own 15.0 floor.
 - **CocoaPods, not Swift Package Manager**: `build_ios_ipa` runs
   `flutter config --no-enable-swift-package-manager` first, because resolving FlutterFire through
   SPM hung for 80+ minutes cloning github.com/firebase/flutterfire. CocoaPods is a Gemfile gem
