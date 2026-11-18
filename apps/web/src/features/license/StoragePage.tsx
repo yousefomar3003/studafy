@@ -371,48 +371,51 @@ export default function StoragePage() {
         description={t("schoolLicense.storage.description")}
       />
 
-      {data?.testMode ? (
-        <div
-          className="license-banner"
-          data-tone="warning"
-          role="note"
-          data-testid="storage-test-mode"
-        >
-          <div>
-            <p className="license-banner__title">{t("schoolLicense.storage.testModeTitle")}</p>
-            <p className="license-banner__body">{t("schoolLicense.storage.testModeBody")}</p>
+      {/* Test mode and checkout status, spaced like every licence page's banners. */}
+      <div className="license-banners">
+        {data?.testMode ? (
+          <div
+            className="license-banner"
+            data-tone="warning"
+            role="note"
+            data-testid="storage-test-mode"
+          >
+            <div>
+              <p className="license-banner__title">{t("schoolLicense.storage.testModeTitle")}</p>
+              <p className="license-banner__body">{t("schoolLicense.storage.testModeBody")}</p>
+            </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
 
-      {confirming ? (
-        <div className="license-banner" data-tone="neutral" role="status">
-          <div>
-            <p className="license-banner__title">{t("schoolLicense.storage.confirmingTitle")}</p>
-            <p className="license-banner__body">
-              {t(
-                confirmTimedOut
-                  ? "schoolLicense.storage.confirmingSlowBody"
-                  : "schoolLicense.storage.confirmingBody",
-              )}
-            </p>
+        {confirming ? (
+          <div className="license-banner" data-tone="neutral" role="status">
+            <div>
+              <p className="license-banner__title">{t("schoolLicense.storage.confirmingTitle")}</p>
+              <p className="license-banner__body">
+                {t(
+                  confirmTimedOut
+                    ? "schoolLicense.storage.confirmingSlowBody"
+                    : "schoolLicense.storage.confirmingBody",
+                )}
+              </p>
+            </div>
           </div>
-        </div>
-      ) : checkoutStatus === "success" ? (
-        <div className="license-banner" data-tone="success" role="status">
-          <div>
-            <p className="license-banner__title">{t("schoolLicense.storage.successTitle")}</p>
-            <p className="license-banner__body">{t("schoolLicense.storage.successReadyBody")}</p>
+        ) : checkoutStatus === "success" ? (
+          <div className="license-banner" data-tone="success" role="status">
+            <div>
+              <p className="license-banner__title">{t("schoolLicense.storage.successTitle")}</p>
+              <p className="license-banner__body">{t("schoolLicense.storage.successReadyBody")}</p>
+            </div>
           </div>
-        </div>
-      ) : checkoutStatus === "cancelled" ? (
-        <div className="license-banner" data-tone="neutral" role="status">
-          <div>
-            <p className="license-banner__title">{t("schoolLicense.storage.cancelledTitle")}</p>
-            <p className="license-banner__body">{t("schoolLicense.storage.cancelledBody")}</p>
+        ) : checkoutStatus === "cancelled" ? (
+          <div className="license-banner" data-tone="neutral" role="status">
+            <div>
+              <p className="license-banner__title">{t("schoolLicense.storage.cancelledTitle")}</p>
+              <p className="license-banner__body">{t("schoolLicense.storage.cancelledBody")}</p>
+            </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
 
       {offer.isPending ? (
         <p role="status">{t("schoolLicense.common.loading")}</p>

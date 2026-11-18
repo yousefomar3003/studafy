@@ -1,6 +1,8 @@
 import { useFormatters, useTranslation } from "../../lib/i18n";
 import { useMoney } from "../platform/licensing/format";
 
+import "./license-tables.css";
+
 /** One licence year's total, as the API and @studafy/license-pricing `yearTotals` give it. */
 export interface YearTotalRow {
   year: number;
@@ -49,15 +51,17 @@ export function YearTotals({
   const title = caption ?? t("schoolLicense.years.title");
   if (rows.length === 0) return null;
   return (
-    <div className="platform-table-scroll">
-      <table className="platform-table license-years" data-testid="year-totals">
+    <div className="license-table-scroll">
+      <table className="license-table license-years" data-testid="year-totals">
         <caption className="sf-visually-hidden">{title}</caption>
         <thead>
           <tr>
             <th scope="col">{t("schoolLicense.years.columns.year")}</th>
             <th scope="col">{t("schoolLicense.years.columns.period")}</th>
-            <th scope="col">{t("schoolLicense.years.columns.payments")}</th>
-            <th scope="col">
+            <th scope="col" className="license-amount">
+              {t("schoolLicense.years.columns.payments")}
+            </th>
+            <th scope="col" className="license-amount">
               {shares
                 ? t("schoolLicense.years.columns.share")
                 : t("schoolLicense.years.columns.amount")}
@@ -75,8 +79,8 @@ export function YearTotals({
                   count: row.months,
                 })}
               </td>
-              <td>{formatNumber(row.payments)}</td>
-              <td className="licensing-amount">
+              <td className="license-amount">{formatNumber(row.payments)}</td>
+              <td className="license-amount">
                 {shares
                   ? `${formatNumber(row.amountMinor / 100, { maximumFractionDigits: 2 })}%`
                   : money(row.amountMinor, currencyCode, minorUnit)}

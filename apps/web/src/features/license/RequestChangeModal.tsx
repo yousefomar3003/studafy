@@ -144,6 +144,7 @@ export function RequestChangeModal({
       onClose={close}
       title={t("schoolLicense.aiRequest.title")}
       description={t("schoolLicense.aiRequest.description")}
+      size="wide"
     >
       <Modal.Body>
         {audiences.map((audience) => {

@@ -10,12 +10,12 @@ name: Production deploy (fly.io)
 # Order matters and matches the README: the scanner first (the workers reach it), then migrations
 # (a release never runs against an older schema), then api, realtime, workers and web.
 #
-# QA-005: a `gate` job (no secrets, no environment) refuses any ref but dev and any commit whose CI
+# QA-005: a `gate` job (no secrets, no environment) refuses any ref but main and any commit whose CI
 # run did not pass. App images are built once, Trivy-scanned at HIGH, and deployed by digest, so the
 # scanned image is the released one. The smoke check needs /readyz, the auth surface and one shared
 # JWT key; if it (or any deploy step) fails, the services go back to the digests they ran before.
 # Migrations are forward-only and are not rolled back. The `prod` environment's deployment-branch
-# policy (dev only) and required reviewers are the server-side half of the gate: a modified copy of
+# policy (main only) and required reviewers are the server-side half of the gate: a modified copy of
 # this file on another branch cannot pass them (docs/runbooks/deploy.md).
 #
 # Replaced the retired AWS ECS deploy workflows, removed with the rest of the AWS stack.
@@ -39,10 +39,10 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Release only dev, and only a commit CI passed
+      - name: Release only main, and only a commit CI passed
         env:
           GH_TOKEN: ${{ github.token }}
-        run: scripts/deploy/verify-ci-green.sh "$GITHUB_REPOSITORY" "$GITHUB_SHA" "$GITHUB_REF" ci.yml dev
+        run: scripts/deploy/verify-ci-green.sh "$GITHUB_REPOSITORY" "$GITHUB_SHA" "$GITHUB_REF" ci.yml main
 
   deploy:
     needs: gate
@@ -168,16 +168,24 @@ jobs:
           set -euo pipefail
           flyctl auth docker
           build() { scripts/deploy/release.sh build "studafy-core-$1" "infra/fly/$1.toml" "$RELEASE" "${@:2}"; }
-          echo "api=$(build api)" >> "$GITHUB_OUTPUT"
-          echo "realtime=$(build realtime)" >> "$GITHUB_OUTPUT"
-          echo "workers=$(build workers)" >> "$GITHUB_OUTPUT"
-          echo "web=$(build web \
+          # Assigned first so `set -e` stops the job when a build fails; inside `echo "x=$(...)"`
+          # a failure was swallowed and the scan got an empty image reference.
+          api="$(build api)"
+          realtime="$(build realtime)"
+          workers="$(build workers)"
+          web="$(build web \
             --build-arg "VITE_RELEASE_VERSION=$RELEASE" \
             --build-arg "VITE_TURNSTILE_SITE_KEY=${{ vars.VITE_TURNSTILE_SITE_KEY }}" \
             --build-arg "VITE_SENTRY_DSN=${{ vars.VITE_SENTRY_DSN }}" \
             --build-arg "SENTRY_ORG=${{ vars.SENTRY_ORG }}" \
             --build-arg "SENTRY_PROJECT=${{ vars.SENTRY_PROJECT }}" \
-            ${SENTRY_AUTH_TOKEN:+--build-secret "sentry_auth_token=$SENTRY_AUTH_TOKEN"})" >> "$GITHUB_OUTPUT"
+            ${SENTRY_AUTH_TOKEN:+--build-secret "sentry_auth_token=$SENTRY_AUTH_TOKEN"})"
+          {
+            echo "api=$api"
+            echo "realtime=$realtime"
+            echo "workers=$workers"
+            echo "web=$web"
+          } >> "$GITHUB_OUTPUT"
         env:
           # Source maps upload to Sentry only when the token is there (web.Dockerfile mounts it as a
           # BuildKit secret, so it never lands in the image).

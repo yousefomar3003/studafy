@@ -169,6 +169,8 @@ describe("missing information on the dashboards", () => {
     expect(
       within(tile).getByRole("link", { name: "See missing information" }).getAttribute("href"),
     ).toBe("/portal/principal/records/missing");
+    // The link sits in the home's "Students & families" shortcut group.
+    fireEvent.click(screen.getByRole("button", { name: /Students & families/ }));
     expect(screen.getByRole("link", { name: "School records" }).getAttribute("href")).toBe(
       "/portal/principal/school/records",
     );
@@ -179,6 +181,8 @@ describe("missing information on the dashboards", () => {
     wrap(<Page />, await createTestSessionStore(["ATTENDANCE_OFFICER"]));
     await screen.findAllByRole("heading");
     expect(screen.queryByRole("region", { name: "Missing information" })).toBeNull();
+    // Open the group, so the link is checked as absent rather than merely folded away.
+    fireEvent.click(screen.getByRole("button", { name: /Students & families/ }));
     expect(screen.queryByRole("link", { name: "School records" })).toBeNull();
   });
 });

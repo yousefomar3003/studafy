@@ -4,7 +4,9 @@ on:
   pull_request:
   push:
     # stage carries the QA fix tasks (docs/testing/qa-plan.md), pushed directly; "done" there is CI green.
-    branches: [dev, stage]
+    # main is the release branch: the production deploy releases a main commit only once this CI
+    # push run passed for it (scripts/deploy/verify-ci-green.sh).
+    branches: [dev, stage, main]
 
 permissions:
   contents: read

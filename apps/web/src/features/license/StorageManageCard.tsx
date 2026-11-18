@@ -8,6 +8,8 @@ import { formatStorage } from "./storage-format";
 
 import type { StorageCurrent, StorageInvoice } from "./storage";
 
+import "./license-tables.css";
+
 interface Props {
   current: StorageCurrent;
   includedBytes: number;
@@ -218,8 +220,8 @@ export function StorageManageCard({
         ) : invoices.length === 0 ? (
           <p className="license-muted">{t("schoolLicense.storage.manage.historyEmpty")}</p>
         ) : (
-          <div className="platform-table-scroll">
-            <table className="platform-table">
+          <div className="license-table-scroll">
+            <table className="license-table">
               <caption className="sf-visually-hidden">
                 {t("schoolLicense.storage.manage.historyTitle")}
               </caption>

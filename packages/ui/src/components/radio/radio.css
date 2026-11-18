@@ -9,6 +9,11 @@
   font-family: var(--font-family-sans);
 }
 
+/* No browser padding on the legend, so the group's label lines up with every other field label. */
+.sf-radio-group > legend {
+  padding: 0;
+}
+
 .sf-radio-group__items {
   display: flex;
   flex-direction: column;

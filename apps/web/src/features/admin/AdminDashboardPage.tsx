@@ -2,7 +2,7 @@ import { PERMISSIONS } from "@studafy/constants";
 
 import { useApprovalQueueQuery } from "../../components/ApprovalQueueBadge";
 import { HomeHeader, useSummarySentence } from "../../components/home/HomeHeader";
-import { HomeShortcuts, SummaryStrip } from "../../components/home/SummaryStrip";
+import { HomeShortcutGroups, SummaryStrip } from "../../components/home/SummaryStrip";
 import { usePermissions } from "../../lib/auth";
 import { useFormatters, useTranslation } from "../../lib/i18n";
 import { LicenseTile } from "../license/LicenseTile";
@@ -18,21 +18,37 @@ import type { UseQueryResult } from "@tanstack/react-query";
 import "../../components/dashboard-tile.css";
 import "./admin-dashboard.css";
 
-const ADMIN_LINKS = [
-  { key: "importData", to: "/portal/admin/import" },
-  { key: "users", to: "/portal/admin/users" },
-  { key: "students", to: "/portal/admin/students" },
-  { key: "teachers", to: "/portal/admin/teachers" },
-  { key: "timetable", to: "/portal/admin/timetable" },
-  // The school's classes and each one's record. The admin console has no class list of its own:
-  // ORG_ADMIN holds principalDashboard:view, so the shared Classes page serves both.
-  { key: "classes", to: "/portal/principal/classes" },
-  { key: "calendar", to: "/portal/admin/calendar" },
-  { key: "settings", to: "/portal/admin/settings" },
-  { key: "announcements", to: "/portal/admin/announcements" },
-  { key: "audit", to: "/portal/admin/audit" },
-  { key: "privacy", to: "/portal/admin/privacy" },
-  { key: "aiReports", to: "/portal/admin/ai-reports" },
+// The admin home's twelve shortcuts, sorted into three groups so they fit on one line.
+const ADMIN_LINK_GROUPS = [
+  {
+    key: "people",
+    links: [
+      { key: "users", to: "/portal/admin/users" },
+      { key: "students", to: "/portal/admin/students" },
+      { key: "teachers", to: "/portal/admin/teachers" },
+      { key: "importData", to: "/portal/admin/import" },
+    ],
+  },
+  {
+    key: "academics",
+    links: [
+      { key: "timetable", to: "/portal/admin/timetable" },
+      // The school's classes and each one's record. The admin console has no class list of its
+      // own: ORG_ADMIN holds principalDashboard:view, so the shared Classes page serves both.
+      { key: "classes", to: "/portal/principal/classes" },
+      { key: "calendar", to: "/portal/admin/calendar" },
+      { key: "announcements", to: "/portal/admin/announcements" },
+    ],
+  },
+  {
+    key: "administration",
+    links: [
+      { key: "settings", to: "/portal/admin/settings" },
+      { key: "audit", to: "/portal/admin/audit" },
+      { key: "privacy", to: "/portal/admin/privacy" },
+      { key: "aiReports", to: "/portal/admin/ai-reports" },
+    ],
+  },
 ] as const;
 
 const statusOf = (query: UseQueryResult) =>
@@ -149,10 +165,14 @@ export default function AdminDashboardPage() {
     <>
       <HomeHeader title={t("adminSchool.dashboard.title")} summary={summary} />
 
-      <HomeShortcuts
-        links={ADMIN_LINKS.map((link) => ({
-          ...link,
-          label: t(`adminSchool.dashboard.links.${link.key}`),
+      <HomeShortcutGroups
+        groups={ADMIN_LINK_GROUPS.map((group) => ({
+          key: group.key,
+          label: t(`adminSchool.dashboard.groups.${group.key}`),
+          links: group.links.map((link) => ({
+            ...link,
+            label: t(`adminSchool.dashboard.links.${link.key}`),
+          })),
         }))}
       />
 
