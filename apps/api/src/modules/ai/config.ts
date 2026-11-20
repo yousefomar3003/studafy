@@ -81,6 +81,14 @@ export const AI_ASK_MIN_RELEVANCE_SCORE = 0.02;
 export const AI_ASK_SOURCE_LIMIT = 6;
 
 /**
+ * Characters of an open material's opening handed to Ask AI when a question scoped to that
+ * material matches none of its chunks by keyword (`ask/material-scope.ts`). ~4 characters per
+ * token ≈ 4,000 input tokens: about what six retrieved chunks already cost (6 × ~3,200 chars), so
+ * the route's `AI_LLM_MAX_RESERVE_TOKENS` hold still covers the turn.
+ */
+export const AI_ASK_MATERIAL_MAX_INPUT_CHARS = 16_000;
+
+/**
  * How many earlier turns of a conversation are sent with a follow-up question. Each is clipped to
  * a few hundred characters (`ask/prompt.ts`), so this bounds the added input at a few thousand
  * tokens while keeping enough context for "explain that more simply".

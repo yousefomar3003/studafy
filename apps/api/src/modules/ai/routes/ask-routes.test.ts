@@ -79,6 +79,8 @@ function fakeDatabase(
     hits?: Record<string, unknown>[];
     conversationExists?: boolean;
     history?: { question: string; answer: string }[];
+    /** The material a `material_id` question loads (loadSummaryMaterial); none by default. */
+    material?: { title: string; chunks: string[] };
   } = {},
 ) {
   const queries: string[] = [];
@@ -103,6 +105,25 @@ function fakeDatabase(
     // loadRecentTurns reads newest first.
     if (sql.includes("FROM app.ai_messages")) return rows([...(opts.history ?? [])].reverse());
     if (sql.includes("INSERT INTO app.ai_message_citations")) return rows([]);
+    if (sql.includes("FROM app.materials m")) {
+      const material = opts.material;
+      return rows(
+        material
+          ? [{ id: MATERIAL_ID, title: material.title, ingest_status: "ready", ai_enabled: true }]
+          : [],
+      );
+    }
+    if (sql.includes("ORDER BY chunk_index ASC")) {
+      return rows(
+        (opts.material?.chunks ?? []).map((content, index) => ({
+          id: `00000000-0000-4000-8000-0000000001${String(index).padStart(2, "0")}`,
+          chunk_index: index,
+          page_number: index + 1,
+          section_title: null,
+          content,
+        })),
+      );
+    }
     return rows([]);
   }) as unknown as TransactionSql;
   (tx as unknown as { unsafe: unknown }).unsafe = async () => undefined;
@@ -534,5 +555,87 @@ describe("POST /api/ai/students/{studentId}/ask", () => {
 
     expect(events[events.length - 1].event).toBe("error");
     expect(events[events.length - 1].data.code).toBe(ERROR_CODES.AI_LLM_REQUEST_REJECTED);
+  });
+
+  describe("a question about the material the student has open", () => {
+    const UNMATCHED = [groundedHit({ keyword_rank: null, rrf_score: 0.05 })];
+    const lesson = {
+      title: "Plants and light",
+      chunks: ["Plants make food from light.", "Chlorophyll absorbs red and blue light."],
+    };
+
+    function capturingProvider(text = "Plants use light [1].") {
+      const seen: { system?: string; prompt: string }[] = [];
+      const provider: LlmProvider = {
+        generate: async () => {
+          throw new Error("unused");
+        },
+        stream: (input) => {
+          seen.push(input);
+          return answeredStream(text);
+        },
+      };
+      return { provider, seen };
+    }
+
+    test("'explain this' matches no chunk by keyword, so it is answered from the material's opening", async () => {
+      const { provider, seen } = capturingProvider();
+      const { app } = buildAskApp(provider, {
+        database: fakeDatabase({ hits: UNMATCHED, material: lesson }),
+      });
+
+      const events = parseSse(
+        await (
+          await postAsk(app, { question: "اشرح لي هذا الدرس", material_id: MATERIAL_ID })
+        ).text(),
+      );
+
+      const sources = events[0]!;
+      expect(sources.event).toBe("sources");
+      expect(sources.data.grounded).toBe(true);
+      const anchors = sources.data.sources as Record<string, unknown>[];
+      expect(anchors.map((a) => a.order)).toEqual([1, 2]);
+      expect(anchors[0]).toMatchObject({
+        material_id: MATERIAL_ID,
+        material_title: "Plants and light",
+      });
+
+      expect(seen[0]!.prompt).toContain("Plants make food from light.");
+      expect(seen[0]!.prompt).toContain("Chlorophyll absorbs red and blue light.");
+      expect(seen[0]!.system).toContain('the material "Plants and light"');
+      // An Arabic question pins an Arabic answer.
+      expect(seen[0]!.system).toContain("Arabic (Modern Standard Arabic");
+
+      const done = events.at(-1)!;
+      expect(done.event).toBe("done");
+      expect(done.data.grounded).toBe(true);
+      expect((done.data.citations as unknown[]).length).toBe(1);
+    });
+
+    test("a keyword match inside the material still answers from the matched chunks", async () => {
+      const { provider, seen } = capturingProvider();
+      const { app } = buildAskApp(provider, {
+        database: fakeDatabase({ material: lesson }),
+      });
+
+      await (
+        await postAsk(app, { question: "How does photosynthesis work?", material_id: MATERIAL_ID })
+      ).text();
+
+      expect(seen[0]!.prompt).toContain("Photosynthesis is the process");
+      expect(seen[0]!.prompt).not.toContain("Plants make food from light.");
+      expect(seen[0]!.system).toContain("Write your whole answer in English");
+    });
+
+    test("a material that cannot be loaded keeps the old path: refused without the general flag", async () => {
+      const { provider } = capturingProvider();
+      const { app } = buildAskApp(provider, { database: fakeDatabase({ hits: UNMATCHED }) });
+
+      const events = parseSse(
+        await (await postAsk(app, { question: "explain this", material_id: MATERIAL_ID })).text(),
+      );
+
+      expect(events.map((event) => event.event)).toEqual(["refusal"]);
+    });
   });
 });
