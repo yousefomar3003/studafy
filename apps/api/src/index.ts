@@ -20,6 +20,7 @@ import {
   AI_DATA_SHARING_DISCLOSURE,
   createAnthropicProvider,
   isTransientLlmFailure,
+  withScriptGuard,
   type AiModelTier,
   type LlmProvider,
 } from "./modules/ai";
@@ -183,20 +184,22 @@ const aiLlmOpenAiCompatible = env.AI_LLM_PROVIDER === "openai-compatible";
 const aiLlmApiKey = aiLlmOpenAiCompatible ? env.AI_LLM_API_KEY : env.ANTHROPIC_API_KEY;
 const aiLlmProvider: LlmProvider | null =
   env.AI_LLM_ENABLED && redis && aiLlmApiKey
-    ? createAnthropicProvider({
-        apiKey: aiLlmApiKey,
-        apiFormat: env.AI_LLM_PROVIDER,
-        baseUrl: aiLlmOpenAiCompatible ? env.AI_LLM_BASE_URL : env.ANTHROPIC_BASE_URL,
-        timeoutMs: env.AI_LLM_TIMEOUT_MS,
-        defaultMaxTokens: env.AI_LLM_MAX_TOKENS,
-        zeroRetention: env.AI_LLM_ZERO_RETENTION,
-        logger,
-        circuitBreaker: new RedisCircuitBreaker(redis, logger, {
-          keyPrefix: "cb:ai",
-          component: "ai-circuit-breaker",
-          isFailure: isTransientLlmFailure,
+    ? withScriptGuard(
+        createAnthropicProvider({
+          apiKey: aiLlmApiKey,
+          apiFormat: env.AI_LLM_PROVIDER,
+          baseUrl: aiLlmOpenAiCompatible ? env.AI_LLM_BASE_URL : env.ANTHROPIC_BASE_URL,
+          timeoutMs: env.AI_LLM_TIMEOUT_MS,
+          defaultMaxTokens: env.AI_LLM_MAX_TOKENS,
+          zeroRetention: env.AI_LLM_ZERO_RETENTION,
+          logger,
+          circuitBreaker: new RedisCircuitBreaker(redis, logger, {
+            keyPrefix: "cb:ai",
+            component: "ai-circuit-breaker",
+            isFailure: isTransientLlmFailure,
+          }),
         }),
-      })
+      )
     : null;
 
 // Ask AI photo text: English and Arabic in one pass, the two languages students' work is written in.
