@@ -7,10 +7,14 @@ const String _androidPackageId = String.fromEnvironment(
   defaultValue: 'com.studafy.studafy_mobile',
 );
 
-/// The App Store numeric id, assigned by Apple when the app is first created in App Store Connect.
-/// Injected per build via `--dart-define=IOS_APP_STORE_ID=...`; empty until the listing exists,
-/// in which case the forced-update screen falls back to a name-based App Store URL.
-const String _iosAppStoreId = String.fromEnvironment('IOS_APP_STORE_ID');
+/// The App Store numeric id Apple assigned to Studafy in App Store Connect (app 6826890449).
+/// The release builds never passed `--dart-define=IOS_APP_STORE_ID`, so the default is the real id:
+/// a name-based `apps.apple.com/app/studafy` URL is not a valid listing and the forced-update
+/// screen's Update button would lead nowhere.
+const String _iosAppStoreId = String.fromEnvironment(
+  'IOS_APP_STORE_ID',
+  defaultValue: '6826890449',
+);
 
 /// Where the forced-update screen sends a user to get a supported build. `https` listing URLs,
 /// not `market:` / `itms-apps:` deep links: `launchUrl(..., externalApplication)` already hands
@@ -23,8 +27,6 @@ Uri storeListingUri(MobilePlatform platform) {
         'https://play.google.com/store/apps/details?id=$_androidPackageId',
       );
     case MobilePlatform.ios:
-      return _iosAppStoreId.isEmpty
-          ? Uri.parse('https://apps.apple.com/app/studafy')
-          : Uri.parse('https://apps.apple.com/app/id$_iosAppStoreId');
+      return Uri.parse('https://apps.apple.com/app/id$_iosAppStoreId');
   }
 }
