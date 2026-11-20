@@ -240,12 +240,6 @@
   margin: 0 auto;
 }
 
-.marketing-footer__brand-name {
-  color: var(--mk-ink);
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-bold);
-}
-
 .marketing-footer__tagline {
   max-inline-size: 22rem;
   margin: var(--space-8) 0 0;

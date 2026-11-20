@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 
+import { BrandLogo } from "../../components/BrandLogo";
 import { useAuthStatus } from "../../lib/auth";
 import { useTranslation } from "../../lib/i18n";
 
@@ -21,7 +22,7 @@ export function MarketingFooter() {
     <footer className="marketing-footer">
       <div className="marketing-footer__row">
         <div className="marketing-footer__brand">
-          <span className="marketing-footer__brand-name">Studafy</span>
+          <BrandLogo tone="navy" />
           <p className="marketing-footer__tagline">{t("site.marketing.footer.tagline")}</p>
         </div>
 
