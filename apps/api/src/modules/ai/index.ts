@@ -232,6 +232,7 @@ export {
   type LlmStreamEvent,
   type LlmUsage,
 } from "./llm/provider";
+export { withScriptGuard } from "./llm/script-guard";
 export { recordDurableUsage } from "./usage/durable";
 export {
   createDeterministicQueryEmbedder,

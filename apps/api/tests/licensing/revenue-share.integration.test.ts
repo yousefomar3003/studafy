@@ -31,6 +31,7 @@ import {
   academicYearMonths,
   conversionMeasureDay,
   instalmentPeriods,
+  monthCount,
   monthStart,
   splitEvenly,
 } from "@studafy/license-pricing";
@@ -267,10 +268,19 @@ function addMonths(date: Date, months: number): Date {
   d.setUTCMonth(d.getUTCMonth() + months);
   return d;
 }
-/** Tomorrow, 00:00 UTC: the licences below start then. */
-function tomorrow(): Date {
+/**
+ * When the licences below start: tomorrow, 00:00 UTC, unless a licence of `months` months starting
+ * then would count a different number of months. The month rule counts every month a licence
+ * covers at least half of, so one starting on the 16th (the tests running on a 15th) can count one
+ * month more, or one fewer across February; the worked examples assume `months`. Then a day later.
+ */
+function licenceStart(months: number): Date {
   const now = new Date();
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+  let start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+  const counted = (from: Date) =>
+    monthCount(academicYearMonths(ISO(from), ISO(addDays(addMonths(from, months), -1))));
+  while (counted(start) !== months) start = addDays(start, 1);
+  return start;
 }
 
 interface ProgrammeLicence {
@@ -292,7 +302,7 @@ async function programmeLicence(
   months = 10,
   inProgramme = true,
 ): Promise<ProgrammeLicence> {
-  const start = tomorrow();
+  const start = licenceStart(months);
   const quote = await as(f.schoolId, operator, async (tx) => {
     const created = await createQuote(
       tx,
@@ -375,9 +385,10 @@ const byPosition = (entries: RevenueShareEntryView[]) =>
   );
 
 /**
- * The months a programme licence counts (THE month rule: the licences start tomorrow, so the first
- * month is tomorrow's, or the next one when tomorrow is late in its month) and the day each month's
- * conversion is measured and locked: its first day, or the licence's first day in the first month.
+ * The months a programme licence counts (THE month rule: the licences start tomorrow or soon after,
+ * see licenceStart, so the first month is that day's, or the next one when it is late in its month)
+ * and the day each month's conversion is measured and locked: its first day, or the licence's first
+ * day in the first month.
  */
 function licenceMonths(
   licence: ProgrammeLicence,
