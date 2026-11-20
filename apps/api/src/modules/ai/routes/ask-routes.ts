@@ -12,6 +12,7 @@ import { openApiValidationHook } from "../../../openapi/hook";
 import { requestIdHeaders, standardResponses } from "../../../openapi/responses";
 import { requireFeature } from "../../features/middleware";
 import { resolveCitations, type Citation } from "../ask/citations";
+import { openingSources } from "../ask/material-scope";
 import { loadRecentTurns, persistAskMessage, resolveConversation } from "../ask/persistence";
 import { assembleGeneralPrompt, assembleGroundedPrompt, toGroundedSources } from "../ask/prompt";
 import { assessGrounding, type NearestTopic } from "../ask/refusal";
@@ -22,12 +23,14 @@ import {
   AI_EXPLAIN_LEVELS,
 } from "../config";
 import { AI_FEATURE_ROUTE, aiTokenBudget, getAiQuota } from "../gate/token-budget";
+import { replyLanguageFor } from "../language";
 import { LlmProviderError } from "../llm/provider";
 import { AI_MODEL_TIERS, resolveAiModel } from "../llm/routing";
 import { effectiveAgeLevel } from "../moderation/age-level";
 import { recordBlockedContent } from "../moderation/enforce";
 import { moderateInput, moderateOutput, type AgeLevel } from "../moderation/moderate";
 import { hybridSearch } from "../retrieval/search";
+import { loadSummaryMaterial } from "../summary/materials";
 import { recordDurableUsage, splitByTier } from "../usage/durable";
 
 import type { Database } from "../../../db/client";
@@ -456,10 +459,25 @@ export function aiAskRoutes(deps: {
       const history = body.conversation_id
         ? await loadRecentTurns(tx, conversationId, AI_ASK_HISTORY_TURNS)
         : [];
-      return { search, conversationId, history };
+      // The material the student has open. Loaded under the same RLS and AI-materials rule as the
+      // summary, so a material the student cannot read, or one not yet ingested, loads as nothing.
+      const scoped =
+        body.material_id !== undefined ? await loadSummaryMaterial(tx, body.material_id) : null;
+      const openMaterial =
+        scoped?.status === "ok" && scoped.material.chunks.length > 0 ? scoped.material : null;
+      return { search, conversationId, history, openMaterial };
     });
 
-    const grounding = assessGrounding(preflight.search.hits, preflight.search.mode);
+    const searchGrounding = assessGrounding(preflight.search.hits, preflight.search.mode);
+    // A question about the open material that matched none of its chunks by keyword ("explain
+    // this") is still about that material: answer from its opening rather than generally.
+    const fromOpening = !searchGrounding.grounded && preflight.openMaterial !== null;
+    const grounding = fromOpening ? { grounded: true, topics: [] } : searchGrounding;
+    const promptContext = {
+      level,
+      language: replyLanguageFor(body.question, locale),
+      openMaterialTitle: preflight.openMaterial?.title ?? null,
+    };
     // The school's `ai.ask.general` flag (on by default) makes Ask AI a general study assistant:
     // a message the materials do not cover is answered conversationally with no sources or
     // citations (`grounded: false`), and a grounded answer may complete what its sources only
@@ -468,10 +486,18 @@ export function aiAskRoutes(deps: {
     const allowGeneralKnowledge =
       flags !== null && (await flags.get("ai.ask.general", { schoolId: auth.schoolId }));
     const answerGenerally = !grounding.grounded && allowGeneralKnowledge;
-    const sources = answerGenerally ? [] : toGroundedSources(preflight.search.hits);
+    const sources = answerGenerally
+      ? []
+      : fromOpening && preflight.openMaterial
+        ? openingSources(preflight.openMaterial)
+        : toGroundedSources(preflight.search.hits);
     const prompt = answerGenerally
-      ? assembleGeneralPrompt(body.question, level, { history: preflight.history })
+      ? assembleGeneralPrompt(body.question, level, {
+          history: preflight.history,
+          language: promptContext.language,
+        })
       : assembleGroundedPrompt(body.question, sources, undefined, {
+          ...promptContext,
           history: preflight.history,
           allowGeneralKnowledge,
         });
