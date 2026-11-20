@@ -1,9 +1,10 @@
 /* Import data: a header (title, intro, Past imports) over the four steps as numbered cards. */
 
+/* No width cap: the page fills the content area, like every other portal page, and the step grid
+ * below widens to match. */
 .import-data {
   display: grid;
   gap: var(--space-32);
-  max-width: 72rem;
 }
 
 .import-data__header {
@@ -155,6 +156,14 @@
 .import-data__step-link:focus-visible {
   outline: var(--focus-ring-width) solid var(--focus-ring-color);
   outline-offset: var(--focus-ring-offset);
+}
+
+/* Wide screens: the four steps in one row, in order, rather than a 2×2 grid with room to spare.
+ * Always 4, 2 or 1 columns, so no row is ever left with a lone card and a gap beside it. */
+@media (min-width: 80rem) {
+  .import-data__steps {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 720px) {

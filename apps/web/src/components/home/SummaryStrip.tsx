@@ -1,9 +1,10 @@
-import { Link } from "react-router-dom";
+import { Link, NavLink, matchPath, useLocation } from "react-router-dom";
 
 import { useDisclosure } from "../../layouts/portal/use-disclosure";
 import { useTranslation } from "../../lib/i18n";
 
 import type { DashboardTileStatus } from "../DashboardTile";
+import type { ReactNode } from "react";
 
 import "./home.css";
 
@@ -86,7 +87,8 @@ const TRAILING_ARROW = /\s*[→←]\s*$/u;
 export interface ShortcutGroup {
   key: string;
   label: string;
-  links: readonly { key: string; to: string; label: string }[];
+  /** `end` matches the link's route exactly (NavLink's `end`), for a section with sibling sub-routes. */
+  links: readonly { key: string; to: string; label: string; end?: boolean }[];
 }
 
 /**
@@ -106,26 +108,51 @@ export function HomeShortcutGroups({ groups }: { groups: readonly ShortcutGroup[
       <h2 id="home-shortcuts-heading" className="sf-visually-hidden">
         {t("home.shortcuts")}
       </h2>
-      <ul className="home-shortcut-groups">
-        {shown.map((group) => (
-          <li key={group.key}>
-            <ShortcutGroupMenu group={group} />
-          </li>
-        ))}
-      </ul>
+      <ShortcutGroupList groups={shown} />
     </nav>
+  );
+}
+
+/**
+ * The row of group buttons on its own, for a caller that supplies its own `<nav>` landmark (the
+ * platform console's section nav). `leading` renders as the row's first item, for a standalone link
+ * that belongs to no group. A group holding the current page marks its button, and the current
+ * link inside it carries `aria-current="page"`, so the row doubles as a "you are here" indicator.
+ */
+export function ShortcutGroupList({
+  groups,
+  leading,
+}: {
+  groups: readonly ShortcutGroup[];
+  leading?: ReactNode;
+}) {
+  const shown = groups.filter((group) => group.links.length > 0);
+  return (
+    <ul className="home-shortcut-groups">
+      {leading ? <li>{leading}</li> : null}
+      {shown.map((group) => (
+        <li key={group.key}>
+          <ShortcutGroupMenu group={group} />
+        </li>
+      ))}
+    </ul>
   );
 }
 
 function ShortcutGroupMenu({ group }: { group: ShortcutGroup }) {
   const { open, toggle, close, triggerRef, panelRef } = useDisclosure();
+  const { pathname } = useLocation();
   const panelId = `home-shortcut-group-${group.key}`;
+  const current = group.links.some((link) =>
+    matchPath({ path: link.to, end: link.end ?? false }, pathname),
+  );
   return (
     <div className="home-shortcut-group">
       <button
         ref={triggerRef}
         type="button"
         className="home-shortcut-group__trigger"
+        data-current={current || undefined}
         aria-expanded={open}
         aria-controls={panelId}
         onClick={toggle}
@@ -155,9 +182,14 @@ function ShortcutGroupMenu({ group }: { group: ShortcutGroup }) {
           <ul className="home-shortcut-group__list">
             {group.links.map((link) => (
               <li key={link.key}>
-                <Link to={link.to} className="home-shortcut-group__link" onClick={close}>
+                <NavLink
+                  to={link.to}
+                  end={link.end ?? false}
+                  className="home-shortcut-group__link"
+                  onClick={close}
+                >
                   {link.label.replace(TRAILING_ARROW, "")}
-                </Link>
+                </NavLink>
               </li>
             ))}
           </ul>

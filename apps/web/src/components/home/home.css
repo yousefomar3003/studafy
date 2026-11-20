@@ -212,6 +212,19 @@
   color: var(--color-accent);
 }
 
+/* The group holding the current page (ShortcutGroupList), and a standalone link pill on its page. */
+.home-shortcut-group__trigger[data-current],
+.home-shortcut-group__trigger[aria-current="page"] {
+  border-color: var(--color-accent);
+  background-color: var(--color-accent-subtle-bg);
+  color: var(--color-accent-subtle-foreground);
+}
+
+/* A link styled as a group button (ShortcutGroupList's `leading` item). */
+a.home-shortcut-group__trigger {
+  text-decoration: none;
+}
+
 .home-shortcut-group__trigger:focus-visible {
   outline: var(--focus-ring-width) solid var(--focus-ring-color);
   outline-offset: var(--focus-ring-offset);
@@ -267,6 +280,12 @@
 .home-shortcut-group__link:hover {
   background-color: var(--color-surface);
   color: var(--color-accent);
+}
+
+.home-shortcut-group__link[aria-current="page"] {
+  background-color: var(--color-accent-subtle-bg);
+  color: var(--color-accent-subtle-foreground);
+  font-weight: var(--font-weight-medium);
 }
 
 .home-shortcut-group__link:focus-visible {
