@@ -185,14 +185,17 @@ async function inbox(schoolId: string) {
   );
 }
 
+// A week out, at noon UTC so the calendar day is the same in every school time zone. Relative to
+// today, not a fixed date: ck_assignments_assignment_time needs due_at >= assigned_at (now()).
+const DUE_DAY = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
 async function createAssignment(f: Fixture, title: string): Promise<string> {
   return asAdmin(f.schoolId, async (tx) => {
     const [row] = await tx<{ id: string }[]>`
       INSERT INTO app.assignments
         (school_id, class_id, created_by_user_id, last_edited_by_user_id, title, status, assigned_at, due_at, max_score)
       VALUES (${f.schoolId}::uuid, ${f.classId}::uuid, ${f.teacherUserId}::uuid,
-              ${f.teacherUserId}::uuid, ${title}, 'published', now(),
-              '2099-11-20T12:00:00Z', 20)
+              ${f.teacherUserId}::uuid, ${title}, 'published', now(), ${`${DUE_DAY}T12:00:00Z`}::timestamptz, 20)
       RETURNING id
     `;
     return row!.id;
@@ -213,9 +216,9 @@ describeDb("school event notices", () => {
     const parent = rows.find((row) => row.user_id === f.parentUserId)!;
     expect(student.notification_type).toBe("ASSIGNMENT_PUBLISHED");
     expect(student.title).toBe("New assignment: Gravity");
-    expect(student.body).toBe("Physics · due 2099-11-20");
+    expect(student.body).toBe(`Physics · due ${DUE_DAY}`);
     expect(student.metadata.route).toBe(`/courses/${f.courseId}/assignments/${assignmentId}`);
-    expect(parent.body).toBe("Amina Tazi · Physics · due 2099-11-20");
+    expect(parent.body).toBe(`Amina Tazi · Physics · due ${DUE_DAY}`);
     expect(parent.metadata.route).toBe("/");
 
     // Consumed: a second pass finds nothing and writes nothing.
