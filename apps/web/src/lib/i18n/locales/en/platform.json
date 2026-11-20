@@ -16,7 +16,14 @@
     "announcements": "Announcements",
     "activity": "Staff activity",
     "health": "System health",
-    "flags": "Feature switches"
+    "flags": "Feature switches",
+    "groups": {
+      "schools": "Schools & accounts",
+      "billing": "Billing",
+      "catalog": "Catalog",
+      "ai": "AI",
+      "operations": "Operations"
+    }
   },
   "status": {
     "registered": "Awaiting email verification",

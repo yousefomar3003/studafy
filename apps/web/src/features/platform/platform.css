@@ -42,39 +42,9 @@
   gap: var(--space-8);
 }
 
+/* Grouped section links (ShortcutGroupList): no overflow clipping, so a group's list can open. */
 .platform-nav {
-  display: flex;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  scrollbar-width: thin;
-  gap: var(--space-4);
   margin-top: var(--space-16);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.platform-nav__link {
-  flex-shrink: 0;
-  white-space: nowrap;
-  padding: var(--space-8) var(--space-12);
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-  color: var(--color-muted-foreground);
-  font-weight: var(--font-weight-medium);
-  text-decoration: none;
-}
-
-.platform-nav__link:hover {
-  color: var(--color-foreground);
-}
-
-.platform-nav__link[aria-current="page"] {
-  border-bottom-color: var(--color-accent);
-  color: var(--color-foreground);
-}
-
-.platform-nav__link:focus-visible {
-  outline: var(--focus-ring-width) solid var(--focus-ring-color);
-  outline-offset: var(--focus-ring-offset);
 }
 
 .platform-stats {
