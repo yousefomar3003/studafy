@@ -14,7 +14,12 @@
 
 import { approveShares, lockDueConversionSnapshots } from "@studafy/billing";
 import { ROLES } from "@studafy/constants";
-import { academicYearMonths, conversionMeasureDay, monthStart } from "@studafy/license-pricing";
+import {
+  academicYearMonths,
+  conversionMeasureDay,
+  monthCount,
+  monthStart,
+} from "@studafy/license-pricing";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 
@@ -122,9 +127,19 @@ function addMonths(date: Date, months: number): Date {
   d.setUTCMonth(d.getUTCMonth() + months);
   return d;
 }
-function tomorrow(): Date {
+/**
+ * When the licences below start: tomorrow, 00:00 UTC, unless a licence of `months` months starting
+ * then would count a different number of months. The month rule counts every month a licence
+ * covers at least half of, so one starting on the 16th (the tests running on a 15th) can count one
+ * month more, or one fewer across February; the worked examples assume `months`. Then a day later.
+ */
+function licenceStart(months: number): Date {
   const now = new Date();
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+  let start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+  const counted = (from: Date) =>
+    monthCount(academicYearMonths(ISO(from), ISO(addDays(addMonths(from, months), -1))));
+  while (counted(start) !== months) start = addDays(start, 1);
+  return start;
 }
 
 beforeAll(async () => {
@@ -219,7 +234,7 @@ async function school(
 
 /** A Student AI licence of `seats` seats x $4 x `months`, paid monthly, accepted by the school. */
 async function licence(f: SchoolFixture, seats: number, months: number, inProgramme = true) {
-  const start = tomorrow();
+  const start = licenceStart(months);
   const quote = (await as(f.schoolId, operator, async (tx) => {
     const created = await createQuote(
       tx,
