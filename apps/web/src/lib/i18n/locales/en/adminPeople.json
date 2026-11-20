@@ -844,7 +844,8 @@
     "roles": {
       "STUDENT": "Students",
       "PARENT": "Parents",
-      "INSTRUCTOR": "Teachers"
+      "INSTRUCTOR": "Teachers",
+      "ATTENDANCE_OFFICER": "Attendance officers"
     },
     "reprint": "Also reprint slips that were printed before but not used yet",
     "reprintWarning": "Reprinting gives those people a new code. Slips you printed for them earlier will stop working.",
@@ -852,13 +853,22 @@
     "preparing": "Preparing…",
     "error": "Couldn't prepare the slips. Please try again.",
     "none": "Everyone has already signed in or has an unused slip. Tick “reprint” to print those again.",
-    "ready_one": "{{count}} slip is ready. The codes are shown only now, so print before you leave this page.",
-    "ready_other": "{{count}} slips are ready. The codes are shown only now, so print before you leave this page.",
+    "ready_one": "{{count}} slip is ready. The codes are shown only now, so print or download them before you leave this page.",
+    "ready_other": "{{count}} slips are ready. The codes are shown only now, so print or download them before you leave this page.",
     "print": "Print",
     "listLabel": "Login slips",
     "parentOf": "Parent of {{names}}",
     "id": "Studafy ID",
     "code": "One-time code",
-    "how": "Go to {{url}}, enter your ID and this code, then choose your own password. The code works until {{date}}."
+    "how": "Go to {{url}}, enter your ID and this code, then choose your own password. The code works until {{date}}.",
+    "downloadExcel": "Download Excel",
+    "excelWarning": "The Excel file holds working sign-in codes. Keep it private, and delete it once the slips are handed out.",
+    "columns": {
+      "name": "Name",
+      "class": "Class",
+      "parentOf": "Parent of",
+      "validUntil": "Code works until",
+      "signInAt": "Sign in at"
+    }
   }
 }
