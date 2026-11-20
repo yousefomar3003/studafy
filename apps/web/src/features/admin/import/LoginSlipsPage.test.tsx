@@ -6,6 +6,7 @@ import { afterEach, describe, expect, mock, test } from "bun:test";
 import { MemoryRouter } from "react-router-dom";
 
 import { expectNoA11yViolations } from "../../../lib/test/axe";
+import { xlsxToCsv } from "../../../lib/xlsx";
 
 import type { LoginSlip } from "./LoginSlipsPage";
 import type { ComponentType } from "react";
@@ -139,6 +140,62 @@ describe("LoginSlipsPage", () => {
       { role: "PARENT", include_pending: true, after: "PAR-100001" },
     ]);
     expect(screen.getByText("Parent of Ali Hassan, Sara Hassan")).toBeTruthy();
+  });
+
+  test("attendance officers get slips too", async () => {
+    batches = [
+      { issued: [issued("a1", "Huda Saleh", "ATT-100001")], remaining: 0, last: "ATT-100001" },
+    ];
+    await renderPage();
+    fireEvent.click(screen.getByRole("combobox", { name: /^Slips for/ }));
+    fireEvent.click(screen.getByRole("option", { name: "Attendance officers" }));
+    fireEvent.click(screen.getByRole("button", { name: "Prepare slips" }));
+    const list = within(await screen.findByRole("list", { name: "Login slips" }));
+    expect(list.getByText("ATT-100001")).toBeTruthy();
+    expect(posted).toEqual([{ role: "ATTENDANCE_OFFICER" }]);
+  });
+
+  test("the slips download as an Excel sheet, in the order shown, every cell as text", async () => {
+    batches = [
+      {
+        issued: [
+          issued("u2", "Sara Hassan", "STU-100002", { class_label: "Grade 1 – B" }),
+          issued("u1", "Ali Hassan", "STU-100001", { class_label: "Grade 1 – A" }),
+        ],
+        remaining: 0,
+        last: "STU-100002",
+      },
+    ];
+    let saved: Blob | null = null;
+    const createObjectURL = URL.createObjectURL;
+    const revokeObjectURL = URL.revokeObjectURL;
+    URL.createObjectURL = (blob: Blob) => {
+      saved = blob;
+      return "blob:slips";
+    };
+    URL.revokeObjectURL = () => undefined;
+    try {
+      await renderPage();
+      fireEvent.click(screen.getByRole("button", { name: "Prepare slips" }));
+      await screen.findByRole("list", { name: "Login slips" });
+      expect(screen.getByText(/Keep it private/)).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: "Download Excel" }));
+      expect(saved).not.toBeNull();
+      const rows = xlsxToCsv(new Uint8Array(await saved!.arrayBuffer()))
+        .trim()
+        .split("\n");
+      expect(rows[0]).toBe(
+        "Name,Class,Parent of,Studafy ID,One-time code,Code works until,Sign in at",
+      );
+      expect(rows.slice(1).map((row) => row.split(",").slice(0, 5))).toEqual([
+        ["Ali Hassan", "Grade 1 – A", "", "STU-100001", "CODE-STU-100001"],
+        ["Sara Hassan", "Grade 1 – B", "", "STU-100002", "CODE-STU-100002"],
+      ]);
+      expect(rows[1]).toContain("/auth/login");
+    } finally {
+      URL.createObjectURL = createObjectURL;
+      URL.revokeObjectURL = revokeObjectURL;
+    }
   });
 
   test("says so when everyone already has a way in", async () => {
