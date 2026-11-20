@@ -191,6 +191,17 @@
   margin: var(--space-16) 0;
 }
 
+.login-slips__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+
+.login-slips__ready > .students-import__warning {
+  flex-basis: 100%;
+  margin: 0;
+}
+
 .login-slips {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));

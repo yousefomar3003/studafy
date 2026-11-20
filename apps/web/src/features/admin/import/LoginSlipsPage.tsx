@@ -5,10 +5,13 @@ import { useState } from "react";
 
 import { api } from "../../../lib/api";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
+import { buildXlsx, downloadXlsx } from "../../../lib/xlsx-write";
 
 import "./import-data.css";
 
-type SlipRole = "STUDENT" | "PARENT" | "INSTRUCTOR";
+type SlipRole = "STUDENT" | "PARENT" | "INSTRUCTOR" | "ATTENDANCE_OFFICER";
+
+const SLIP_ROLES: readonly SlipRole[] = ["STUDENT", "PARENT", "INSTRUCTOR", "ATTENDANCE_OFFICER"];
 
 export interface LoginSlip {
   userId: string;
@@ -66,8 +69,43 @@ export function sortSlips(slips: readonly LoginSlip[], locale: string): LoginSli
 }
 
 /**
- * Login slips (`/portal/admin/import/slips`): one printable slip per student, parent or teacher who
- * has not signed in yet, with their Studafy ID and a one-time setup code. They sign in with the two
+ * The slips as one sheet for Excel: a row per person with their name, class, children (for a
+ * parent), Studafy ID, setup code, when the code expires and where to sign in -- in the order the
+ * page shows them. Every cell is text, so an ID or code is never turned into a number.
+ */
+export function slipsWorkbook(
+  slips: readonly LoginSlip[],
+  options: {
+    sheetName: string;
+    header: string[];
+    separator: string;
+    signInUrl: string;
+    expires: (iso: string) => string;
+    rightToLeft: boolean;
+  },
+) {
+  return {
+    name: options.sheetName,
+    rightToLeft: options.rightToLeft,
+    rows: [
+      options.header,
+      ...slips.map((slip) => [
+        slip.name,
+        slip.classLabel ?? "",
+        slip.children.join(options.separator),
+        slip.usernames.join(" / "),
+        slip.setupCode,
+        options.expires(slip.expiresAt),
+        options.signInUrl,
+      ]),
+    ],
+  };
+}
+
+/**
+ * Login slips (`/portal/admin/import/slips`): one printable slip per student, parent, teacher or
+ * attendance officer who has not signed in yet, with their Studafy ID and a one-time setup code --
+ * printed, or downloaded as an Excel sheet. They sign in with the two
  * and choose their own password; the code then stops working. Codes are shown only here and only
  * now (the server keeps just a hash), so the page says to print before leaving. A reprint replaces
  * codes not used yet, which makes earlier slips stop working.
@@ -84,7 +122,7 @@ export default function LoginSlipsPage() {
   });
   const signInUrl = `${window.location.origin}/auth/login`;
 
-  const roleOptions = (["STUDENT", "PARENT", "INSTRUCTOR"] as const).map((value) => ({
+  const roleOptions = SLIP_ROLES.map((value) => ({
     value,
     label: t(`adminPeople.loginSlips.roles.${value}`),
   }));
@@ -141,9 +179,42 @@ export default function LoginSlipsPage() {
         {slips && slips.length > 0 ? (
           <div className="login-slips__ready" role="status">
             <p>{t("adminPeople.loginSlips.ready", { count: slips.length })}</p>
-            <Button type="button" onClick={() => window.print()}>
-              {t("adminPeople.loginSlips.print")}
-            </Button>
+            <div className="login-slips__actions">
+              <Button type="button" onClick={() => window.print()}>
+                {t("adminPeople.loginSlips.print")}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  const expires = (iso: string) => formatDate(new Date(iso));
+                  downloadXlsx(
+                    buildXlsx(
+                      slipsWorkbook(slips, {
+                        sheetName: t(`adminPeople.loginSlips.roles.${role}`),
+                        header: [
+                          t("adminPeople.loginSlips.columns.name"),
+                          t("adminPeople.loginSlips.columns.class"),
+                          t("adminPeople.loginSlips.columns.parentOf"),
+                          t("adminPeople.loginSlips.id"),
+                          t("adminPeople.loginSlips.code"),
+                          t("adminPeople.loginSlips.columns.validUntil"),
+                          t("adminPeople.loginSlips.columns.signInAt"),
+                        ],
+                        separator: t("adminPeople.common.listSeparator"),
+                        signInUrl,
+                        expires,
+                        rightToLeft: i18n.dir() === "rtl",
+                      }),
+                    ),
+                    `login-slips-${role.toLowerCase().replace(/_/g, "-")}-${new Date().toISOString().slice(0, 10)}.xlsx`,
+                  );
+                }}
+              >
+                {t("adminPeople.loginSlips.downloadExcel")}
+              </Button>
+            </div>
+            <p className="students-import__warning">{t("adminPeople.loginSlips.excelWarning")}</p>
           </div>
         ) : null}
       </div>
