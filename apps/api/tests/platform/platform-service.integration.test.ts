@@ -143,18 +143,19 @@ afterAll(async () => {
 const database = () => db.sql as unknown as Database;
 
 describe("platform console reads", () => {
-  integrationTest("the overview counts every school's own rows", async () => {
+  integrationTest("the overview counts every customer school's own rows", async () => {
     const overview = await getPlatformOverview(database());
-    expect(overview.totalSchools).toBe(3);
+    // Studafy HQ holds the super admin, so it is a platform school: not counted as a school.
+    expect(overview.totalSchools).toBe(2);
     expect(overview.schoolsByStatus).toEqual({
       registered: 0,
       pending: 1,
-      active: 2,
+      active: 1,
       suspended: 0,
       archived: 0,
     });
-    // ops + 3 in alpha + 1 active student in beta (the invited teacher is not active).
-    expect(overview.totalActiveUsers).toBe(5);
+    // 3 in alpha + 1 active student in beta (the invited teacher is not active); not the operator.
+    expect(overview.totalActiveUsers).toBe(4);
     expect(overview.totalStudents).toBe(3);
     expect(overview.subscriptionsByStatus).toEqual({ trialing: 1 });
     expect(overview.subscriptionsByPlan).toEqual({ platform_test_plan: 1 });
@@ -163,7 +164,9 @@ describe("platform console reads", () => {
 
   integrationTest("the school list filters, searches and attaches per-school figures", async () => {
     const all = await listSchools(database(), { limit: 25, offset: 0 });
-    expect(all.total).toBe(3);
+    // Customer schools only: Studafy HQ, the operator's platform school, is not listed.
+    expect(all.total).toBe(2);
+    expect(all.schools.map((school) => school.id)).not.toContain(fixture.home);
 
     const found = await listSchools(database(), { search: "alpha", limit: 25, offset: 0 });
     expect(found.total).toBe(1);
