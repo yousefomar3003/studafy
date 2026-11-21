@@ -73,7 +73,16 @@ export interface CrossTabCoordinator {
   publish(tokens: SessionTokens): void;
   /** The newest tokens any tab has published, or null. */
   latest(): SessionTokens | null;
+  /**
+   * Forget the shared tokens, here and in every other tab: the session is over (signed out, or the
+   * server said there is none). Without it a tab kept adopting the dead token after a sign-out,
+   * reported itself signed in, and bounced between the login page and the portal.
+   */
+  clear(): void;
 }
+
+/** The BroadcastChannel message that tells the other tabs the session is over. */
+const SESSION_CLEARED = "session-cleared";
 
 const REFRESH_LOCK_NAME = "studafy-refresh";
 const SESSION_CHANNEL_NAME = "studafy-session";
@@ -91,7 +100,11 @@ export function createBrowserCrossTab(): CrossTabCoordinator {
       ? new globalThis.BroadcastChannel(SESSION_CHANNEL_NAME)
       : null;
   if (channel) {
-    channel.onmessage = (event: MessageEvent<SessionTokens>) => {
+    channel.onmessage = (event: MessageEvent<SessionTokens | typeof SESSION_CLEARED>) => {
+      if (event.data === SESSION_CLEARED) {
+        latest = null;
+        return;
+      }
       const tokens = event.data;
       if (
         tokens &&
@@ -110,6 +123,10 @@ export function createBrowserCrossTab(): CrossTabCoordinator {
       channel?.postMessage(tokens);
     },
     latest: () => latest,
+    clear() {
+      latest = null;
+      channel?.postMessage(SESSION_CLEARED);
+    },
   };
 }
 
@@ -293,11 +310,14 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
           tokens = null;
           roles = [];
           userId = null;
+          // No session on the server: a token another tab shared is dead too, never adopt it.
+          crossTab?.clear();
           setStatus("unauthenticated");
         } else if (statusCode === REFRESH_REJECTED_STATUS) {
           tokens = null;
           roles = [];
           userId = null;
+          crossTab?.clear();
           setStatus("expired");
         } else if (tokens !== null && tokens.expiresAt > now()) {
           // Transient failure while a still-valid token was held: keep serving it.
@@ -345,6 +365,8 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
       roles = [];
       userId = null;
       cancelRotationTimer();
+      // The shared copy of the session's tokens goes with it, in every tab.
+      crossTab?.clear();
       setStatus("unauthenticated");
       options.onSignedOut?.();
     }
