@@ -33,7 +33,12 @@ function outstandingByCurrency(invoices: readonly Invoice[]): string {
     sum.minor += invoice.outstanding_amount_minor;
     sums.set(invoice.currency, sum);
   }
-  if (sums.size === 0) return "0";
+  // Nothing owed still reads as money, in the student's invoice currency ("0.00 AED"), like every
+  // other amount on the page; a bare "0" only when there is no invoice to take a currency from.
+  if (sums.size === 0) {
+    const first = invoices[0];
+    return first ? `${(0).toFixed(first.currency_minor_unit)} ${first.currency}` : "0";
+  }
   return [...sums.entries()]
     .map(([currency, sum]) => `${(sum.minor / 10 ** sum.unit).toFixed(sum.unit)} ${currency}`)
     .join(" · ");

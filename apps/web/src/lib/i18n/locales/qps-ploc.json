@@ -4626,7 +4626,8 @@
       "STUDENT": "[Šţúđéñţ ǝɥʇ]",
       "PARENT": "[Ρáŕéñţ ǝɥʇ]",
       "GUEST": "[Ğúéšţ ǝɥ]",
-      "SUPPORT_AGENT": "[Šúρρóŕţ áğéñţ ǝɥʇ ʞ]"
+      "SUPPORT_AGENT": "[Šúρρóŕţ áğéñţ ǝɥʇ ʞ]",
+      "ATTENDANCE_OFFICER": "[Áţţéñđáñçé óƒƒíçéŕ ǝɥʇ ʞɔı]"
     },
     "common": {
       "previous": "[Ρŕéṽíóúš ǝɥʇ]",
@@ -4951,7 +4952,18 @@
           "student": "[Šţúđéñţš ǝɥʇ]",
           "teacher": "[Ţéáçħéŕš ǝɥʇ]",
           "parent": "[Ρáŕéñţš ǝɥʇ]"
-        }
+        },
+        "accountsTotal": "[Áçţíṽé áççóúñţš ǝɥʇ ʞɔ]",
+        "invitedCount_one": "[{{count}} ñóţ áçţíṽáţéđ ǝɥʇ ʞɔınb]",
+        "invitedCount_other": "[{{count}} ñóţ áçţíṽáţéđ ǝɥʇ ʞɔınb]",
+        "storageCap": "[óƒ {{cap}} · {{percent}} ǝɥʇ ʞɔınb]",
+        "activeLast30Count_one": "[{{count}} šíğñéđ íñ đúŕíñğ ţħé ĺášţ 30 đáýš ǝɥʇ ʞɔınb uʍoɹq ]",
+        "activeLast30Count_other": "[{{count}} šíğñéđ íñ đúŕíñğ ţħé ĺášţ 30 đáýš ǝɥʇ ʞɔınb uʍoɹq ]",
+        "aiTile": "[Šţúđéñţ ÁÍ ǝɥʇ ]",
+        "aiTileHint": "[šţúđéñţš ŵíţħ ţħé áđđ-óñ · {{tokens}} ÁÍ ţóķéñš ţħíš ƀíĺĺíñğ ρéŕíóđ ǝɥʇ ʞɔınb uʍoɹq ɟoxʞǝɥʇ ]",
+        "peopleByRole": "[Áççóúñţš ƀý ŕóĺé ǝɥʇ ʞɔ]",
+        "featureUse": "[F̃éáţúŕé úšé ţħíš ɱóñţħ ǝɥʇ ʞɔın]",
+        "seatsLabel": "[{{audience}} šéáţš ǝɥʇ ʞɔı]"
       },
       "exports": {
         "title": "[Đáţá éx̃ρóŕţš ǝɥʇ ʞ]",
@@ -5279,7 +5291,8 @@
         "noMethod": "[Ñó šíğñ-íñ šéţ úρ ýéţ ǝɥʇ ʞɔın]",
         "provider": {
           "google": "[Ğóóğĺé ǝɥʇ]",
-          "microsoft": "[M̃íçŕóšóƒţ ǝɥʇ ]"
+          "microsoft": "[M̃íçŕóšóƒţ ǝɥʇ ]",
+          "mock": "[Đéɱó šíğñ-íñ (đéṽéĺóρɱéñţ óñĺý) ǝɥʇ ʞɔınb u]"
         },
         "locked": "[Ĺóçķóúţ ǝɥʇ]",
         "lockedUntil": "[Ĺóçķéđ úñţíĺ {{time}} áƒţéŕ ŵŕóñğ ρáššŵóŕđš ǝɥʇ ʞɔınb uʍoɹq ]",
@@ -7915,7 +7928,9 @@
       "statusOk": "[óķ ǝ]",
       "statusUnavailable": "[úñáṽáíĺáƀĺé ǝɥʇ ]",
       "statusUnavailableRef": "[úñáṽáíĺáƀĺé (ŕéƒ {{requestId}}) ǝɥʇ ʞɔınb u]",
-      "unknownRef": "[úñķñóŵñ ǝɥʇ]"
+      "unknownRef": "[úñķñóŵñ ǝɥʇ]",
+      "forbiddenTitle": "[Ñó áççéšš ǝɥʇ ]",
+      "backHome": "[Ğó ţó ýóúŕ ħóɱé ρáğé ǝɥʇ ʞɔı]"
     },
     "legal": {
       "deleteAccount": {
@@ -11070,6 +11085,13 @@
         "FEE_PAYMENT_RECEIVED": "[F̃éé ρáýɱéñţš ŕéçéíṽéđ ǝɥʇ ʞɔın]",
         "FEE_PAYMENT_REMINDER": "[Óṽéŕđúé ƒéé ŕéɱíñđéŕš ǝɥʇ ʞɔın]",
         "FEE_STATEMENT": "[F̃áɱíĺý ƒéé šţáţéɱéñţš ǝɥʇ ʞɔın]",
+        "LICENSE_SEAT_APPLE_RENEWAL": "[Šçħóóĺ šéáţ çóṽéŕš ýóúŕ Áρρ Šţóŕé šúƀšçŕíρţíóñ ǝɥʇ ʞɔınb uʍoɹq ɟ]",
+        "LICENSE_EXPIRING": "[Ĺíçéñšé éñđíñğ šóóñ ǝɥʇ ʞɔı]",
+        "LICENSE_INVOICE_DUE": "[Ĺíçéñšé íñṽóíçé đúé ǝɥʇ ʞɔı]",
+        "LICENSE_INVOICE_OVERDUE": "[Ĺíçéñšé íñṽóíçé óṽéŕđúé ǝɥʇ ʞɔınb]",
+        "LICENSE_RECEIPT_UPLOADED": "[Ĺíçéñšé ţŕáñšƒéŕ ŕéçéíρţš ǝɥʇ ʞɔınb]",
+        "LICENSE_AI_STOP_WARNING": "[Šţúđéñţ ÁÍ áƀóúţ ţó šţóρ ƒóŕ ñóñ-ρáýɱéñţ ǝɥʇ ʞɔınb uʍoɹ]",
+        "LICENSE_AI_STOPPED": "[Šţúđéñţ ÁÍ šţóρρéđ ƒóŕ ñóñ-ρáýɱéñţ ǝɥʇ ʞɔınb uʍ]",
         "ASSIGNMENT_PUBLISHED": "[Ñéŵ áššíğñɱéñţš ǝɥʇ ʞɔ]",
         "ASSIGNMENT_GRADED": "[M̃áŕķéđ áššíğñɱéñţš ǝɥʇ ʞɔı]",
         "ATTENDANCE_MARKED": "[Áƀšéñçéš áñđ ĺáţéš ǝɥʇ ʞɔı]",

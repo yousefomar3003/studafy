@@ -57,7 +57,8 @@
     "STUDENT": "Student",
     "PARENT": "Parent",
     "GUEST": "Guest",
-    "SUPPORT_AGENT": "Support agent"
+    "SUPPORT_AGENT": "Support agent",
+    "ATTENDANCE_OFFICER": "Attendance officer"
   },
   "common": {
     "previous": "Previous",
@@ -382,7 +383,18 @@
         "student": "Students",
         "teacher": "Teachers",
         "parent": "Parents"
-      }
+      },
+      "accountsTotal": "Active accounts",
+      "invitedCount_one": "{{count}} not activated",
+      "invitedCount_other": "{{count}} not activated",
+      "storageCap": "of {{cap}} · {{percent}}",
+      "activeLast30Count_one": "{{count}} signed in during the last 30 days",
+      "activeLast30Count_other": "{{count}} signed in during the last 30 days",
+      "aiTile": "Student AI",
+      "aiTileHint": "students with the add-on · {{tokens}} AI tokens this billing period",
+      "peopleByRole": "Accounts by role",
+      "featureUse": "Feature use this month",
+      "seatsLabel": "{{audience}} seats"
     },
     "exports": {
       "title": "Data exports",
@@ -710,7 +722,8 @@
       "noMethod": "No sign-in set up yet",
       "provider": {
         "google": "Google",
-        "microsoft": "Microsoft"
+        "microsoft": "Microsoft",
+        "mock": "Demo sign-in (development only)"
       },
       "locked": "Lockout",
       "lockedUntil": "Locked until {{time}} after wrong passwords",

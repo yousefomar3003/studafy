@@ -55,7 +55,8 @@ export default function ParentDirectoryPage() {
         >
           {parents.map((parent) => (
             <Table.Row key={parent.user_id}>
-              <Table.Cell>
+              {/* A name stays on one line; the long children column wraps instead. */}
+              <Table.Cell style={{ whiteSpace: "nowrap" }}>
                 <Link to={`/portal/principal/parents/${parent.user_id}`}>
                   {parent.display_name ?? parent.email ?? t("records.principal.parentFallback")}
                 </Link>

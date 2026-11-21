@@ -1,6 +1,6 @@
 import { ApiError } from "@studafy/api-client";
 import { useQuery } from "@tanstack/react-query";
-import { Navigate, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useSearchParams } from "react-router-dom";
 
 import { api } from "../../lib/api";
 import { resolveRoleHome, useAuth } from "../../lib/auth";
@@ -37,6 +37,20 @@ export default function PortalPage() {
 
   if (!forbidden && roleHome !== "/portal") {
     return <Navigate to={roleHome} replace />;
+  }
+
+  // A role with a home of its own landed here from a page it can't open: say so and lead back,
+  // instead of the guest landing page and its API health line.
+  if (forbidden && roleHome !== "/portal") {
+    return (
+      <>
+        <h1>{t("onboarding.portal.forbiddenTitle")}</h1>
+        <p role="alert">{t("onboarding.portal.forbidden")}</p>
+        <p>
+          <Link to={roleHome}>{t("onboarding.portal.backHome")}</Link>
+        </p>
+      </>
+    );
   }
 
   return (

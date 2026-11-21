@@ -46,7 +46,9 @@ export interface DataGridProps<TRow> {
    * correct; cell content is clipped to a single line to guarantee it. Defaults to `44`, which
    * matches Table's own cell padding and line height. */
   rowHeight?: number;
-  /** Height of the scrollable viewport in pixels. Defaults to `480`. */
+  /** Maximum height of the rows' scrollable area in pixels (the header and a visible caption get
+   * room on top). Defaults to `480`. A grid whose rows fit in less shrinks to them, so a short or
+   * empty grid leaves no blank box under its rows. */
   height?: number;
   /** Rows rendered outside the viewport on each side, to absorb fast scrolling. Defaults to `8`. */
   overscan?: number;
@@ -245,7 +247,9 @@ export function DataGrid<TRow>({
         tabIndex={0}
         style={
           {
-            height,
+            // `height` is the rows' area; the header row (and a visible caption) sit inside the
+            // same scroll box, so it allows for them too and the last row is never cut mid-way.
+            maxHeight: height + rowHeight * (hideCaption ? 1 : 2),
             "--sf-data-grid-row-height": `${rowHeight}px`,
           } as CSSProperties
         }

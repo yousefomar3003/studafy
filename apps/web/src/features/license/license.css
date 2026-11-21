@@ -223,6 +223,14 @@
   margin-block: var(--space-12);
 }
 
+/* A hint beside the toolbar's buttons: no paragraph margins lifting it above them, centred on their
+   line, and taking the row's remaining width instead of a narrow column. */
+.license-toolbar > p {
+  flex: 1 1 16rem;
+  align-self: center;
+  margin: 0;
+}
+
 /* A toolbar that groups fields as a fieldset (the licence form): no browser bevel, and its fields
    in equal columns across the whole width, two side by side where they fit. */
 fieldset.license-toolbar {

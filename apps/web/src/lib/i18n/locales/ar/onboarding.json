@@ -271,7 +271,9 @@
     "statusOk": "تعمل",
     "statusUnavailable": "غير متاحة",
     "statusUnavailableRef": "غير متاحة (المرجع {{requestId}})",
-    "unknownRef": "غير معروف"
+    "unknownRef": "غير معروف",
+    "forbiddenTitle": "لا تملك صلاحية الوصول",
+    "backHome": "الانتقال إلى صفحتك الرئيسية"
   },
   "legal": {
     "deleteAccount": {

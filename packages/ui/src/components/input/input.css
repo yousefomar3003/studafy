@@ -68,3 +68,12 @@
   box-sizing: border-box;
   block-size: calc(var(--line-height-sm) + 2 * var(--space-8));
 }
+
+/* A search box claims room for its placeholder ("Payment or invoice number, student name or ID")
+   wherever a page's toolbar puts it, instead of the browser's default input width (~166px), which
+   cut placeholders off mid-word. It still shrinks to a narrow container. */
+.sf-field:has(> .sf-input > .sf-input__control[type="search"]) {
+  flex: 1 1 20rem;
+  min-inline-size: min(100%, 18rem);
+  max-inline-size: 28rem;
+}
