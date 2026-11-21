@@ -49,10 +49,13 @@ export function RequireAuth({ children }: PropsWithChildren) {
     previousStatus.current = status;
     if (status === "unauthenticated" || status === "expired") {
       if (signedOut) {
+        // A deliberate sign-out ends on the landing page, wherever it was started (the account
+        // menu, the legal or deletion gates); only a missing or dead session asks to sign in.
         clearReturnTo();
-      } else {
-        setReturnTo(`${location.pathname}${location.search}`);
+        void navigate("/", { replace: true });
+        return;
       }
+      setReturnTo(`${location.pathname}${location.search}`);
       void navigate(status === "expired" ? "/auth/login?reason=expired" : "/auth/login", {
         replace: true,
       });

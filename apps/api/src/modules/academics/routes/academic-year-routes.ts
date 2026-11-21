@@ -27,6 +27,8 @@ import {
   yearIdParamSchema,
 } from "../schemas";
 
+import { withPeriodDates } from "./period-dates";
+
 import type { Database } from "../../../db/client";
 import type { AppEnv } from "../../../middleware/requestId";
 import type { Context } from "hono";
@@ -211,7 +213,7 @@ export function academicYearRoutes(database: Database): OpenAPIHono<AppEnv> {
       listAcademicYears(tx, auth.schoolId, query),
     );
 
-    return c.json({ academic_years: rows, total }, 200);
+    return c.json({ academic_years: rows.map(withPeriodDates), total }, 200);
   });
 
   routes.openapi(createYearRoute, async (c) => {
@@ -222,7 +224,7 @@ export function academicYearRoutes(database: Database): OpenAPIHono<AppEnv> {
       createAcademicYear(tx, auth.schoolId, body),
     );
 
-    return c.json(row, 201);
+    return c.json(withPeriodDates(row), 201);
   });
 
   routes.openapi(getYearRoute, async (c) => {
@@ -237,7 +239,7 @@ export function academicYearRoutes(database: Database): OpenAPIHono<AppEnv> {
       throw new HTTPException(404, { message: "Academic year not found" });
     }
 
-    return c.json(row, 200);
+    return c.json(withPeriodDates(row), 200);
   });
 
   routes.openapi(updateYearRoute, async (c) => {
@@ -249,7 +251,7 @@ export function academicYearRoutes(database: Database): OpenAPIHono<AppEnv> {
       updateAcademicYear(tx, auth.schoolId, yearId, body),
     );
 
-    return c.json(row, 200);
+    return c.json(withPeriodDates(row), 200);
   });
 
   routes.openapi(deleteYearRoute, async (c) => {

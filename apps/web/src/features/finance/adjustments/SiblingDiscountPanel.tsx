@@ -118,7 +118,7 @@ export function SiblingDiscountPanel() {
               <div>
                 <dt>{t("financeReports.adjustments.siblingDiscount.updated")}</dt>
                 <dd>
-                  {formatDate(new Date(rule.updated_at))}
+                  {formatDate(new Date(rule.updated_at), { dateStyle: "medium" })}
                   {rule.updated_by_name ? ` · ${rule.updated_by_name}` : ""}
                 </dd>
               </div>

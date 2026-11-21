@@ -10,6 +10,47 @@
   align-items: end;
 }
 
+/* Fields in a row share its rows through subgrid (label / control / help / error): a label that
+   wraps or a help line under one field no longer staggers the inputs beside it. Labels sit on the
+   bottom of their row, right above their control. */
+.licensing-form-grid {
+  grid-auto-rows: auto;
+  row-gap: 0;
+}
+
+.licensing-form-grid > .licensing-field:has(> .sf-field:only-child),
+.licensing-form-grid > .licensing-field > .sf-field:only-child,
+.licensing-form-grid > .sf-field {
+  display: grid;
+  grid-row: span 4;
+  grid-template-rows: subgrid;
+  row-gap: var(--space-4);
+  margin-block-end: var(--space-12);
+}
+
+.licensing-form-grid .sf-field__label {
+  align-self: end;
+}
+
+/* A grid item's minimum is its content's, and an input's natural width (~196px) is wider than a
+   dense column: let the field and its control shrink to the column instead of overflowing it. */
+.licensing-form-grid .sf-field,
+.licensing-form-grid .sf-field > *,
+.licensing-form-grid > .licensing-field {
+  min-inline-size: 0;
+}
+
+/* Anything else in the row (a checkbox) takes the same four rows and sits on the control row. */
+.licensing-form-grid > :not(.sf-field, .licensing-field:has(> .sf-field:only-child)) {
+  grid-row: span 4;
+  align-self: center;
+}
+
+.licensing-form-grid > .licensing-field > .sf-field:only-child {
+  grid-row: 1 / -1;
+  margin-block-end: 0;
+}
+
 .licensing-calculator {
   display: grid;
   grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
@@ -76,6 +117,13 @@
   flex-wrap: wrap;
   gap: var(--space-8);
   align-items: end;
+}
+
+/* A checkbox in a row of inputs (the Licenses and Student AI schools filters) is as tall as an input
+   and centred in it, so it sits on the inputs' middle rather than ~8px below it. */
+.licensing-row > .sf-field:has(> .sf-checkbox) {
+  justify-content: center;
+  min-block-size: calc(var(--line-height-sm) + 2 * var(--space-8) + 2px);
 }
 
 .licensing-compare th[scope="row"] {
@@ -213,6 +261,49 @@
   gap: var(--space-4);
   padding-block-end: var(--space-8);
   border-bottom: 1px solid var(--color-border);
+}
+
+/* One currency's prices: its code, three fields and Remove on one line. The fields share rows
+   through subgrid (label / input / help / error), so a help line under one field no longer lifts
+   its input above its neighbours'; the code and Remove sit on the input row. */
+.licensing-price-row > .licensing-row {
+  display: grid;
+  grid-template-columns: auto repeat(3, minmax(0, 1fr)) auto;
+  grid-template-rows: repeat(4, auto);
+  column-gap: var(--space-8);
+  row-gap: 0;
+  align-items: start;
+}
+
+.licensing-price-row > .licensing-row > .sf-field {
+  display: grid;
+  grid-row: 1 / span 4;
+  grid-template-rows: subgrid;
+  row-gap: var(--space-4);
+}
+
+.licensing-price-row > .licensing-row > :not(.sf-field) {
+  grid-row: 2;
+  align-self: center;
+}
+
+@media (width <= 48rem) {
+  .licensing-price-row > .licensing-row {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    row-gap: var(--space-8);
+  }
+
+  .licensing-price-row > .licensing-row > .sf-field,
+  .licensing-price-row > .licensing-row > :not(.sf-field) {
+    grid-row: auto;
+    justify-self: start;
+  }
+
+  .licensing-price-row > .licensing-row > .sf-field {
+    display: flex;
+    justify-self: stretch;
+  }
 }
 
 .licensing-warning {

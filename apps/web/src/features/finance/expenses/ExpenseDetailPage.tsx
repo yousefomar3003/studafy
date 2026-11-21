@@ -156,19 +156,16 @@ export default function ExpenseDetailPage() {
                     <label className="sf-field__label" htmlFor={fileInputId}>
                       {t("finance.expenses.detail.attachReceipt")}
                     </label>
-                    <div className="sf-input">
-                      <input
-                        id={fileInputId}
-                        className="sf-input__control"
-                        type="file"
-                        accept="image/*,application/pdf"
-                        disabled={uploading}
-                        onChange={(event) => {
-                          const file = event.target.files?.[0];
-                          if (file) void attach(file);
-                        }}
-                      />
-                    </div>
+                    <input
+                      id={fileInputId}
+                      type="file"
+                      accept="image/*,application/pdf"
+                      disabled={uploading}
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (file) void attach(file);
+                      }}
+                    />
                     {uploading ? (
                       <p role="status">{t("finance.expenses.detail.uploading")}</p>
                     ) : null}

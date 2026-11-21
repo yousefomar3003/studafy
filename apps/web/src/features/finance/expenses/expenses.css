@@ -75,6 +75,14 @@
   background-color: var(--color-background);
 }
 
+/* Same size as the shared filter controls on Payments and Invoices (14px text, input height). */
+.expenses-list__search,
+.expenses-list__month {
+  font-size: var(--font-size-sm);
+  min-block-size: calc(var(--line-height-sm) + 2 * var(--space-8) + 2px);
+  box-sizing: border-box;
+}
+
 .expenses-list__search:focus-visible,
 .expenses-list__month:focus-visible {
   outline: var(--focus-ring-width) solid var(--focus-ring-color);

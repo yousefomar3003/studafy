@@ -24,11 +24,12 @@ import { seedFinance } from "./data/finance";
 import { seedMaterials } from "./data/materials";
 import { seedMessaging } from "./data/messaging";
 import { seedPeople, suppressTenantEmail } from "./data/people";
+import { populatePlatformStaff } from "./data/platform-staff";
 import { seedSchool } from "./data/school";
 import { seedTimetableAndAttendance } from "./data/timetable";
 import { assertSeedAllowed, SeedSafetyError } from "./guard";
 import { checkIndexHealth, formatIndexHealthReport } from "./index-health";
-import { DEMO_TENANT } from "./tenants";
+import { DEMO_PLATFORM_TENANT, DEMO_TENANT } from "./tenants";
 
 import type { FullCtx, SchoolCtx, Sql, TenantProfile } from "./support";
 import type { ReservedSql } from "../../packages/db/src/client";
@@ -143,6 +144,11 @@ export function seedDemoTenant(options: SeedOptions = {}): Promise<SeedResult> {
   return seedTenant(DEMO_TENANT, assertSeedAllowed, options);
 }
 
+/** The local platform school: only the super admin, as production's "Studafy" school. */
+export function seedDemoPlatformTenant(options: SeedOptions = {}): Promise<SeedResult> {
+  return seedTenant(DEMO_PLATFORM_TENANT, assertSeedAllowed, options, populatePlatformStaff);
+}
+
 export async function seedTenant(
   tenant: TenantProfile,
   guard: SeedGuard,
@@ -250,6 +256,8 @@ export async function main(): Promise<number> {
     if (result) console.error("Recreate or re-migrate a fresh database to reseed.");
     return 1;
   }
+  const platform = await runSeedCli(DEMO_PLATFORM_TENANT, () => seedDemoPlatformTenant());
+  if (!platform?.seeded) return 1;
 
   // Post-seed index health, using the freshly seeded rows.
   try {

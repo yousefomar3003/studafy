@@ -6,6 +6,7 @@ import { useSchoolUsageQuery } from "./school-admin";
 
 import type { Formatters } from "../../lib/i18n";
 import type { TFunction } from "i18next";
+import type { ReactNode } from "react";
 
 const ONE_DECIMAL = { maximumFractionDigits: 1 } as const;
 
@@ -32,9 +33,45 @@ export function formatStorage(
 /** The roles shown first, in this order; any other role follows. */
 const ROLE_ORDER = ["STUDENT", "INSTRUCTOR", "PARENT"];
 
+/** A thin usage bar; its numbers are always written beside it, so it is decorative. */
+function UsageBar({ fraction }: { fraction: number }) {
+  const clamped = Math.min(1, Math.max(0, fraction));
+  return (
+    <span className="platform-usage-bar" aria-hidden="true">
+      <span
+        className="platform-usage-bar__fill"
+        data-tone={clamped >= 0.95 ? "danger" : clamped >= 0.8 ? "warning" : undefined}
+        style={{ inlineSize: `${clamped * 100}%` }}
+      />
+    </span>
+  );
+}
+
+function UsageStat({
+  label,
+  value,
+  hint,
+  children,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="platform-usage-stat">
+      <dt className="platform-usage-stat__label">{label}</dt>
+      <dd className="platform-usage-stat__value">{value}</dd>
+      {children ? <dd className="platform-usage-stat__extra">{children}</dd> : null}
+      {hint ? <dd className="platform-usage-stat__hint">{hint}</dd> : null}
+    </div>
+  );
+}
+
 /**
- * One school's usage (`GET /api/platform/schools/{schoolId}/usage`): accounts per role, open
- * invitations, storage against the cap, sign-in activity, AI use and the active licence's seats.
+ * One school's usage (`GET /api/platform/schools/{schoolId}/usage`): the headline figures in a row
+ * of tiles (accounts, storage against the cap, sign-in activity, Student AI), then the accounts by
+ * role beside the active licence's seats and this month's feature use.
  */
 export function SchoolUsageCard({ schoolId }: { schoolId: string }) {
   const { t } = useTranslation();
@@ -48,6 +85,8 @@ export function SchoolUsageCard({ schoolId }: { schoolId: string }) {
     };
     return rank(a.role) - rank(b.role) || a.role.localeCompare(b.role);
   });
+  const activeTotal = people.reduce((sum, row) => sum + row.active, 0);
+  const invitedTotal = people.reduce((sum, row) => sum + row.invited, 0);
 
   return (
     <Card as="section" aria-labelledby="platform-usage-title">
@@ -60,136 +99,137 @@ export function SchoolUsageCard({ schoolId }: { schoolId: string }) {
         ) : isError || !usage ? (
           <p role="alert">{t("platform.school.usage.loadError")}</p>
         ) : (
-          <div className="platform-usage">
-            <section aria-labelledby="platform-usage-people">
-              <h3 id="platform-usage-people">{t("platform.school.usage.people")}</h3>
-              <table className="platform-usage-table">
-                <thead>
-                  <tr>
-                    <th scope="col">{t("platform.school.usage.role")}</th>
-                    <th scope="col">{t("platform.school.usage.active")}</th>
-                    <th scope="col">{t("platform.school.usage.invited")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {people.map((row) => (
-                    <tr key={row.role}>
-                      <th scope="row">
-                        {t(`platform.roles.${row.role}`, { defaultValue: row.role })}
-                      </th>
-                      <td>{formatNumber(row.active)}</td>
-                      <td>{formatNumber(row.invited)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <p className="platform-muted">
-                {t("platform.school.usage.pendingInvitations", {
-                  count: usage.pendingInvitations,
-                })}
-              </p>
-            </section>
-
-            <section aria-labelledby="platform-usage-storage">
-              <h3 id="platform-usage-storage">{t("platform.school.usage.storage")}</h3>
-              <p>
-                {t("platform.school.usage.storageValue", {
-                  used: formatStorage(usage.storage.bytesUsed, t, formatNumber),
-                  cap: formatStorage(usage.storage.capBytes, t, formatNumber),
-                })}
-              </p>
-              {usage.storage.fractionUsed !== null ? (
-                <>
-                  <meter
-                    className="platform-usage-meter"
-                    min={0}
-                    max={1}
-                    low={0.8}
-                    high={0.95}
-                    optimum={0}
-                    value={Math.min(1, usage.storage.fractionUsed)}
-                    aria-label={t("platform.school.usage.storage")}
-                  />
-                  <p className="platform-muted">
-                    {t("platform.school.usage.storagePercent", {
-                      percent: formatNumber(usage.storage.fractionUsed, {
-                        style: "percent",
-                        maximumFractionDigits: 1,
-                      }),
-                    })}
-                  </p>
-                </>
-              ) : null}
-            </section>
-
-            <section aria-labelledby="platform-usage-activity">
-              <h3 id="platform-usage-activity">{t("platform.school.usage.activity")}</h3>
-              <dl className="platform-dl">
-                <dt>{t("platform.school.usage.lastActivity")}</dt>
-                <dd>
-                  {usage.activity.lastActivityAt
-                    ? formatDate(new Date(usage.activity.lastActivityAt), {
-                        dateStyle: "medium",
-                        timeStyle: "short",
+          <>
+            <dl className="platform-usage-stats">
+              <UsageStat
+                label={t("platform.school.usage.accountsTotal")}
+                value={formatNumber(activeTotal)}
+                hint={[
+                  t("platform.school.usage.invitedCount", { count: invitedTotal }),
+                  t("platform.school.usage.pendingInvitations", {
+                    count: usage.pendingInvitations,
+                  }),
+                ].join(" · ")}
+              />
+              <UsageStat
+                label={t("platform.school.usage.storage")}
+                value={formatStorage(usage.storage.bytesUsed, t, formatNumber)}
+                hint={
+                  usage.storage.fractionUsed !== null
+                    ? t("platform.school.usage.storageCap", {
+                        cap: formatStorage(usage.storage.capBytes, t, formatNumber),
+                        percent: formatNumber(usage.storage.fractionUsed, {
+                          style: "percent",
+                          maximumFractionDigits: 1,
+                        }),
                       })
-                    : t("platform.common.never")}
-                </dd>
-                <dt>{t("platform.school.usage.activeLast30")}</dt>
-                <dd>{formatNumber(usage.activity.activeUsersLast30Days)}</dd>
-              </dl>
-            </section>
+                    : undefined
+                }
+              >
+                {usage.storage.fractionUsed !== null ? (
+                  <UsageBar fraction={usage.storage.fractionUsed} />
+                ) : null}
+              </UsageStat>
+              <UsageStat
+                label={t("platform.school.usage.lastActivity")}
+                value={
+                  usage.activity.lastActivityAt
+                    ? formatDate(new Date(usage.activity.lastActivityAt), { dateStyle: "medium" })
+                    : t("platform.common.never")
+                }
+                hint={t("platform.school.usage.activeLast30Count", {
+                  count: usage.activity.activeUsersLast30Days,
+                })}
+              />
+              <UsageStat
+                label={t("platform.school.usage.aiTile")}
+                value={formatNumber(usage.ai.activeSubscriptions)}
+                hint={t("platform.school.usage.aiTileHint", {
+                  tokens: formatNumber(usage.ai.tokensThisPeriod),
+                })}
+              />
+            </dl>
 
-            <section aria-labelledby="platform-usage-ai">
-              <h3 id="platform-usage-ai">{t("platform.school.usage.ai")}</h3>
-              <dl className="platform-dl">
-                <dt>{t("platform.school.usage.aiSubscriptions")}</dt>
-                <dd>{formatNumber(usage.ai.activeSubscriptions)}</dd>
-                <dt>{t("platform.school.usage.aiTokens")}</dt>
-                <dd>{formatNumber(usage.ai.tokensThisPeriod)}</dd>
-              </dl>
-              {usage.ai.featureUses.length > 0 ? (
-                <ul className="platform-breakdown">
-                  {usage.ai.featureUses.map((feature) => (
-                    <li key={feature.featureKey}>
-                      <code>{feature.featureKey}</code>
-                      <strong>{formatNumber(feature.used)}</strong>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="platform-muted">{t("platform.school.usage.noFeatureUse")}</p>
-              )}
-            </section>
-
-            <section aria-labelledby="platform-usage-license">
-              <h3 id="platform-usage-license">{t("platform.school.usage.license")}</h3>
-              {usage.license ? (
-                <>
-                  <p className="platform-muted">
-                    {t("platform.school.usage.licensePeriod", {
-                      from: formatDate(new Date(usage.license.startsAt), { dateStyle: "medium" }),
-                      to: formatDate(new Date(usage.license.endsAt), { dateStyle: "medium" }),
-                    })}
-                  </p>
-                  <ul className="platform-breakdown">
-                    {usage.license.seats.map((seat) => (
-                      <li key={seat.audience}>
-                        <span>{t(`platform.school.usage.audience.${seat.audience}`)}</span>
-                        <strong>
-                          {t("platform.school.usage.seatsValue", {
-                            used: formatNumber(seat.used),
-                            bought: formatNumber(seat.bought),
-                          })}
-                        </strong>
-                      </li>
+            <div className="platform-usage-details">
+              <section aria-labelledby="platform-usage-people">
+                <h3 id="platform-usage-people">{t("platform.school.usage.peopleByRole")}</h3>
+                <table className="platform-usage-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">{t("platform.school.usage.role")}</th>
+                      <th scope="col">{t("platform.school.usage.active")}</th>
+                      <th scope="col">{t("platform.school.usage.invited")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {people.map((row) => (
+                      <tr key={row.role}>
+                        <th scope="row">
+                          {t(`platform.roles.${row.role}`, { defaultValue: row.role })}
+                        </th>
+                        <td>{formatNumber(row.active)}</td>
+                        <td data-zero={row.invited === 0 || undefined}>
+                          {formatNumber(row.invited)}
+                        </td>
+                      </tr>
                     ))}
-                  </ul>
-                </>
-              ) : (
-                <p className="platform-muted">{t("platform.school.usage.noLicense")}</p>
-              )}
-            </section>
-          </div>
+                  </tbody>
+                </table>
+              </section>
+
+              <div className="platform-usage-side">
+                <section aria-labelledby="platform-usage-license">
+                  <h3 id="platform-usage-license">{t("platform.school.usage.license")}</h3>
+                  {usage.license ? (
+                    <>
+                      <p className="platform-muted">
+                        {t("platform.school.usage.licensePeriod", {
+                          from: formatDate(new Date(usage.license.startsAt), {
+                            dateStyle: "medium",
+                          }),
+                          to: formatDate(new Date(usage.license.endsAt), { dateStyle: "medium" }),
+                        })}
+                      </p>
+                      <ul className="platform-usage-seats">
+                        {usage.license.seats.map((seat) => (
+                          <li key={seat.audience}>
+                            <span className="platform-usage-seats__row">
+                              <span>{t(`platform.school.usage.audience.${seat.audience}`)}</span>
+                              <strong>
+                                {t("platform.school.usage.seatsValue", {
+                                  used: formatNumber(seat.used),
+                                  bought: formatNumber(seat.bought),
+                                })}
+                              </strong>
+                            </span>
+                            <UsageBar fraction={seat.bought > 0 ? seat.used / seat.bought : 0} />
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  ) : (
+                    <p className="platform-muted">{t("platform.school.usage.noLicense")}</p>
+                  )}
+                </section>
+
+                <section aria-labelledby="platform-usage-features">
+                  <h3 id="platform-usage-features">{t("platform.school.usage.featureUse")}</h3>
+                  {usage.ai.featureUses.length > 0 ? (
+                    <ul className="platform-breakdown">
+                      {usage.ai.featureUses.map((feature) => (
+                        <li key={feature.featureKey}>
+                          <code>{feature.featureKey}</code>
+                          <strong>{formatNumber(feature.used)}</strong>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="platform-muted">{t("platform.school.usage.noFeatureUse")}</p>
+                  )}
+                </section>
+              </div>
+            </div>
+          </>
         )}
       </Card.Body>
     </Card>

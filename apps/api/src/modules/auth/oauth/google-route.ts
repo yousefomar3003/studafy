@@ -112,6 +112,9 @@ export function googleOAuthRoutes(
       code_challenge: codeChallenge,
       code_challenge_method: "S256",
       access_type: "offline",
+      // Always show Google's account chooser: after signing out of Studafy the browser is still
+      // signed in to Google, which otherwise signs straight back in to that same account.
+      prompt: "select_account",
     });
 
     return c.redirect(`${GOOGLE_AUTH_ENDPOINT}?${params.toString()}`, 302);

@@ -360,6 +360,39 @@
   align-items: start;
 }
 
+/* Fields in a row share its rows through subgrid (label / control / help / error): a label that
+   wraps or a help line under one field no longer staggers the inputs beside it. Labels sit on the
+   bottom of their row, right above their control. */
+.ag-grid {
+  grid-auto-rows: auto;
+  row-gap: 0;
+}
+
+.ag-grid > .sf-field {
+  display: grid;
+  grid-row: span 4;
+  grid-template-rows: subgrid;
+  row-gap: var(--space-4);
+  margin-block-end: var(--space-12);
+}
+
+.ag-grid .sf-field__label {
+  align-self: end;
+}
+
+/* A grid item's minimum is its content's, and an input's natural width (~196px) is wider than a
+   dense column: let the field and its control shrink to the column instead of overflowing it. */
+.ag-grid .sf-field,
+.ag-grid .sf-field > *,
+.ag-grid > .licensing-field {
+  min-inline-size: 0;
+}
+
+.ag-grid > :not(.sf-field) {
+  grid-row: span 4;
+  align-self: center;
+}
+
 .ag-grid--dense {
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
 }

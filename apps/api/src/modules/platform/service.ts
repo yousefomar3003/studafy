@@ -279,11 +279,12 @@ export async function auditSchoolChange(
 // Overview
 // ---------------------------------------------------------------------------
 
+/** Platform-wide figures over the customer schools (platform schools excluded, as in listSchools). */
 export async function getPlatformOverview(database: Database) {
   return withSystemTx(database, async (tx) => {
     const schools = await tx<
       { id: string; status: SchoolStatus; created_at: Date }[]
-    >`SELECT id, status::text AS status, created_at FROM app.schools`;
+    >`SELECT id, status::text AS status, created_at FROM app.schools WHERE NOT is_platform_tenant`;
 
     const schoolsByStatus: Record<SchoolStatus, number> = {
       registered: 0,
@@ -674,8 +675,10 @@ export function compareByUsage(sort: SchoolSort, order: "asc" | "desc") {
 export async function listSchools(database: Database, filters: SchoolListFilters) {
   return withSystemTx(database, async (tx) => {
     const pattern = filters.search ? `%${filters.search.replace(/[\\%_]/g, "\\$&")}%` : null;
+    // Platform schools (is_platform_tenant, 000185) hold Studafy's own staff, not a customer: the
+    // console lists and counts schools, so they are left out here and in the overview's totals.
     const where = tx`
-      WHERE true
+      WHERE NOT s.is_platform_tenant
       ${filters.status ? tx`AND s.status = ${filters.status}::app.school_status` : tx``}
       ${
         pattern

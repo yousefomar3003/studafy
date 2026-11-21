@@ -6,7 +6,7 @@ import { SummaryStrip } from "../../components/home/SummaryStrip";
 import { useFormatters, useTranslation } from "../../lib/i18n";
 
 import { PlatformPageHeader } from "./PlatformNav";
-import { usePlatformOverviewQuery } from "./queries";
+import { usePlansQuery, usePlatformOverviewQuery } from "./queries";
 
 import type { SummaryItem } from "../../components/home/SummaryStrip";
 
@@ -25,6 +25,10 @@ export default function PlatformOverviewPage() {
   const { t } = useTranslation();
   const { formatNumber, formatDate } = useFormatters();
   const { data, isPending, isError } = usePlatformOverviewQuery();
+  // Plan names for the by-plan breakdown, which the overview keys by plan code.
+  const plans = usePlansQuery();
+  const planName = (code: string) =>
+    plans.data?.find((plan) => plan.code === code)?.displayName ?? code;
   const status = isPending ? "pending" : isError ? "error" : "ready";
   const errorMessage = t("platform.overview.loadError");
 
@@ -136,7 +140,7 @@ export default function PlatformOverviewPage() {
             <ul className="platform-breakdown">
               {entries(data?.subscriptionsByPlan).map(([key, count]) => (
                 <li key={key}>
-                  <code>{key}</code>
+                  <span>{planName(key)}</span>
                   <strong>{formatNumber(count)}</strong>
                 </li>
               ))}

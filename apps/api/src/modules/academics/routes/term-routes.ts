@@ -20,6 +20,8 @@ import {
 } from "../schemas";
 import { createTerm, deleteTerm, getTerm, listTerms, updateTerm } from "../term-service";
 
+import { withPeriodDates } from "./period-dates";
+
 import type { Database } from "../../../db/client";
 import type { AppEnv } from "../../../middleware/requestId";
 import type { Context } from "hono";
@@ -177,7 +179,7 @@ export function termRoutes(database: Database): OpenAPIHono<AppEnv> {
       listTerms(tx, auth.schoolId, yearId, query),
     );
 
-    return c.json({ terms: rows, total }, 200);
+    return c.json({ terms: rows.map(withPeriodDates), total }, 200);
   });
 
   routes.openapi(createTermRoute, async (c) => {
@@ -189,7 +191,7 @@ export function termRoutes(database: Database): OpenAPIHono<AppEnv> {
       createTerm(tx, auth.schoolId, { ...body, academic_year_id: yearId }),
     );
 
-    return c.json(row, 201);
+    return c.json(withPeriodDates(row), 201);
   });
 
   routes.openapi(getTermRoute, async (c) => {
@@ -204,7 +206,7 @@ export function termRoutes(database: Database): OpenAPIHono<AppEnv> {
       throw new HTTPException(404, { message: "Term not found" });
     }
 
-    return c.json(row, 200);
+    return c.json(withPeriodDates(row), 200);
   });
 
   routes.openapi(updateTermRoute, async (c) => {
@@ -216,7 +218,7 @@ export function termRoutes(database: Database): OpenAPIHono<AppEnv> {
       updateTerm(tx, auth.schoolId, termId, body),
     );
 
-    return c.json(row, 200);
+    return c.json(withPeriodDates(row), 200);
   });
 
   routes.openapi(deleteTermRoute, async (c) => {

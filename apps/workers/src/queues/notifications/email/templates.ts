@@ -153,14 +153,79 @@ function formatAmountMinor(amountMinor: number): string {
   return (amountMinor / 100).toFixed(2);
 }
 
+/** The logo artwork's own navy (same value as the web app's `.brand-logo-badge`). */
+const BRAND_NAVY = "#161551";
+const FONT_STACK = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+/**
+ * The white wordmark, served unhashed from apps/web/public/email/ so mail clients can fetch it.
+ * Always the production host: email images must resolve for every recipient, whichever
+ * environment sent the message.
+ */
+const LOGO_URL = "https://app.studafy.com/email/studafy-logo.png";
+
+/**
+ * The shared frame every transactional email renders inside: a navy brand header carrying the
+ * Studafy logo, the school name as an eyebrow, the body, and a short footer. Table layout and
+ * inline styles only, so it holds up in Outlook and Gmail alike.
+ */
 function shell(schoolName: string, bodyHtml: string): string {
   const safeSchool = escapeHtml(schoolName);
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f5f7;padding:24px 0"><tr><td align="center"><table role="presentation" width="560" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden"><tr><td style="padding:24px 32px;border-bottom:1px solid #e6e8eb"><p style="margin:0;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;color:#1a2332">${safeSchool}</p></td></tr><tr><td style="padding:32px;font-family:Arial,sans-serif;font-size:14px;line-height:1.6;color:#333c47">${bodyHtml}</td></tr></table></td></tr></table>`;
+  return (
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#eef0f6;padding:32px 12px">` +
+    `<tr><td align="center">` +
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background-color:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e3e6ef">` +
+    `<tr><td style="background-color:${BRAND_NAVY};padding:22px 32px">` +
+    `<img src="${LOGO_URL}" alt="Studafy" width="97" height="30" style="display:block;height:30px;width:auto;border:0;outline:none;color:#ffffff;font-family:${FONT_STACK};font-size:20px;font-weight:bold">` +
+    `</td></tr>` +
+    `<tr><td style="padding:32px 32px 8px;font-family:${FONT_STACK}">` +
+    `<p style="margin:0;font-size:12px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#6b7280">${safeSchool}</p>` +
+    `</td></tr>` +
+    `<tr><td style="padding:8px 32px 32px;font-family:${FONT_STACK};font-size:15px;line-height:1.6;color:#374151">${bodyHtml}</td></tr>` +
+    `</table>` +
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px">` +
+    `<tr><td style="padding:20px 32px;font-family:${FONT_STACK};font-size:12px;line-height:1.6;color:#8a91a3;text-align:center">` +
+    `Sent by Studafy on behalf of ${safeSchool}.<br>&copy; Studafy. All rights reserved.` +
+    `</td></tr></table>` +
+    `</td></tr></table>`
+  );
 }
 
+/** A table-based ("bulletproof") button, so Outlook keeps the padding and background. */
 function button(actionUrl: string, label: string): string {
   const safeUrl = escapeHtml(actionUrl);
-  return `<p style="margin:24px 0"><a href="${safeUrl}" style="display:inline-block;padding:10px 20px;background-color:#2563eb;color:#ffffff;text-decoration:none;border-radius:6px;font-family:Arial,sans-serif;font-size:14px;font-weight:bold">${escapeHtml(label)}</a></p>`;
+  return (
+    `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px 0"><tr>` +
+    `<td style="border-radius:10px;background-color:${BRAND_NAVY}">` +
+    `<a href="${safeUrl}" style="display:inline-block;padding:14px 28px;color:#ffffff;text-decoration:none;border-radius:10px;font-family:${FONT_STACK};font-size:15px;font-weight:600">${escapeHtml(label)}</a>` +
+    `</td></tr></table>`
+  );
+}
+
+/** The "button does not work" fallback, set apart so a long URL doesn't swamp the message. */
+function linkFallback(actionUrl: string): string {
+  const safeUrl = escapeHtml(actionUrl);
+  return (
+    `<p style="margin:24px 0 8px;font-size:13px;color:#6b7280">If the button doesn't work, copy and paste this link into your browser:</p>` +
+    `<p style="margin:0;padding:12px 14px;background-color:#f5f6fa;border:1px solid #e3e6ef;border-radius:8px;font-size:12px;line-height:1.5;word-break:break-all"><a href="${safeUrl}" style="color:${BRAND_NAVY};text-decoration:underline">${safeUrl}</a></p>`
+  );
+}
+
+/** A reader-friendly expiry, e.g. "28 November 2026 at 11:37 UTC". */
+function formatExpiry(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  const day = date.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+  const time = date.toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "UTC",
+  });
+  return `${day} at ${time} UTC`;
 }
 
 function formatDateLabel(iso: string): string {
@@ -170,10 +235,21 @@ function formatDateLabel(iso: string): string {
 }
 
 export function renderInvitationEmail(data: InvitationEmailData): RenderedEmail {
-  const bodyHtml = `<p>You have been invited to join ${escapeHtml(data.schoolName)} on Studafy.</p>${button(data.actionUrl, "Accept invitation")}<p>If the button does not work, open this link in your browser: <a href="${escapeHtml(data.actionUrl)}">${escapeHtml(data.actionUrl)}</a></p>${data.expiresAt ? `<p>This invitation expires on ${formatDateLabel(data.expiresAt)}.</p>` : ""}`;
+  const safeSchool = escapeHtml(data.schoolName);
+  const expiryHtml = data.expiresAt
+    ? `<p style="margin:0;font-size:13px;color:#6b7280">This invitation expires on <strong style="color:#374151">${escapeHtml(formatExpiry(data.expiresAt))}</strong>.</p>`
+    : "";
+  const bodyHtml =
+    `<h1 style="margin:0 0 16px;font-size:24px;line-height:1.3;font-weight:700;color:${BRAND_NAVY}">You're invited to join Studafy</h1>` +
+    `<p style="margin:0"><strong style="color:#111827">${safeSchool}</strong> has invited you to join their school on Studafy. Accept the invitation to set up your account and get started.</p>` +
+    button(data.actionUrl, "Accept invitation") +
+    expiryHtml +
+    `<hr style="margin:24px 0 0;border:0;border-top:1px solid #e3e6ef">` +
+    linkFallback(data.actionUrl) +
+    `<p style="margin:20px 0 0;font-size:13px;color:#6b7280">If you weren't expecting this invitation, you can safely ignore this email.</p>`;
   return {
     subject: `You're invited to ${data.schoolName}`,
-    text: `You have been invited to join ${data.schoolName} on Studafy.\n\nAccept your invitation here: ${data.actionUrl}\n${data.expiresAt ? `\nThis invitation expires on ${formatDateLabel(data.expiresAt)}.` : ""}`,
+    text: `You have been invited to join ${data.schoolName} on Studafy.\n\nAccept your invitation here: ${data.actionUrl}\n${data.expiresAt ? `\nThis invitation expires on ${formatExpiry(data.expiresAt)}.` : ""}\n\nIf you weren't expecting this invitation, you can safely ignore this email.`,
     html: shell(data.schoolName, bodyHtml),
   };
 }

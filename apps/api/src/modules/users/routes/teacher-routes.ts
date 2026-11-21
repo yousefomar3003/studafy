@@ -27,6 +27,8 @@ import {
   updateTeacher as updateTeacherService,
 } from "../teacher-service";
 
+import { toDateStr } from "./date-column";
+
 import type { Database } from "../../../db/client";
 import type { AppEnv } from "../../../middleware/requestId";
 import type { TeacherProfile } from "../schemas";
@@ -44,10 +46,6 @@ function tenantFrom(c: Context<AppEnv>): {
 } {
   const auth = requireAuth(c);
   return { schoolId: auth.schoolId, userId: auth.userId, requestId: c.get("requestId") };
-}
-
-function toDateStr(d: Date | null): string | null {
-  return d !== null ? d.toISOString() : null;
 }
 
 function projectTeacher(row: TeacherRow): TeacherProfile {

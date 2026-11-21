@@ -175,6 +175,8 @@ export default function PlatformFinancePage() {
         <p className="platform-muted">{t("platform.finance.attentionHelp")}</p>
         <DataGrid
           caption={t("platform.finance.attention")}
+          // The section's h2 already names it on screen; the caption stays for screen readers.
+          hideCaption
           columns={attentionColumns}
           rows={data?.attention ?? []}
           getRowId={(row) => `${row.schoolId}:${row.reason}`}
@@ -188,6 +190,8 @@ export default function PlatformFinancePage() {
         <h2 id="platform-finance-failed">{t("platform.finance.failedRenewals")}</h2>
         <DataGrid
           caption={t("platform.finance.failedRenewals")}
+          // The section's h2 already names it on screen; the caption stays for screen readers.
+          hideCaption
           columns={failedColumns}
           rows={data?.recentFailedRenewals ?? []}
           getRowId={(row) => row.id}

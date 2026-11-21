@@ -210,6 +210,14 @@
   overflow-y: auto;
 }
 
+/* Pages that return their cards straight into the content area (notification preferences, a
+   parent's records, lists linked to a record) stack them in normal flow: space them like every
+   other page's cards instead of letting their borders touch. Only direct children, so a grid of
+   cards inside a page keeps its own gap. */
+.portal-content > .sf-card + .sf-card {
+  margin-block-start: var(--space-16);
+}
+
 .portal-content::-webkit-scrollbar-track {
   margin-block-start: 64px;
 }

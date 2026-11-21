@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterEach, describe, expect, test } from "bun:test";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -25,6 +25,8 @@ async function renderGuardedAs(roles: string[]) {
             }
           />
           <Route path="/auth/error" element={<h1>Use the mobile app</h1>} />
+          <Route path="/" element={<h1>Landing</h1>} />
+          <Route path="/auth/login" element={<h1>Sign in</h1>} />
         </Routes>
       </MemoryRouter>
     </AuthProvider>,
@@ -48,5 +50,12 @@ describe("RequireAuth", () => {
   test("lets a web role through, even when it also teaches", async () => {
     await renderGuardedAs(["INSTRUCTOR", "ORG_ADMIN"]);
     expect(await screen.findByRole("heading", { name: "Portal" })).toBeTruthy();
+  });
+
+  test("a sign-out ends on the landing page, not the sign-in page", async () => {
+    const store = await renderGuardedAs(["ORG_ADMIN"]);
+    expect(await screen.findByRole("heading", { name: "Portal" })).toBeTruthy();
+    await act(() => store.logout());
+    expect(await screen.findByRole("heading", { name: "Landing" })).toBeTruthy();
   });
 });
