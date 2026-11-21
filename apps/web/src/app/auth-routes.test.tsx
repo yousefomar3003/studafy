@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
@@ -118,14 +118,15 @@ describe("web auth flow", () => {
   test("signing out does not save the page, so the next account lands on its home", async () => {
     const { store, setHasSession } = createStore();
     setHasSession(true);
-    renderAt("/account", store);
+    const first = renderAt("/account", store);
     await screen.findByRole("heading", { name: /account/i, level: 1 }, { timeout: 5000 });
 
     // The server clears the refresh cookie on logout.
     setHasSession(false);
     await store.logout();
 
-    expect(await screen.findByRole("heading", { name: /sign in/i })).toBeTruthy();
+    // A deliberate sign-out ends on the landing page, and leaves no page to return to.
+    await waitFor(() => expect(first.router.state.location.pathname).toBe("/"));
     expect(getReturnTo()).toBeNull();
 
     // A different account signs in on the same tab: it lands on its home, not the old page.
