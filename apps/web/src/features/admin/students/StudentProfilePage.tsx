@@ -8,6 +8,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { usePermissions } from "../../../lib/auth";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 import { LinkedListsPanel } from "../../custom-lists/LinkedListsPanel";
+import { calendarDay } from "../../records/fields";
 import { RecordsPanel } from "../../records/RecordsPanel";
 
 import { LinkGuardianModal } from "./LinkGuardianModal";
@@ -67,6 +68,7 @@ interface DemographicsSectionProps {
  * `student:read`), edit gated on `student:update`. */
 function DemographicsSection({ student, canEdit }: DemographicsSectionProps) {
   const { t } = useTranslation();
+  const { formatDate } = useFormatters();
   const { show } = useToast();
   const updateStudent = useUpdateStudent();
   const [editing, setEditing] = useState(false);
@@ -158,7 +160,11 @@ function DemographicsSection({ student, canEdit }: DemographicsSectionProps) {
             </div>
             <div>
               <dt>{t("adminPeople.students.form.dateOfBirth")}</dt>
-              <dd>{student.date_of_birth ?? "—"}</dd>
+              <dd>
+                {student.date_of_birth
+                  ? formatDate(calendarDay(student.date_of_birth), { dateStyle: "medium" })
+                  : "—"}
+              </dd>
             </div>
             <div>
               <dt>{t("adminPeople.students.form.status")}</dt>
@@ -253,6 +259,7 @@ interface AdmissionSectionProps {
  */
 function AdmissionSection({ student, canEdit }: AdmissionSectionProps) {
   const { t } = useTranslation();
+  const { formatDate } = useFormatters();
   const { show } = useToast();
   const updateStudent = useUpdateStudent();
   const [editing, setEditing] = useState(false);
@@ -326,7 +333,11 @@ function AdmissionSection({ student, canEdit }: AdmissionSectionProps) {
             </div>
             <div>
               <dt>{t("adminPeople.students.form.admissionDate")}</dt>
-              <dd>{student.admission_date ?? "—"}</dd>
+              <dd>
+                {student.admission_date
+                  ? formatDate(calendarDay(student.admission_date), { dateStyle: "medium" })
+                  : "—"}
+              </dd>
             </div>
           </dl>
         </Card.Body>

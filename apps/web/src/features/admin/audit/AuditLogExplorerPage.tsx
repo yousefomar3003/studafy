@@ -276,6 +276,7 @@ export default function AuditLogExplorerPage() {
         <Input
           label={t("adminSchool.audit.filters.resourceTable")}
           placeholder={t("adminSchool.audit.filters.resourceTablePlaceholder")}
+          type="search"
           value={targetTableInput}
           onChange={(event) => setTargetTableInput(event.target.value)}
         />

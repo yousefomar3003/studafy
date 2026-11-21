@@ -353,12 +353,15 @@ export function GrantsTable({
   loading,
   empty,
   caption,
+  hideCaption = false,
   showSchool,
 }: {
   grants: readonly ManualGrant[];
   loading: boolean;
   empty: string;
   caption: string;
+  /** For a table under a heading that already names it on screen (the school page's card). */
+  hideCaption?: boolean;
   showSchool: boolean;
 }) {
   const { t } = useTranslation();
@@ -472,6 +475,7 @@ export function GrantsTable({
     <>
       <DataGrid
         caption={caption}
+        hideCaption={hideCaption}
         columns={columns}
         rows={grants}
         getRowId={(grant) => grant.id}

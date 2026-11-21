@@ -23,6 +23,7 @@ export function UserMenu() {
   const handleSignOut = async () => {
     close();
     await store.logout();
+    // Signing out ends on the landing page (RequireAuth does the same for a portal page).
     void navigate("/", { replace: true });
   };
 

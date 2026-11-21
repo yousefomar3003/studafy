@@ -205,17 +205,6 @@
   margin: var(--space-16) 0;
 }
 
-.students-import__upload input[type="file"]::file-selector-button {
-  margin-inline-end: var(--space-12);
-  padding: var(--space-8) var(--space-16);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-background);
-  color: var(--color-foreground);
-  font: inherit;
-  cursor: pointer;
-}
-
 .students-import__progress {
   display: flex;
   align-items: center;

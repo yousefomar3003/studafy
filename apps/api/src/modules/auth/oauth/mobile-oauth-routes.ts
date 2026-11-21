@@ -311,6 +311,9 @@ export function providerAuthorizationUrl(
     nonce: params.nonce,
     code_challenge: params.codeChallenge,
     code_challenge_method: "S256",
+    // Google and Microsoft show their account chooser every time, so signing out and back in can
+    // switch accounts (the mock IdP ignores it).
+    prompt: "select_account",
   };
 
   if (provider === "google") {

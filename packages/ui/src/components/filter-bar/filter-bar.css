@@ -5,6 +5,14 @@
   gap: var(--space-16);
 }
 
+/* The search box: wide enough for its placeholder ("Search by name or admission number") rather
+   than the browser's default input width, which cut it off mid-word. */
+.sf-filter-bar > .sf-field {
+  flex: 1 1 18rem;
+  min-inline-size: min(100%, 16rem);
+  max-inline-size: 28rem;
+}
+
 .sf-filter-bar__date-range {
   display: block;
   min-inline-size: 0;

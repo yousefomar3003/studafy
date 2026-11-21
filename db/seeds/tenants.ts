@@ -26,9 +26,31 @@ export const DEMO_TENANT: TenantProfile = {
     isActive: true,
     monthlyAmountMinor: 49900,
   },
-  personas: MOCK_PERSONAS,
+  // Everyone but Studafy's own staff: the super admin lives in the platform school below, as in
+  // production, so the platform console lists the demo school as a school and not as Studafy.
+  personas: MOCK_PERSONAS.filter((persona) => persona.role !== "SUPER_ADMIN"),
   loginIdentity: (persona) => ({ provider: MOCK_OAUTH_PROVIDER, subject: mockSubject(persona) }),
   localFixtures: true,
+};
+
+// Local dev / CI platform school: holds only the SUPER_ADMIN (seeded is_platform_tenant), like
+// production's "Studafy" school. The platform console leaves platform schools out of its school
+// list and totals. Its plan is internal: inactive and unpriced, never sold.
+export const DEMO_PLATFORM_TENANT: TenantProfile = {
+  slug: "studafy",
+  name: "Studafy",
+  isReviewTenant: false,
+  isQaTenant: false,
+  plan: {
+    code: "studafy_platform",
+    displayName: "Studafy platform",
+    description: "Internal plan for the local platform school. Never sold.",
+    isActive: false,
+    monthlyAmountMinor: null,
+  },
+  personas: MOCK_PERSONAS.filter((persona) => persona.role === "SUPER_ADMIN"),
+  loginIdentity: (persona) => ({ provider: MOCK_OAUTH_PROVIDER, subject: mockSubject(persona) }),
+  localFixtures: false,
 };
 
 // App Store / Play reviewer tenant, provisioned in production. Its plan is inactive and unpriced, so

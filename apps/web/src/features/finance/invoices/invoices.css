@@ -184,22 +184,6 @@
   max-width: 480px;
 }
 
-.invoices-batch__form input[type="text"],
-.invoices-batch__form input[type="date"] {
-  padding: var(--space-8) var(--space-12);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  font: inherit;
-  color: var(--color-foreground);
-  background-color: var(--color-background);
-}
-
-.invoices-batch__form input[type="text"]:focus-visible,
-.invoices-batch__form input[type="date"]:focus-visible {
-  outline: var(--focus-ring-width) solid var(--focus-ring-color);
-  outline-offset: var(--focus-ring-offset);
-}
-
 .invoices-batch__target {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -215,10 +199,18 @@
   padding: 0;
 }
 
-.invoices-batch__target-option {
+/* Same size as the form's other controls (the radios were browser-default 16px). */
+.invoices-batch__target-option,
+.invoices-batch__class-option {
   display: flex;
   align-items: center;
   gap: var(--space-8);
+  font-size: var(--font-size-sm);
+}
+
+.invoices-batch__target-option input,
+.invoices-batch__class-option input {
+  accent-color: var(--color-accent);
 }
 
 .invoices-batch__classes {

@@ -239,15 +239,13 @@ function ExpenseForm({ onCreated }: ExpenseFormProps) {
             <label className="sf-field__label" htmlFor={attachmentId}>
               {t("finance.expenses.new.receipt")}
             </label>
-            <div className="sf-input">
-              <input
-                id={attachmentId}
-                className="sf-input__control"
-                type="file"
-                accept="image/*,application/pdf"
-                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-              />
-            </div>
+            {/* A file picker brings its own button (styles/global.css): no text-input frame. */}
+            <input
+              id={attachmentId}
+              type="file"
+              accept="image/*,application/pdf"
+              onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+            />
             {file ? <p className="expenses-form__attachment-name">{file.name}</p> : null}
           </div>
 

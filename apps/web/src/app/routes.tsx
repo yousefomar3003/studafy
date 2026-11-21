@@ -215,8 +215,9 @@ const PlatformSchoolsListPage = lazyWithCatalogs(
   PLATFORM_CATALOGS,
   () => import("../features/platform/SchoolsListPage"),
 );
+// SchoolStorageCard formats sizes with the school licence's storage units (schoolLicense catalog).
 const PlatformSchoolDetailPage = lazyWithCatalogs(
-  PLATFORM_CATALOGS,
+  [...PLATFORM_CATALOGS, "schoolLicense"],
   () => import("../features/platform/SchoolDetailPage"),
 );
 const PlatformAnnouncementsPage = lazyWithCatalogs(
@@ -304,8 +305,10 @@ const PlatformAiProgrammeSchoolPage = lazyWithCatalogs(
   [...PLATFORM_CATALOGS, "schoolLicense"],
   () => import("../features/platform/licensing/AiProgrammeSchoolPage"),
 );
+// The quote calculator and the invoice page render the school licence's payment schedule and year
+// totals (features/license), whose strings are in the schoolLicense catalog.
 const PlatformQuotesPage = lazyWithCatalogs(
-  PLATFORM_CATALOGS,
+  [...PLATFORM_CATALOGS, "schoolLicense"],
   () => import("../features/platform/licensing/CalculatorPage"),
 );
 const PlatformLicensesPage = lazyWithCatalogs(
@@ -321,7 +324,7 @@ const PlatformManualGrantsPage = lazyWithCatalogs(
   () => import("../features/platform/grants/ManualGrantsPage"),
 );
 const PlatformInvoicePage = lazyWithCatalogs(
-  PLATFORM_CATALOGS,
+  [...PLATFORM_CATALOGS, "schoolLicense"],
   () => import("../features/platform/licensing/InvoicePage"),
 );
 const PrincipalDashboardPage = lazyWithCatalogs(

@@ -155,20 +155,25 @@ afterEach(() => {
 });
 
 describe("SchoolUsageCard", () => {
-  test("shows accounts, storage, activity, AI use and licence seats", async () => {
+  test("leads with the headline figures, then accounts by role, licence seats and feature use", async () => {
     const { SchoolUsageCard } = await import("./SchoolUsageCard");
     wrap(<SchoolUsageCard schoolId={SCHOOL_ID} />);
     const card = await screen.findByRole("region", { name: "Usage" });
-    await within(card).findByText("9 GB of 10 GB used");
 
+    // Headline tiles: totals across roles, storage against the cap, activity, Student AI.
+    await within(card).findByText("9 GB");
+    expect(within(card).getByText("of 10 GB · 90%")).toBeTruthy();
+    // The accounts tile sums every role's active accounts (40 students + 0 parents).
+    expect(within(card).getByText("Active accounts").nextElementSibling?.textContent).toBe("40");
+    expect(within(card).getByText("3 not activated · 3 open invitations")).toBeTruthy();
+    expect(within(card).getByText("17 signed in during the last 30 days")).toBeTruthy();
+    expect(within(card).getByText(/12,000 AI tokens this billing period/)).toBeTruthy();
+
+    // Accounts by role: students first, then parents.
     const rows = within(card).getAllByRole("row");
-    // Students first, then parents.
     expect(rows[1]!.textContent).toContain("Student");
-    expect(rows[1]!.textContent).toContain("40");
     expect(rows[2]!.textContent).toContain("Parent");
-    expect(within(card).getByText("3 open invitations")).toBeTruthy();
-    expect(within(card).getByText("90% of the cap")).toBeTruthy();
-    expect(within(card).getByText("17")).toBeTruthy();
+
     expect(within(card).getByText("ai_tutor")).toBeTruthy();
     expect(within(card).getByText("40 of 50 seats")).toBeTruthy();
   });

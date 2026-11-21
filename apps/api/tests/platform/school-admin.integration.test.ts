@@ -306,7 +306,8 @@ describe("schools list usage sorts and filters", () => {
       offset: 0,
     });
     expect(firstPage.schools.map((school) => school.id)).toEqual([fixture.beta]);
-    expect(firstPage.total).toBe(4);
+    // Every customer school; the operator's platform school is not listed.
+    expect(firstPage.total).toBe(3);
   });
 });
 

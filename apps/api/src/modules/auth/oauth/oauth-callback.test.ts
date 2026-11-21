@@ -407,6 +407,21 @@ describe("OAuth callback flow dispatch", () => {
   });
 });
 
+describe("OAuth account chooser", () => {
+  for (const [app, provider] of [
+    [googleApp, "google"],
+    [microsoftApp, "microsoft"],
+  ] as const) {
+    test(`${provider}: sign-in always shows the provider's account chooser`, async () => {
+      // Signing out of Studafy leaves the browser signed in to the provider; without this the next
+      // sign-in skipped straight back into the same account, with no way to switch.
+      const start = await app.request(`/api/auth/oauth/${provider}/start`);
+      const authorize = new URL(start.headers.get("location")!);
+      expect(authorize.searchParams.get("prompt")).toBe("select_account");
+    });
+  }
+});
+
 describe("OAuth browser binding (QA-20 / F-07 login CSRF)", () => {
   for (const [app, provider] of [
     [googleApp, "google"],
