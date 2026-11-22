@@ -205,6 +205,38 @@ void main() {
     },
   );
 
+  testWidgets('back from another tab returns to Home; back on Home lets the app close', (
+    tester,
+  ) async {
+    await pumpAppShell(
+      tester,
+      session: await fakeAuthenticatedSession(roles: const ['STUDENT']),
+    );
+
+    PillNavigationBar navBar() => tester.widget(find.byType(PillNavigationBar));
+    PopScope<dynamic> shellScope() => tester.widget(
+      find
+          .descendant(of: find.byType(AppShell), matching: find.byWidgetPredicate((w) => w is PopScope))
+          .first,
+    );
+
+    // On Home the shell does not hold back, so the system back closes the app.
+    expect(shellScope().canPop, isTrue);
+
+    await tester.tap(find.byTooltip('AI'));
+    await tester.pumpAndSettle();
+    expect(navBar().selectedIndex, 3);
+    expect(shellScope().canPop, isFalse);
+
+    // The Android back button / back swipe.
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(navBar().selectedIndex, 0);
+    expect(find.byType(TodayScreen), findsOneWidget);
+    expect(shellScope().canPop, isTrue);
+  });
+
   testWidgets('swiping moves to the neighbouring tab and the nav bar follows', (
     tester,
   ) async {

@@ -109,7 +109,15 @@ class _AppShellScaffoldState extends ConsumerState<_AppShellScaffold> {
       if (index >= 0 && index != _selectedIndex) _selectTab(index);
     });
 
-    return Scaffold(
+    // Android back (button or edge swipe): from any other tab it returns to Home; on Home it is let
+    // through, so the app closes. A screen pushed over a tab pops first, as usual, since this only
+    // applies while the shell itself is the top route.
+    return PopScope(
+      canPop: _selectedIndex == 0,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _selectTab(0);
+      },
+      child: Scaffold(
       // The floating nav bar has no backdrop of its own: tab content scrolls on behind it, and the
       // body sees the bar's height as its bottom `MediaQuery` padding (see `withBottomInset`).
       extendBody: true,
@@ -165,6 +173,7 @@ class _AppShellScaffoldState extends ConsumerState<_AppShellScaffold> {
               label: destination.labelKey.tr(),
             ),
         ],
+      ),
       ),
     );
   }
