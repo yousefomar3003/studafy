@@ -18,6 +18,9 @@
 .vscode
 graphify-out
 **/.DS_Store
+# Tool caches in the CI workspace: the deploy's Trivy scans keep their vulnerability database in
+# .cache/trivy (3.3 GB), which otherwise rides into every later image build's context.
+.cache
 
 # Dependency + build output (reinstalled and rebuilt inside the image; never trusted from host)
 **/node_modules
