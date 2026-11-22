@@ -40,6 +40,16 @@ export function replyLanguageRule(language: ReplyLanguage): string {
   );
 }
 
+/**
+ * For an answer shown as written (chat, explanation, summary). The apps draw these as plain text, so
+ * Markdown such as `**bold**` would show its asterisks; larger models (Gemma 4) reach for it unless
+ * told not to.
+ */
+export const PLAIN_TEXT_RULE =
+  "Plain text only, because the app shows your answer exactly as written. Never use Markdown: no " +
+  "** or __ for bold, no # headings, no tables, no code fences. For a list, start each item on its " +
+  'own line with "- " or a number and a dot.';
+
 /** For a study tool built from a material (summary, quiz, flashcards...): the material's language. */
 export const SOURCE_LANGUAGE_RULE =
   "Write in the same language as the source material (Arabic material gets Modern Standard " +

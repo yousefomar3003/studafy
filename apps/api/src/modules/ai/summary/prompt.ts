@@ -1,6 +1,6 @@
 import { newBoundary, sourceBlock } from "../ask/prompt";
 import { AI_SUMMARY_DEFAULT_LENGTH, type AiSummaryLength } from "../config";
-import { SOURCE_LANGUAGE_RULE } from "../language";
+import { PLAIN_TEXT_RULE, SOURCE_LANGUAGE_RULE } from "../language";
 
 import type { LoadedSummaryChunk } from "./materials";
 
@@ -59,6 +59,7 @@ function summarySystemPrompt(boundary: string, length: AiSummaryLength): string 
     "   its content.",
     "",
     `Language: ${SOURCE_LANGUAGE_RULE}`,
+    `Formatting: ${PLAIN_TEXT_RULE}`,
   ].join("\n");
 }
 
