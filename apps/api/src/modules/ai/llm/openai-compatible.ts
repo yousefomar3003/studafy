@@ -19,11 +19,26 @@
  *
  * No user identifier is sent. The Anthropic format's `metadata.user_id` exists for that provider's
  * abuse monitoring; an OpenAI-compatible host has no equivalent agreement behind its `user` field.
+ *
+ * OpenRouter routes each request to one of several hosts of the model. {@link routingPrivacy} makes
+ * every request to it allow only hosts that neither store prompts nor train on them, so that holds
+ * per request whatever the account settings say.
  */
 
 import type { LlmGenerateInput, LlmUsage } from "./provider";
 
 export const OPENAI_COMPATIBLE_PATH = "/chat/completions";
+
+/**
+ * Extra request fields for a router host. For OpenRouter: only hosts that do not retain or train on
+ * the data (`provider.data_collection: "deny"`). Empty for any other host.
+ */
+export function routingPrivacy(baseUrl: string): Record<string, unknown> {
+  const host = URL.canParse(baseUrl) ? new URL(baseUrl).hostname : "";
+  return host === "openrouter.ai" || host.endsWith(".openrouter.ai")
+    ? { provider: { data_collection: "deny" } }
+    : {};
+}
 
 /**
  * Appended to the user turn in JSON mode. JSON mode only allows an object at the top level, and every

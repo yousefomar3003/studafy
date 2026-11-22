@@ -1,6 +1,6 @@
 # Terms of Service
 
-Last updated: 2026-11-11
+Last updated: 2026-11-22
 
 ## 1. About these terms
 
@@ -86,7 +86,7 @@ School leaders, administrators and finance staff must sign in with Google or Mic
 
 6.1 **What they do.** Students can use AI study features in the Studafy mobile app. They can ask questions about their class materials and get explanations, summaries and key concepts, and create practice quizzes, flashcards and practice exams. Only students can use them, and only for themselves; parents and teachers cannot use them for a student. To use them, a student needs AI access, either through a licence their school provides or through the AI Study Assistant they buy (section 7).
 
-6.2 **Agreeing to data sharing.** Before using the AI study features for the first time, a student is asked to agree to send questions and class-material text to our AI provider, Together AI, in the United States. A student can withdraw that agreement at any time, and the features then stop working for them. The Privacy Policy explains exactly what is sent. Students under 16 need a parent's or guardian's agreement first (section 3.3).
+6.2 **Agreeing to data sharing.** Before using the AI study features for the first time, a student is asked to agree to send questions and class-material text to our AI provider, OpenRouter, in the United States. A student can withdraw that agreement at any time, and the features then stop working for them. The Privacy Policy explains exactly what is sent. Students under 16 need a parent's or guardian's agreement first (section 3.3).
 
 6.3 **What is sent.** The features send the text you type, recent turns of the conversation, and the text of class materials. We do not send your name, email address, marks or attendance to the AI provider. Photos you take to turn into text are processed on our own servers and are never sent to the AI provider. Class materials that teachers share can be used by the AI features to answer questions, so teachers should not put personal details in class materials unless they need to.
 

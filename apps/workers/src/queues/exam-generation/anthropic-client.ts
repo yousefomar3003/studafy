@@ -133,6 +133,12 @@ export function createAnthropicClient(options: AnthropicClientOptions) {
     throw new Error("An OpenAI-compatible LLM client needs a baseUrl");
   }
   const baseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/$/, "");
+  // OpenRouter routes to one of several hosts of the model: allow only hosts that neither retain nor
+  // train on the data, per request (mirrors routingPrivacy in the API's openai-compatible.ts).
+  const routing =
+    openAiCompatible && /^https:\/\/([a-z0-9-]+\.)*openrouter\.ai(\/|$)/i.test(baseUrl)
+      ? { provider: { data_collection: "deny" } }
+      : {};
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const fetchFn = options.fetch ?? globalThis.fetch.bind(globalThis);
 
@@ -167,6 +173,7 @@ export function createAnthropicClient(options: AnthropicClientOptions) {
                   ],
                   reasoning: { enabled: false },
                   ...(input.json ? { response_format: { type: "json_object" } } : {}),
+                  ...routing,
                 }
               : {
                   model: input.model,
