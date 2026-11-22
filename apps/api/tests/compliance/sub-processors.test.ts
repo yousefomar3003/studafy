@@ -53,7 +53,7 @@ const disclosed: Integration[] = [
   { provider: "Google Firebase Cloud Messaging", wiredBy: /FIREBASE_SERVICE_ACCOUNT/ },
   { provider: "Sentry", wiredBy: /SENTRY_DSN/ },
   { provider: "Axiom", wiredBy: /axiom\.co/ },
-  { provider: "Together AI", wiredBy: /api\.together\.xyz/ },
+  { provider: "OpenRouter", wiredBy: /openrouter\.ai/ },
 ];
 
 /** Live, undisclosed: NEEDS HUMAN (counsel). See QA_PROGRESS QA-077. */
