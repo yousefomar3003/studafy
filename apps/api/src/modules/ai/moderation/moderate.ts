@@ -18,12 +18,8 @@
 
 import { createHash } from "crypto";
 
-import {
-  type AgeLevel,
-  levelBlocked,
-  MODERATION_CATEGORIES,
-  type ModerationCategory,
-} from "./policy";
+import { ARABIC_GUIDANCE, ARABIC_PATTERNS, isMostlyArabic, normalizeArabic } from "./arabic-policy";
+import { type AgeLevel, levelBlocked, MODERATION_CATEGORIES } from "./policy";
 
 export type { AgeLevel } from "./policy";
 
@@ -46,8 +42,12 @@ export interface ModerationResult {
  * @returns {@link ModerationResult} — `blocked: true` means the question must not be sent to the
  *   model; `blocked: false` means it passed all categories.
  */
-export function moderateInput(text: string, level: AgeLevel = "high"): ModerationResult {
-  return checkText(text, level);
+export function moderateInput(
+  text: string,
+  level: AgeLevel = "high",
+  language?: ModerationLanguage,
+): ModerationResult {
+  return checkText(text, level, language);
 }
 
 /**
@@ -56,9 +56,19 @@ export function moderateInput(text: string, level: AgeLevel = "high"): Moderatio
  * @returns {@link ModerationResult} — `blocked: true` means the answer must not be streamed or
  *   persisted; `blocked: false` means it passed all categories.
  */
-export function moderateOutput(text: string, level: AgeLevel = "high"): ModerationResult {
-  return checkText(text, level);
+export function moderateOutput(
+  text: string,
+  level: AgeLevel = "high",
+  language?: ModerationLanguage,
+): ModerationResult {
+  return checkText(text, level, language);
 }
+
+/**
+ * The language of the guidance a block returns. Omitted, it follows the checked text: Arabic for a
+ * mostly-Arabic text, English otherwise.
+ */
+export type ModerationLanguage = "ar" | "en";
 
 /**
  * Compute a deterministic sha-256 hex digest of the checked text. Used as the `text_hash` column
@@ -100,15 +110,22 @@ function asciiDigits(text: string): string {
   );
 }
 
-function checkText(text: string, level: AgeLevel): ModerationResult {
+function checkText(text: string, level: AgeLevel, language?: ModerationLanguage): ModerationResult {
   const normalized = asciiDigits(text);
+  const arabic = normalizeArabic(normalized);
+  const guidanceLanguage = language ?? (isMostlyArabic(text) ? "ar" : "en");
   for (const category of MODERATION_CATEGORIES) {
     if (!levelBlocked(level, category.blockThreshold)) continue;
-    if (matchesAny(normalized, category)) {
+    if (
+      matchesAny(normalized, category.patterns) ||
+      matchesAny(arabic, ARABIC_PATTERNS[category.key] ?? [])
+    ) {
       return {
         blocked: true,
         category: category.key,
-        guidance: category.guidance[level],
+        guidance:
+          (guidanceLanguage === "ar" ? ARABIC_GUIDANCE[category.key]?.[level] : undefined) ??
+          category.guidance[level],
         escalate: category.escalate,
       };
     }
@@ -116,8 +133,8 @@ function checkText(text: string, level: AgeLevel): ModerationResult {
   return { blocked: false };
 }
 
-function matchesAny(text: string, category: ModerationCategory): boolean {
-  for (const pattern of category.patterns) {
+function matchesAny(text: string, patterns: readonly RegExp[]): boolean {
+  for (const pattern of patterns) {
     if (pattern.test(text)) return true;
   }
   return false;
