@@ -658,6 +658,25 @@ describe("AcademicSetupPage", () => {
     expect(init.body).toMatchObject({ result_format: "gpa", result_scale_max: 4 });
   });
 
+  test("a grade can switch on predicted grades and show them to families", async () => {
+    await renderAt("/subjects");
+
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: "Teachers record predicted grades" }),
+    );
+    fireEvent.click(screen.getByRole("combobox", { name: "Predicted grades are seen by" }));
+    fireEvent.click(screen.getByRole("option", { name: "Staff, students and parents" }));
+    putMock.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "Save policies" }));
+
+    await waitFor(() => expect(putMock).toHaveBeenCalledTimes(1));
+    const [, init] = putMock.mock.calls[0]! as [string, { body: Record<string, unknown> }];
+    expect(init.body).toMatchObject({
+      predicted_grades_enabled: true,
+      predicted_grades_visibility: "students_and_parents",
+    });
+  });
+
   test("a descriptive subject drops marks and weights for skills and descriptors", async () => {
     await renderAt("/subjects");
 

@@ -165,7 +165,8 @@
       "CONFLICT_STATE_MISMATCH": "That isn't possible in the current state.",
       "GRADE_CONCURRENT_EDIT": "Someone else changed this in the meantime. Reload and try again.",
       "VALIDATION_FAILED": "Some values aren't valid.",
-      "AUTHZ_FORBIDDEN": "You don't have permission to do this."
+      "AUTHZ_FORBIDDEN": "You don't have permission to do this.",
+      "PREDICTED_GRADES_DISABLED": "Predicted grades aren't switched on for this grade this year."
     }
   },
   "issues": {
@@ -360,7 +361,10 @@
       "outOfMax": "Out of",
       "outOfMaxHelp": "For example 20: an average of 82.5% shows as 16.5 / 20.",
       "gpaMax": "GPA out of",
-      "gpaMaxHelp": "Usually 4 or 5. Each subject's GPA points come from its grading scale and are weighted like the average."
+      "gpaMaxHelp": "Usually 4 or 5. Each subject's GPA points come from its grading scale and are weighted like the average.",
+      "predicted": "Teachers record predicted grades",
+      "predictedVisibility": "Predicted grades are seen by",
+      "predictedVisibilityHelp": "Teachers' notes on a predicted grade are always for staff only."
     }
   },
   "editor": {
@@ -824,6 +828,10 @@
     "gpaValue": "GPA {{value}} / {{max}}",
     "withPercentage": "{{percentage}}%",
     "gpaUnavailable": "GPA not available"
+  },
+  "predictedVisibility": {
+    "staff": "Staff only",
+    "students_and_parents": "Staff, students and parents"
   },
   "transcript": {
     "title": "Academic Transcript",

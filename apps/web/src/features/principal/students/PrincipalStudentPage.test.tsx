@@ -214,6 +214,38 @@ const TRANSCRIPT_READY = {
   cumulative: TRANSCRIPT_CONTENT.cumulative,
 };
 
+const PREDICTED = {
+  student_id: "student-1",
+  years: [
+    {
+      academic_year_id: "year-2",
+      academic_year_name: "2026–2027",
+      section_id: "section-1",
+      section_name: "A",
+      grade_level_name: "Year 13",
+      enabled: true,
+      visibility: "staff",
+      can_edit: true,
+      subjects: [
+        { subject_id: "subject-math", subject_name: "Mathematics", labels: ["A*", "A", "B"] },
+        { subject_id: "subject-phys", subject_name: "Physics", labels: [] },
+      ],
+      terms: [{ term_id: "term-1", term_name: "Term 1" }],
+      grades: [
+        {
+          term_id: null,
+          term_name: null,
+          subject_id: "subject-math",
+          subject_name: "Mathematics",
+          grade_label: "A",
+          note: "Strong mocks",
+          updated_at: "2026-11-01T10:00:00.000Z",
+        },
+      ],
+    },
+  ],
+};
+
 let studentRecords = recordsFor("student", null);
 let transcripts: (typeof TRANSCRIPT)[] = [];
 /** The document GET /api/grading/transcripts/{transcriptId} answers with (TRANSCRIPT when null). */
@@ -221,7 +253,11 @@ let transcriptDocument: unknown = null;
 
 interface RequestInit {
   params?: { path?: Record<string, string> };
-  body?: { answers?: { field_id: string; value: string }[] };
+  body?: {
+    answers?: { field_id: string; value: string }[];
+    term_id?: string | null;
+    grades?: { student_id: string; grade_label: string | null; note: string | null }[];
+  };
 }
 
 const PARENT_SUMMARY = {
@@ -290,6 +326,9 @@ const getMock = mock((path: string, _init?: RequestInit) => {
   if (path === "/api/grading/transcripts/{transcriptId}") {
     return Promise.resolve<unknown>({ data: transcriptDocument ?? TRANSCRIPT });
   }
+  if (path === "/api/grading/students/{studentId}/predicted-grades") {
+    return Promise.resolve<unknown>({ data: PREDICTED });
+  }
   return Promise.resolve<unknown>({ data: {} });
 });
 
@@ -305,6 +344,9 @@ const putMock = mock((path: string, init?: RequestInit) => {
   if (path === "/api/students/{studentId}/records") {
     studentRecords = recordsFor("student", init?.body?.answers?.[0]?.value ?? null);
     return Promise.resolve<unknown>({ data: studentRecords });
+  }
+  if (path === "/api/grading/sections/{sectionId}/subjects/{subjectId}/predicted-grades") {
+    return Promise.resolve<unknown>({ data: { students: [] } });
   }
   return Promise.resolve<unknown>({ data: {} });
 });
@@ -449,6 +491,34 @@ describe("Principal > Students", () => {
         .getByRole("link", { name: "Open this student's attendance history" })
         .getAttribute("href"),
     ).toBe("/portal/attendance/students/student-1");
+  });
+
+  test("a principal reads a student's predicted grades and sets one from the scale", async () => {
+    await renderAsPrincipal("/portal/principal/students/student-1");
+
+    const panel = await screen.findByRole("region", { name: "Predicted grades" });
+    expect(
+      await within(panel).findByRole("heading", { name: "2026–2027 · Year 13 A" }),
+    ).toBeTruthy();
+    expect(within(panel).getByText("Seen by staff only.")).toBeTruthy();
+    expect(within(panel).getByText("Strong mocks")).toBeTruthy();
+
+    fireEvent.click(within(panel).getByRole("button", { name: "Add a predicted grade" }));
+    const form = within(panel).getByRole("group", { name: "Predicted grade" });
+    fireEvent.click(within(form).getByRole("combobox", { name: "Period" }));
+    fireEvent.click(within(form).getByRole("option", { name: "Term 1" }));
+    fireEvent.click(within(form).getByRole("combobox", { name: "Predicted grade" }));
+    fireEvent.click(within(form).getByRole("option", { name: "A*" }));
+    fireEvent.click(within(form).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(putMock).toHaveBeenCalledTimes(1));
+    const [path, init] = putMock.mock.calls[0] as [string, RequestInit];
+    expect(path).toBe("/api/grading/sections/{sectionId}/subjects/{subjectId}/predicted-grades");
+    expect(init.params?.path).toEqual({ sectionId: "section-1", subjectId: "subject-math" });
+    expect(init.body).toEqual({
+      term_id: "term-1",
+      grades: [{ student_id: "student-1", grade_label: "A*", note: null }],
+    });
   });
 
   test("a principal sees what a transcript would cover and issues it", async () => {

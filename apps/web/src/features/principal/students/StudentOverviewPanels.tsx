@@ -13,6 +13,7 @@ import {
   DISCIPLINE_TYPE_LABEL_KEYS,
 } from "../discipline/labels";
 
+import { PredictedGradesPanel } from "./predicted-grades/PredictedGradesPanel";
 import { TranscriptPanel } from "./transcripts/TranscriptPanel";
 
 import type { DisciplineIncident } from "../discipline/queries";
@@ -204,6 +205,8 @@ export function StudentOverviewPanels({ studentId }: { studentId: string }) {
           )}
         </Card.Body>
       </Card>
+
+      <PredictedGradesPanel studentId={studentId} />
 
       <TranscriptPanel studentId={studentId} />
 
