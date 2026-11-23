@@ -63,16 +63,21 @@ const namedSchema = z
 // Sets
 // ---------------------------------------------------------------------------
 
-export const graduationRuleSchema = z
-  .object({
-    id: uuidSchema,
-    type: graduationRuleTypeSchema,
-    min_value: z.number().nullable(),
-    group_name: z.string().nullable(),
-    subjects: z.array(namedSchema).openapi({ description: "The group's subjects, by name." }),
-    external_exam: namedSchema.nullable(),
-  })
-  .openapi("GraduationRule");
+// Spread into the rule and its evaluation (not .extend: that becomes an allOf, which the mobile
+// client generator does not flatten).
+const ruleShape = {
+  id: uuidSchema,
+  type: graduationRuleTypeSchema,
+  min_value: z.number().nullable(),
+  group_name: z.string().nullable(),
+  subjects: z.array(namedSchema).openapi({ description: "The group's subjects, by name." }),
+  external_exam: z
+    .object({ id: uuidSchema, code: z.string(), name: z.string() })
+    .openapi("GraduationRuleExam")
+    .nullable(),
+};
+
+export const graduationRuleSchema = z.object(ruleShape).openapi("GraduationRule");
 
 export const graduationSetSchema = z
   .object({
@@ -81,13 +86,11 @@ export const graduationSetSchema = z
     grade_levels: z
       .array(z.object({ id: uuidSchema, name: z.string() }).openapi("GraduationGradeLevel"))
       .openapi({ description: "The grade levels the set applies to." }),
+    // Applies to students in this year or a later one; null: every year.
     applies_from_academic_year: z
       .object({ id: uuidSchema, name: z.string() })
       .openapi("GraduationAcademicYear")
-      .nullable()
-      .openapi({
-        description: "Applies to students in this year or a later one; null: every year.",
-      }),
+      .nullable(),
     is_active: z.boolean(),
     visible_to_students_and_parents: z.boolean(),
     rules: z.array(graduationRuleSchema),
@@ -131,8 +134,9 @@ export const graduationSetBodySchema = z
 // Evaluations
 // ---------------------------------------------------------------------------
 
-export const graduationRuleEvaluationSchema = graduationRuleSchema
-  .extend({
+export const graduationRuleEvaluationSchema = z
+  .object({
+    ...ruleShape,
     status: graduationStatusSchema,
     current: z
       .number()
@@ -151,26 +155,28 @@ export const graduationRuleEvaluationSchema = graduationRuleSchema
   })
   .openapi("GraduationRuleEvaluation");
 
+const setEvaluationShape = {
+  set: z
+    .object({ id: uuidSchema, name: z.string(), visible_to_students_and_parents: z.boolean() })
+    .openapi("GraduationEvaluatedSet"),
+  status: graduationStatusSchema,
+  rules_met: z.number().int(),
+  rules_total: z.number().int(),
+  rules: z.array(graduationRuleEvaluationSchema),
+};
+
 export const graduationSetEvaluationSchema = z
-  .object({
-    set: z
-      .object({ id: uuidSchema, name: z.string(), visible_to_students_and_parents: z.boolean() })
-      .openapi("GraduationEvaluatedSet"),
-    status: graduationStatusSchema,
-    rules_met: z.number().int(),
-    rules_total: z.number().int(),
-    rules: z.array(graduationRuleEvaluationSchema),
-  })
+  .object(setEvaluationShape)
   .openapi("GraduationSetEvaluation");
 
 export const graduationChecklistSchema = z
   .object({
     student_id: uuidSchema,
+    // The grade level of the student's latest placement.
     grade_level: z
       .object({ id: uuidSchema, name: z.string() })
       .openapi("GraduationStudentGradeLevel")
-      .nullable()
-      .openapi({ description: "The grade level of the student's latest placement." }),
+      .nullable(),
     current_year_pending: z.boolean().openapi({
       description: "The student's current year has no finalized annual result yet.",
     }),
@@ -185,8 +191,9 @@ export const graduationChecklistSchema = z
   })
   .openapi("GraduationChecklist");
 
-export const graduationPreviewSchema = graduationSetEvaluationSchema
-  .extend({
+export const graduationPreviewSchema = z
+  .object({
+    ...setEvaluationShape,
     student_id: uuidSchema,
     current_year_pending: z.boolean(),
     years_counted: z.number().int(),
@@ -212,14 +219,15 @@ export const graduationReportSchema = z
             last_name: z.string(),
             admission_number: z.string(),
             section_name: z.string(),
-            status: graduationStatusSchema.openapi({
-              description: "not_met when any set is not met, otherwise pending.",
-            }),
+            // not_met when any set is not met, otherwise pending.
+            status: graduationStatusSchema,
             sets: z.array(graduationSetEvaluationSchema).openapi({
               description: "The sets not met (yet).",
             }),
           })
-          .openapi("GraduationReportStudent"),
+          .openapi("GraduationReportStudent", {
+            description: "status: not_met when any set is not met, otherwise pending.",
+          }),
       )
       .openapi({
         description:
