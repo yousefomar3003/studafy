@@ -139,6 +139,7 @@
   "RESULT_FINALIZATION_NOT_FOUND": "لم يتم العثور على النتائج المعتمدة.",
   "CERTIFICATE_BLOCKED": "لا يمكن إصدار الشهادة لأن نتائج الطالب غير مكتملة.",
   "CERTIFICATE_NOT_FOUND": "لم يتم العثور على الشهادة.",
+  "PREDICTED_GRADES_DISABLED": "الدرجات المتوقعة غير مفعّلة لهذا الصف في هذا العام الدراسي.",
   "ENROLLMENT_DUPLICATE": "الطالب مسجّل بالفعل في هذا الفصل.",
   "ENROLLMENT_NOT_ACTIVE": "التسجيل غير نشط.",
   "TIMETABLE_TEACHER_CONFLICT": "هذا المدرّس معين بالفعل على فصل آخر في هذا الوقت",

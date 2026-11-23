@@ -243,6 +243,8 @@ const EXPECTED_MUTATING_ROUTES = [
   "PUT /api/grading/report-card-settings",
   "PUT /api/grading/sections/{sectionId}/report-notes",
   "PUT /api/grading/sections/{sectionId}/subjects/{subjectId}/report-comments",
+  // Predicted grades (000254): the service records each student's old and new label and note.
+  "PUT /api/grading/sections/{sectionId}/subjects/{subjectId}/predicted-grades",
   // Timetable (ST-101). Version lifecycle + slot CRUD with conflict detection.
   "POST /api/academics/timetable-versions",
   "PATCH /api/academics/timetable-versions/{versionId}",

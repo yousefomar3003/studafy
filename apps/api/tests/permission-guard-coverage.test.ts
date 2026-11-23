@@ -164,6 +164,7 @@ const EXPECTED_MUTATING_ROUTES = [
   "PUT /api/grading/report-card-settings",
   "PUT /api/grading/sections/{sectionId}/report-notes",
   "PUT /api/grading/sections/{sectionId}/subjects/{subjectId}/report-comments",
+  "PUT /api/grading/sections/{sectionId}/subjects/{subjectId}/predicted-grades",
   "POST /api/grading/finalizations/{finalizationId}/certificates",
   // Transcripts (000207): issue, reissue and revoke behind academicCertificate:issue.
   "POST /api/grading/students/{studentId}/transcripts",

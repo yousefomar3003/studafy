@@ -141,6 +141,7 @@ import {
 import {
   gradingConfigRoutes,
   gradingMarksRoutes,
+  gradingPredictedGradesRoutes,
   gradingReportCardRoutes,
   gradingResultsRoutes,
   gradingTranscriptRoutes,
@@ -1206,6 +1207,8 @@ export function createApp({
     app.route("/", gradingTranscriptRoutes(database));
     // Report card comments, attendance and conduct (000209).
     app.route("/", gradingReportCardRoutes(database));
+    // Predicted grades (000254).
+    app.route("/", gradingPredictedGradesRoutes(database));
   }
 
   // Gradebook configuration (ST-112). Weighted assessment categories per gradebook and
