@@ -248,6 +248,43 @@ void main() {
     },
   );
 
+  testWidgets(
+    'shows whether graduation requirements were met, only when issued with them',
+    (tester) async {
+      final row = _transcript();
+      final content = row['content']! as Map<String, Object?>;
+      content['graduation_requirements'] = [
+        {
+          'name': 'High school diploma',
+          'status': 'met',
+          'rules_met': 5,
+          'rules_total': 5,
+        },
+        // A status a newer API might send is shown neutrally.
+        {'name': 'Honors diploma', 'status': 'later', 'rules_met': 1},
+      ];
+      await _pump(
+        tester,
+        _FakeTranscriptClient([row]),
+        const TranscriptDetailScreen(transcriptId: 'tr-1'),
+      );
+      expect(
+        find.text('Graduation requirements: High school diploma'),
+        findsOneWidget,
+      );
+      expect(find.text('Met (5 of 5)'), findsOneWidget);
+      expect(find.text('Not available (1 of 0)'), findsOneWidget);
+
+      // A transcript issued before graduation requirements existed shows no line.
+      await _pump(
+        tester,
+        _FakeTranscriptClient([_transcript(id: 'tr-2')]),
+        const TranscriptDetailScreen(transcriptId: 'tr-2'),
+      );
+      expect(find.textContaining('Graduation requirements'), findsNothing);
+    },
+  );
+
   testWidgets('years on different GPA scales explain the missing GPA', (
     tester,
   ) async {

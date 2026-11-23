@@ -2582,7 +2582,9 @@
         "incomplete": "لا توجد أرقام تراكمية: بعض النتائج غير مكتملة.",
         "noSubjects": "لا توجد أرقام تراكمية: لا توجد مادة تُحتسب في المعدل.",
         "mixedGpaScales": "لا يوجد معدل تراكمي بالنقاط: السنوات تستخدم مقاييس مختلفة ({scales})، فلا يمكن حساب متوسط نقاطها."
-      }
+      },
+      "graduation": "متطلبات التخرج: {name}",
+      "graduationValue": "{status} ({met} من {total})"
     },
     "kind": {
       "annualCertificate": "شهادة",
@@ -2622,6 +2624,31 @@
       "examSubject": "{exam} — {subject}",
       "satOn": "بتاريخ {date}",
       "scoreLine": "{component}: {score}"
+    },
+    "graduation": {
+      "title": "متطلبات التخرج",
+      "setProgress": "تحقّق {met} من {total} من المتطلبات",
+      "status": {
+        "met": "متحقّق",
+        "notMet": "غير متحقّق",
+        "pending": "قيد الإنجاز",
+        "unknown": "غير متاح"
+      },
+      "rule": {
+        "totalCredits": "مجموع الساعات المعتمدة",
+        "groupCredits": "الساعات المعتمدة في {group}",
+        "subjectsPassed": "النجاح في {group}",
+        "cumulativeGpa": "المعدل التراكمي (GPA)",
+        "cumulativeAverage": "المعدل التراكمي",
+        "unknown": "متطلب"
+      },
+      "progress": {
+        "of": "{current} من {required}",
+        "minimum": "{current} (الحد الأدنى {required})",
+        "recorded": "مسجّل",
+        "notRecorded": "لم يُسجَّل بعد"
+      },
+      "missing": "لم يتم النجاح بعد في: {subjects}"
     }
   },
   "features": {

@@ -2559,7 +2559,9 @@
         "incomplete": "No cumulative figures: some results are incomplete.",
         "noSubjects": "No cumulative figures: no subject counts toward the average.",
         "mixedGpaScales": "No cumulative GPA: the years use different GPA scales ({scales}), so their points can't be averaged."
-      }
+      },
+      "graduation": "Graduation requirements: {name}",
+      "graduationValue": "{status} ({met} of {total})"
     },
     "kind": {
       "annualCertificate": "Certificate",
@@ -2599,6 +2601,31 @@
       "examSubject": "{exam} — {subject}",
       "satOn": "Sat on {date}",
       "scoreLine": "{component}: {score}"
+    },
+    "graduation": {
+      "title": "Graduation requirements",
+      "setProgress": "{met} of {total} requirements met",
+      "status": {
+        "met": "Met",
+        "notMet": "Not met",
+        "pending": "In progress",
+        "unknown": "Not available"
+      },
+      "rule": {
+        "totalCredits": "Total credits",
+        "groupCredits": "Credits in {group}",
+        "subjectsPassed": "Pass {group}",
+        "cumulativeGpa": "Cumulative GPA",
+        "cumulativeAverage": "Cumulative average",
+        "unknown": "Requirement"
+      },
+      "progress": {
+        "of": "{current} of {required}",
+        "minimum": "{current} (minimum {required})",
+        "recorded": "Recorded",
+        "notRecorded": "Not recorded yet"
+      },
+      "missing": "Still to pass: {subjects}"
     }
   },
   "features": {
