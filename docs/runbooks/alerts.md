@@ -13,6 +13,8 @@ These are the alerts production must have, and the signal each one reads. The re
 | Errors / crashes      | Sentry org `studafy-limited`                                               | `@studafy/observability` error monitoring (api, workers, realtime, web, mobile)                      |
 | Queue and DLQ metrics | Fly managed Prometheus (`[metrics]` :9464 in api/workers/realtime `.toml`) | `bullmq.job.outcomes`, `dead_letter.entries`, queue gauges, `http.server.request.duration`           |
 
+**How these look in Axiom.** The Fly log shipper keeps each service's JSON line as a string in `message`, with the app in `fly.app.name`. So `msg`, `level` and `alert` below are fields of `parse_json(message)`, not top-level columns. The workers also write `level` as a word (`"error"`), while the API writes pino numbers (`50`). An error filter has to accept both: `level in ("error", "fatal", 50, 60)`. [`infra/axiom/setup-alerts.sh`](../../infra/axiom/setup-alerts.sh) holds the exact queries.
+
 ## Alerts
 
 | #   | Alert                         | Rule                                                                                                                                            | Severity | Fire drill (staging)                                                            |
@@ -33,7 +35,7 @@ These are the alerts production must have, and the signal each one reads. The re
 
 1. **Route**: a Slack/Telegram channel for `warning`, and a paging integration for `critical`, per [on-call-rotation.md](on-call-rotation.md).
 2. **Uptime**: create A1 and A2 (Better Stack, UptimeRobot, or Sentry Uptime).
-3. **Axiom**: create A3, A4, A5, A9 and A10 as monitors on dataset `studafy-logs`, routed as above.
+3. **Axiom**: run `infra/axiom/setup-alerts.sh`. It creates a Telegram notifier and A3, A4, A5, A9, A10 and A11 as monitors on dataset `studafy-logs`, and it is safe to re-run. It asks for an Axiom API token that can create monitors and notifiers, the Telegram bot token, and the chat ID. Every severity goes to the same Telegram chat, with `[CRITICAL]` or `[WARNING]` in the monitor name, until a paging provider exists.
 4. **Sentry**: create A6 and A7 for each project.
 5. **Fly**: confirm the `workers_alive` check shows up in `fly checks list -a studafy-core-workers`, and connect Fly's managed Grafana/Prometheus to A8.
 6. **Drill each alert once in staging**, and record the date, the alert, the time to notify and a screenshot in `docs/qa/evidence/QA-046-alert-drills.md`.
