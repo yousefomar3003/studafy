@@ -718,6 +718,26 @@
   white-space: nowrap;
 }
 
+/* A long checkbox list (a graduation rule's subjects): scroll inside the rule, not the page. */
+.ag-checks--scroll {
+  max-block-size: 14rem;
+  overflow-y: auto;
+  padding: var(--space-8);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+/* One graduation requirement set's checklist: its name and status above the rules. */
+.ag-graduation {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.ag-graduation + .ag-graduation {
+  margin-block-start: var(--space-16);
+}
+
 @media print {
   /* Print only the certificate when one is on the page, never the portal chrome around it. */
   body:has(.ag-certificate) * {

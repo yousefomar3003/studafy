@@ -315,9 +315,12 @@ export interface OverallResult {
    * and null whenever the GPA itself is.
    */
   weightedGpa: number | null;
-  /** Credits of the counted, complete subjects that have credits; null when none has credits. */
+  /**
+   * Credits of the complete, non-exempt subjects that have credits -- in the average or not,
+   * descriptive (pass/fail) included; null when none has credits.
+   */
   creditsAttempted: number | null;
-  /** The same over the passed subjects; null when no counted subject has credits. */
+  /** The same over the passed subjects; null when no such subject has credits. */
   creditsEarned: number | null;
   subjectsFailed: number;
   failedSubjectIds: string[];

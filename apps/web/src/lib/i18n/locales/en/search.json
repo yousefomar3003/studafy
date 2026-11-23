@@ -325,6 +325,11 @@
       "where": "Principal › Academic setup › External exams",
       "keywords": "external exams, test scores, sat, act, ap, ielts, toefl, igcse, a level, ib diploma, tawjihi, thanaweya amma, state test, national exams"
     },
+    "academic-graduation": {
+      "title": "Graduation requirements",
+      "where": "Principal › Academic setup › Graduation requirements",
+      "keywords": "graduation requirements, diploma, credits, credit hours, gpa, on track, not on track, required subjects, graduation checklist"
+    },
     "academic-approvals": {
       "title": "Mark sheet approvals",
       "where": "Principal › Academic setup › Approvals",

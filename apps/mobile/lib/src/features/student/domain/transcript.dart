@@ -7,6 +7,7 @@
 library;
 
 import 'academic_results.dart';
+import 'graduation_requirements.dart';
 
 /// One academic year on a transcript.
 class TranscriptYear {
@@ -127,6 +128,7 @@ class TranscriptContent {
     required this.issuedByName,
     required this.reissueOfSerial,
     required this.reissueReason,
+    this.graduationRequirements = const [],
   });
 
   factory TranscriptContent.fromJson(Map<String, Object?> json) {
@@ -150,6 +152,10 @@ class TranscriptContent {
           ? reissue['supersedes_serial'] as String?
           : null,
       reissueReason: reissue is Map ? reissue['reason'] as String? : null,
+      graduationRequirements: [
+        for (final row in _list(json['graduation_requirements']))
+          TranscriptGraduationRequirement.fromJson(row),
+      ],
     );
   }
 
@@ -165,6 +171,33 @@ class TranscriptContent {
   final String? issuedByName;
   final String? reissueOfSerial;
   final String? reissueReason;
+
+  /// Whether the student met each graduation requirement set applying to them, as it stood at
+  /// issue. Empty when none applied, and on transcripts issued before they existed.
+  final List<TranscriptGraduationRequirement> graduationRequirements;
+}
+
+/// One graduation requirement set's outcome on a transcript.
+class TranscriptGraduationRequirement {
+  const TranscriptGraduationRequirement({
+    required this.name,
+    required this.status,
+    required this.rulesMet,
+    required this.rulesTotal,
+  });
+
+  factory TranscriptGraduationRequirement.fromJson(Map<String, Object?> json) =>
+      TranscriptGraduationRequirement(
+        name: json['name'] as String? ?? '',
+        status: GraduationStatus.fromWire(json['status']),
+        rulesMet: (json['rules_met'] as num?)?.toInt() ?? 0,
+        rulesTotal: (json['rules_total'] as num?)?.toInt() ?? 0,
+      );
+
+  final String name;
+  final GraduationStatus status;
+  final int rulesMet;
+  final int rulesTotal;
 }
 
 class AcademicTranscript {

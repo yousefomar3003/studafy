@@ -248,5 +248,5 @@ After merging: `bun run ci:local`, the API integration tests for grades/academic
 - [x] Integration of B, C, D
 - [x] WS-A curriculum templates (`feat/grading-curriculum-templates`; no migration)
 - [x] WS-E class rank and percentile (`feat/grading-class-rank`, migration 000257)
-- [ ] WS-F graduation requirements checker
+- [x] WS-F graduation requirements checker (branch `feat/grading-graduation-requirements`, migration 000258; `docs/modules/graduation-requirements.md`)
 - [ ] Phase 2: IB Diploma points and core; exam entries

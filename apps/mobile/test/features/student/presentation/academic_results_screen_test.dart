@@ -7,14 +7,17 @@ import 'package:studafy_mobile/src/design/theme/app_theme.dart';
 import 'package:studafy_mobile/src/features/student/application/academic_results_providers.dart';
 import 'package:studafy_mobile/src/features/student/application/external_exam_results_providers.dart';
 import 'package:studafy_mobile/src/features/student/application/predicted_grades_providers.dart';
+import 'package:studafy_mobile/src/features/student/application/graduation_requirements_providers.dart';
 import 'package:studafy_mobile/src/features/student/application/student_context_providers.dart';
 import 'package:studafy_mobile/src/features/student/application/transcript_providers.dart';
 import 'package:studafy_mobile/src/features/student/data/academic_results_client.dart';
 import 'package:studafy_mobile/src/features/student/data/external_exam_results_client.dart';
+import 'package:studafy_mobile/src/features/student/data/graduation_requirements_client.dart';
 import 'package:studafy_mobile/src/features/student/data/predicted_grades_client.dart';
 import 'package:studafy_mobile/src/features/student/data/transcript_client.dart';
 import 'package:studafy_mobile/src/features/student/domain/academic_results.dart';
 import 'package:studafy_mobile/src/features/student/domain/external_exam_results.dart';
+import 'package:studafy_mobile/src/features/student/domain/graduation_requirements.dart';
 import 'package:studafy_mobile/src/features/student/domain/predicted_grades.dart';
 import 'package:studafy_mobile/src/features/student/domain/transcript.dart';
 import 'package:studafy_mobile/src/features/student/presentation/academic_results_screen.dart';
@@ -234,10 +237,22 @@ class _FakePredictedClient implements StudentPredictedGradesClient {
       parsePredictedGradeYears(json);
 }
 
+/// A graduation checklist as the API sends it (parsed with the app's own parser).
+class _FakeGraduationClient implements GraduationRequirementsClient {
+  _FakeGraduationClient([this.body = const {'sets': <Object?>[]}]);
+
+  final Object? body;
+
+  @override
+  Future<List<GraduationSetChecklist>> fetchChecklist(String studentId) async =>
+      parseGraduationChecklist(body);
+}
+
 Future<void> _pump(
   WidgetTester tester,
   _FakeResultsClient client, {
   ExternalExamResultsClient? testScores,
+  GraduationRequirementsClient? graduation,
   Widget home = const AcademicResultsScreen(),
   String? currentStudentId = 'st-1',
   Locale locale = AppLocales.fallback,
@@ -258,6 +273,9 @@ Future<void> _pump(
           ),
           studentPredictedGradesClientProvider.overrideWithValue(
             predicted ?? _FakePredictedClient(),
+          ),
+          graduationRequirementsClientProvider.overrideWithValue(
+            graduation ?? _FakeGraduationClient(),
           ),
           currentStudentIdProvider.overrideWithValue(currentStudentId),
         ],
@@ -347,6 +365,125 @@ void main() {
   testWidgets('says so when there are no test scores', (tester) async {
     await _pump(tester, _FakeResultsClient());
     expect(find.text('No external exam results recorded yet.'), findsOneWidget);
+  });
+
+  Map<String, Object?> rule(
+    String type,
+    String status, {
+    num? current,
+    num? required,
+    String? group,
+    Map<String, Object?>? exam,
+    List<String> missing = const [],
+  }) => {
+    'id': 'rule-$type',
+    'type': type,
+    'min_value': required,
+    'group_name': group,
+    'subjects': <Object?>[],
+    'external_exam': exam,
+    'status': status,
+    'current': current,
+    'required': required,
+    'missing_subjects': [
+      for (final name in missing)
+        {'id': 'sub-$name', 'code': 'X', 'name': name},
+    ],
+  };
+
+  final checklist = {
+    'student_id': 'st-1',
+    'grade_level': {'id': 'g-12', 'name': 'Grade 12'},
+    'current_year_pending': true,
+    'years_counted': 3,
+    'sets': [
+      {
+        'set': {
+          'id': 'set-1',
+          'name': 'High school diploma',
+          'visible_to_students_and_parents': true,
+        },
+        'status': 'not_met',
+        'rules_met': 2,
+        'rules_total': 6,
+        'rules': [
+          rule('total_credits', 'met', current: 24.5, required: 24),
+          rule(
+            'group_credits',
+            'pending',
+            current: 2,
+            required: 4,
+            group: 'English',
+          ),
+          rule(
+            'subjects_passed',
+            'not_met',
+            current: 1,
+            required: 2,
+            group: 'Core',
+            missing: ['Algebra II'],
+          ),
+          rule('cumulative_gpa', 'pending', current: 3.1, required: 2.5),
+          rule(
+            'external_exam',
+            'met',
+            current: 1350,
+            exam: {'id': 'e-sat', 'code': 'SAT', 'name': 'SAT'},
+          ),
+          // A rule type and status a newer API might send.
+          rule('community_hours', 'waived'),
+        ],
+      },
+    ],
+  };
+
+  testWidgets('shows the graduation checklist: met, not met and in progress', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      _FakeResultsClient(),
+      graduation: _FakeGraduationClient(checklist),
+    );
+
+    expect(find.text('Graduation requirements'), findsOneWidget);
+    expect(find.text('High school diploma'), findsOneWidget);
+    expect(find.text('2 of 6 requirements met'), findsOneWidget);
+    expect(find.text('Total credits'), findsOneWidget);
+    expect(find.text('24.5 of 24'), findsOneWidget);
+    expect(find.text('Credits in English'), findsOneWidget);
+    expect(find.text('2 of 4'), findsOneWidget);
+    expect(find.text('Pass Core'), findsOneWidget);
+    expect(find.text('Still to pass: Algebra II'), findsOneWidget);
+    expect(find.text('Cumulative GPA'), findsOneWidget);
+    expect(find.text('3.1 (minimum 2.5)'), findsOneWidget);
+    expect(find.text('SAT'), findsOneWidget);
+    expect(find.text('Recorded'), findsOneWidget);
+    expect(find.text('Requirement'), findsOneWidget);
+    // The set and one rule are not met; two rules met; two in progress; one unknown.
+    expect(find.text('Not met'), findsNWidgets(2));
+    expect(find.text('Met'), findsNWidgets(2));
+    expect(find.text('In progress'), findsNWidgets(2));
+    expect(find.text('Not available'), findsOneWidget);
+  });
+
+  testWidgets('shows nothing when no graduation requirements are shown', (
+    tester,
+  ) async {
+    await _pump(tester, _FakeResultsClient());
+    expect(find.text('Graduation requirements'), findsNothing);
+  });
+
+  testWidgets('the graduation checklist renders in Arabic', (tester) async {
+    await _pump(
+      tester,
+      _FakeResultsClient(),
+      graduation: _FakeGraduationClient(checklist),
+      locale: const Locale('ar'),
+    );
+    expect(find.text('متطلبات التخرج'), findsOneWidget);
+    expect(find.text('الساعات المعتمدة في English'), findsOneWidget);
+    expect(find.text('قيد الإنجاز'), findsNWidgets(2));
   });
 
   testWidgets(

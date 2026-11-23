@@ -2,6 +2,7 @@ import { z } from "@hono/zod-openapi";
 import { dateTimeSchema, uuidSchema } from "@studafy/shared-schemas";
 
 import { transcriptExternalExamSchema } from "../external-exams/schemas";
+import { transcriptGraduationRequirementSchema } from "../graduation-requirements/schemas";
 
 import { documentClassRankSchema, resultDisplaySchema } from "./schemas";
 
@@ -165,6 +166,10 @@ export const transcriptContentSchema = z
     external_exams: z.array(transcriptExternalExamSchema).optional().openapi({
       description:
         "External examinations (SAT, IELTS, IGCSE finals...) shown on transcripts, as they stood at issue. Absent when there were none, and on transcripts issued before they existed.",
+    }),
+    graduation_requirements: z.array(transcriptGraduationRequirementSchema).optional().openapi({
+      description:
+        "Whether the student met each graduation requirement set applying to them, as it stood at issue: met, not_met, or pending while the current year is not finalized. Absent when no set applied, and on transcripts issued before they existed.",
     }),
   })
   .openapi("TranscriptContent");

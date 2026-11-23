@@ -460,7 +460,84 @@ const EXTERNAL_EXAM_PRESETS = [
   },
 ];
 
+const DIPLOMA = {
+  id: "set-diploma",
+  name: "High school diploma",
+  grade_levels: [{ id: "grade-10", name: "Grade 10" }],
+  applies_from_academic_year: null,
+  is_active: true,
+  visible_to_students_and_parents: true,
+  rules: [
+    {
+      id: "rule-credits",
+      type: "total_credits",
+      min_value: 24,
+      group_name: null,
+      subjects: [],
+      external_exam: null,
+    },
+    {
+      id: "rule-english",
+      type: "group_credits",
+      min_value: 4,
+      group_name: "English",
+      subjects: [{ id: "eng", code: "ENG", name: "English" }],
+      external_exam: null,
+    },
+  ],
+  created_at: "2026-09-01T00:00:00.000Z",
+  updated_at: "2026-09-01T00:00:00.000Z",
+};
+
+const GRADUATION_REPORT = {
+  academic_year_id: "year-1",
+  grade_level_id: "grade-10",
+  students_checked: 2,
+  students: [
+    {
+      student_id: "stu-badr",
+      first_name: "Badr",
+      last_name: "Nasser",
+      admission_number: "A-2",
+      section_name: "C",
+      status: "not_met",
+      sets: [
+        {
+          set: {
+            id: "set-diploma",
+            name: "High school diploma",
+            visible_to_students_and_parents: true,
+          },
+          status: "not_met",
+          rules_met: 1,
+          rules_total: 2,
+          rules: [
+            {
+              ...DIPLOMA.rules[1],
+              status: "not_met",
+              current: 2,
+              required: 4,
+              missing_subjects: [],
+            },
+          ],
+        },
+      ],
+    },
+    {
+      student_id: "stu-lina",
+      first_name: "Lina",
+      last_name: "Haddad",
+      admission_number: "A-1",
+      section_name: "C",
+      status: "pending",
+      sets: [],
+    },
+  ],
+};
+
 const GET_RESPONSES: Record<string, unknown> = {
+  "/api/grading/graduation-requirement-sets": { sets: [DIPLOMA] },
+  "/api/grading/graduation-requirements/report": GRADUATION_REPORT,
   "/api/grading/external-exams": { exams: [IELTS_EXAM] },
   "/api/grading/external-exam-presets": { presets: EXTERNAL_EXAM_PRESETS },
   "/api/grading/report-card-settings": REPORT_SETTINGS,
@@ -1116,6 +1193,62 @@ describe("AcademicSetupPage", () => {
     expect(screen.getByText("Excellent")).toBeTruthy();
     const facts = screen.getByText("Days absent").closest("div")!;
     expect(within(facts).getByText("4")).toBeTruthy();
+  });
+
+  test("lists graduation requirement sets and adds one checked by the grading engine", async () => {
+    const { container } = await renderAt("/graduation-requirements");
+    const edit = await screen.findByRole("button", { name: "Edit High school diploma" });
+    const row = edit.closest("tr")!;
+    expect(within(row).getByText("Total credits · Credits in English")).toBeTruthy();
+    expect(within(row).getByText("Shown to students and parents")).toBeTruthy();
+    await expectNoA11yViolations(container);
+
+    fireEvent.click(screen.getByRole("button", { name: "Add requirement set" }));
+    const save = await screen.findByRole("button", { name: "Save requirements" });
+    // Nothing named, no grade, no minimum: the engine's checks hold the save back.
+    expect((save as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText("Requirement 1: Enter the minimum value.")).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText(/^Name/), { target: { value: "Honors diploma" } });
+    fireEvent.click(screen.getByLabelText("Grade 10"));
+    fireEvent.change(screen.getByLabelText(/Credits earned, at least/), {
+      target: { value: "26" },
+    });
+    await waitFor(() => expect((save as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(save);
+    await waitFor(() => expect(postMock).toHaveBeenCalledTimes(1));
+    const [path, init] = postMock.mock.calls[0] as [string, { body: unknown }];
+    expect(path).toBe("/api/grading/graduation-requirement-sets");
+    expect(init.body).toEqual({
+      name: "Honors diploma",
+      grade_level_ids: ["grade-10"],
+      applies_from_academic_year_id: null,
+      is_active: true,
+      visible_to_students_and_parents: false,
+      rules: [
+        {
+          type: "total_credits",
+          min_value: 26,
+          group_name: null,
+          subject_ids: [],
+          external_exam_id: null,
+        },
+      ],
+    });
+  });
+
+  test("reports the students of a grade not on track, in progress ones on request", async () => {
+    await renderAt("/graduation-requirements");
+    await screen.findByRole("button", { name: "Edit High school diploma" });
+    fireEvent.click(screen.getByRole("combobox", { name: "Grade level" }));
+    fireEvent.click(await screen.findByRole("option", { name: "Grade 10" }));
+    const badr = await screen.findByText("Badr Nasser");
+    const row = badr.closest("tr")!;
+    expect(within(row).getByText("Not met")).toBeTruthy();
+    expect(within(row).getByText("High school diploma: Credits in English")).toBeTruthy();
+    expect(screen.queryByText("Lina Haddad")).toBeNull();
+    fireEvent.click(screen.getByLabelText("Also show students whose year is still in progress"));
+    expect(await screen.findByText("Lina Haddad")).toBeTruthy();
   });
 
   test("lists external exams, adds a preset under its translated name, and locks scored parts", async () => {

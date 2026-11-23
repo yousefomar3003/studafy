@@ -259,6 +259,11 @@ const EXPECTED_MUTATING_ROUTES = [
   "DELETE /api/grading/external-exam-results/{resultId}",
   // Predicted grades (000254): the service records each student's old and new label and note.
   "PUT /api/grading/sections/{sectionId}/subjects/{subjectId}/predicted-grades",
+  // Graduation requirements (000258): leadership behind academicConfig:manage; each write records
+  // its old and new values in the service.
+  "POST /api/grading/graduation-requirement-sets",
+  "PUT /api/grading/graduation-requirement-sets/{setId}",
+  "DELETE /api/grading/graduation-requirement-sets/{setId}",
   // Timetable (ST-101). Version lifecycle + slot CRUD with conflict detection.
   "POST /api/academics/timetable-versions",
   "PATCH /api/academics/timetable-versions/{versionId}",

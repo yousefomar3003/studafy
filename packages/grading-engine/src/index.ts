@@ -25,7 +25,7 @@ export {
   resolveAssessment,
   resultDisplay,
 } from "./calculate";
-export { GPA_ROUNDING, calculateCumulativeResult } from "./cumulative";
+export { GPA_ROUNDING, calculateCumulativeResult, creditTotals } from "./cumulative";
 export type {
   CumulativeGpaUnavailableReason,
   CumulativeResult,
@@ -84,3 +84,20 @@ export type {
   TemplateSubjectDefaults,
   TemplateTermStructure,
 } from "./templates";
+export {
+  GRADUATION_LIMITS,
+  GRADUATION_RULE_TYPES,
+  evaluateGraduationRequirements,
+  validateGraduationRule,
+} from "./graduation";
+export type {
+  GraduationEvaluation,
+  GraduationEvaluationInput,
+  GraduationExamResultInput,
+  GraduationRuleDefinition,
+  GraduationRuleEvaluation,
+  GraduationRuleType,
+  GraduationStatus,
+  GraduationSubjectInput,
+  GraduationYearInput,
+} from "./graduation";

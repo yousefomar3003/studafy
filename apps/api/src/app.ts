@@ -148,6 +148,7 @@ import {
   gradingResultsRoutes,
   gradingTranscriptRoutes,
 } from "./modules/grading";
+import { graduationRequirementRoutes } from "./modules/graduation-requirements";
 import { importRoutes, importSignalRoutes } from "./modules/imports";
 import { inquiryRoutes } from "./modules/inquiries";
 import {
@@ -1215,6 +1216,8 @@ export function createApp({
     app.route("/", gradingPredictedGradesRoutes(database));
     // Curriculum templates (IGCSE, IB, American...) applied to a year's grades.
     app.route("/", gradingCurriculumTemplateRoutes(database));
+    // Graduation requirements: the credits, subjects, GPA and exams a diploma needs (000258).
+    app.route("/", graduationRequirementRoutes(database));
   }
 
   // Gradebook configuration (ST-112). Weighted assessment categories per gradebook and

@@ -25,6 +25,22 @@ when it required the `version-bump` label.
   shown to students and parents only when the grade allows. `CertificateContentOverall` and
   `TranscriptYearOverall` add optional `class_rank` (`DocumentClassRank`), absent on documents
   issued before or without a visible rank.
+- Graduation requirements (migration 000258; docs/modules/graduation-requirements.md), tag
+  "Graduation requirements". Sets: `listGraduationRequirementSets`
+  (`GET /api/grading/graduation-requirement-sets`, `academicConfig:read`),
+  `createGraduationRequirementSet` (`POST`), `updateGraduationRequirementSet`
+  (`PUT .../{setId}`) and `deleteGraduationRequirementSet` (`DELETE .../{setId}`), all
+  `academicConfig:manage`, with `GraduationRequirementSet` / `GraduationRequirementSetInput` and
+  rule types `GraduationRuleType` (`total_credits`, `group_credits`, `subjects_passed`,
+  `cumulative_gpa`, `cumulative_average`, `external_exam`). Checks: `getStudentGraduationRequirements`
+  (`GET /api/grading/students/{studentId}/graduation-requirements`, `grade:read` + row scope;
+  students and parents get only the sets shown to them, `GraduationChecklist`),
+  `previewGraduationRequirementSet` (`GET .../{setId}/preview?student_id=`, `GraduationPreview`) and
+  `getGraduationRequirementsReport` (`GET /api/grading/graduation-requirements/report`,
+  `GraduationReport`), both `academicConfig:manage`. Each rule is `met`, `not_met` or `pending`
+  (`GraduationStatus`). `TranscriptContent` adds an optional `graduation_requirements`
+  (`TranscriptGraduationRequirement`: name, status, rules met and total), absent when no set applied
+  and on transcripts issued before.
 
 - Credits, course levels and the weighted GPA (migration 000253; docs/database/academic-grading.md
   "Credits, course levels and the weighted GPA"). No new paths. `CreateSubjectConfigBody` /
@@ -246,6 +262,12 @@ when it required the `version-bump` label.
   anything not refunded, and the last error.
 
 ### Changed
+
+- Credits attempted and earned (results, previews, certificates, transcripts) now count every
+  complete, non-exempt subject that has credits, including subjects left out of the average and
+  descriptive (pass/fail) subjects, not only the subjects counted in the average. No schema change.
+  Results finalized earlier keep their stored totals; the cumulative credits of transcripts issued
+  from now on use the new rule.
 
 - `getAiStoreConfig` (`GET /api/subscriptions/ai/store/config`, `AiStoreConfig`): new
   `unavailableReason` value `covered_by_school` and a nullable `schoolName`. A student holding a

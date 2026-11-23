@@ -16,7 +16,8 @@
     "results": "Results & certificates",
     "reportCards": "Report cards",
     "externalExams": "External exams",
-    "topStudents": "Top students"
+    "topStudents": "Top students",
+    "graduation": "Graduation requirements"
   },
   "common": {
     "loading": "Loading…",
@@ -895,6 +896,15 @@
       "examSubject": "{{exam}} — {{subject}}",
       "scoreLine": "{{component}}: {{score}}",
       "outOf": "{{score}} / {{max}}"
+    },
+    "graduation": {
+      "heading": "Graduation requirements",
+      "status": {
+        "met": "Graduation requirements met",
+        "not_met": "Graduation requirements not met",
+        "pending": "Graduation requirements in progress"
+      },
+      "rules": "({{met}} of {{total}} requirements met)"
     }
   },
   "reportCards": {
@@ -1252,6 +1262,120 @@
       "section": "Section",
       "value": "Result",
       "percentile": "Percentile"
+    }
+  },
+  "graduation": {
+    "heading": "Graduation requirements",
+    "help": "What a student needs to graduate: credits, credits in a group of subjects, subjects passed, a cumulative GPA or average, or an external exam. Students are checked against their finalized annual results of every year and their recorded test scores. A set applies to the grade levels you choose, from an academic year on if you set one.",
+    "add": "Add requirement set",
+    "caption": "Graduation requirement sets",
+    "empty": "No graduation requirements yet.",
+    "columns": {
+      "name": "Set",
+      "grades": "Grade levels",
+      "rules": "Requirements",
+      "actions": "Actions",
+      "requirement": "Requirement",
+      "needs": "Needs",
+      "progress": "Student",
+      "status": "Status"
+    },
+    "inactive": "Inactive",
+    "visible": "Shown to students and parents",
+    "fromYear": "From {{year}}",
+    "editLabel": "Edit {{name}}",
+    "deleteLabel": "Remove {{name}}",
+    "deleteTitle": "Remove {{name}}?",
+    "deleteDescription": "Students will no longer be checked against it. Transcripts already issued keep what they say.",
+    "deleted": "Requirement set removed.",
+    "deleteFailed": "Couldn't remove the requirement set.",
+    "editTitle": "Edit {{name}}",
+    "details": "Set",
+    "name": "Name",
+    "fromYearLabel": "Applies from",
+    "everyYear": "Every year",
+    "activeLabel": "Active: check students against this set",
+    "visibleLabel": "Show students and parents their checklist in the app",
+    "gradesLegend": "Applies to grade levels",
+    "rulesLegend": "Requirements",
+    "rulesHelp": "Name a group of subjects (English, Core sciences) and choose its subjects; subjects have no group of their own.",
+    "ruleN": "Requirement {{n}}",
+    "ruleTypeLabel": "Type",
+    "ruleType": {
+      "total_credits": "Total credits",
+      "group_credits": "Credits in a group of subjects",
+      "subjects_passed": "Subjects passed",
+      "cumulative_gpa": "Cumulative GPA",
+      "cumulative_average": "Cumulative average",
+      "external_exam": "External exam"
+    },
+    "minLabel": {
+      "total_credits": "Credits earned, at least",
+      "group_credits": "Credits earned, at least",
+      "cumulative_gpa": "GPA, at least",
+      "cumulative_average": "Average %, at least",
+      "external_exam": "Total, at least (optional)"
+    },
+    "groupName": "Group name",
+    "groupNameHelp": "Shown to staff, students and parents, e.g. English.",
+    "subjectsLabel": "Subjects of requirement {{n}}",
+    "exam": "Exam",
+    "examPlaceholder": "Choose an exam",
+    "removeRule": "Remove requirement {{n}}",
+    "addRule": "Add requirement",
+    "nameRequired": "Name the set.",
+    "gradesRequired": "Choose at least one grade level.",
+    "ruleIssue": "Requirement {{n}}: {{message}}",
+    "valid": "The requirements are complete.",
+    "save": "Save requirements",
+    "saved": "Graduation requirements saved.",
+    "rule": {
+      "groupCredits": "Credits in {{group}}",
+      "subjectsPassed": "Pass {{group}}"
+    },
+    "atLeast": "At least {{value}}",
+    "recorded": "Recorded",
+    "progressOf": "{{current}} of {{required}}",
+    "missing": "Not passed yet: {{subjects}}",
+    "rulesMet": "{{met}} of {{total}} met",
+    "checklistCaption": "{{name}} requirements",
+    "noRules": "This set has no requirements.",
+    "status": {
+      "met": "Met",
+      "not_met": "Not met",
+      "pending": "In progress"
+    },
+    "currentYearPending": "This year is not finalized yet, so requirements not met yet are in progress.",
+    "preview": {
+      "heading": "Check a student",
+      "help": "See how a student of the selected year stands against a set as saved, even before it applies to them.",
+      "set": "Requirement set",
+      "section": "Section",
+      "sectionPlaceholder": "Choose a section",
+      "student": "Student",
+      "studentPlaceholder": "Choose a student",
+      "applies": "This set applies to the student.",
+      "doesNotApply": "This set does not apply to the student yet (inactive, another grade level or a later year)."
+    },
+    "report": {
+      "heading": "Students not on track",
+      "help": "Students placed in a grade level in {{year}} who have not met a requirement set that applies to them.",
+      "grade": "Grade level",
+      "gradePlaceholder": "Choose a grade level",
+      "includePending": "Also show students whose year is still in progress",
+      "summary": "{{shown}} shown of {{checked}} students checked.",
+      "empty": "Every student checked is on track.",
+      "columns": {
+        "student": "Student",
+        "section": "Section",
+        "status": "Status",
+        "unmet": "Not met yet"
+      }
+    },
+    "panel": {
+      "heading": "Graduation requirements",
+      "empty": "No graduation requirements apply to this student.",
+      "basis": "Academic years with finalized results counted: {{years}}."
     }
   }
 }

@@ -320,6 +320,16 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "student and linked parents.",
     },
     {
+      name: "Graduation requirements",
+      description:
+        "Graduation requirements checker: a school's requirement sets (total credits, credits in a " +
+        "group of subjects, subjects passed, a cumulative GPA or average, an external exam) and " +
+        "each student's checklist, worked out from their finalized annual results and exam " +
+        "results. Leadership (academicConfig:manage) manages the sets and reads the not-on-track " +
+        "report; a checklist is read by leadership, the student's teachers, and the student and " +
+        "linked parents when the set is shown to them.",
+    },
+    {
       name: "Gradebook Configuration",
       description:
         "Gradebook configuration endpoints. Authenticated and tenant-scoped. " +
