@@ -1,6 +1,8 @@
 import { z } from "@hono/zod-openapi";
 import { dateTimeSchema, uuidSchema } from "@studafy/shared-schemas";
 
+import { transcriptExternalExamSchema } from "../external-exams/schemas";
+
 import { resultDisplaySchema } from "./schemas";
 
 /**
@@ -156,6 +158,10 @@ export const transcriptContentSchema = z
       .object({ supersedes_serial: z.string(), reason: z.string() })
       .openapi("TranscriptReissue")
       .nullable(),
+    external_exams: z.array(transcriptExternalExamSchema).optional().openapi({
+      description:
+        "External examinations (SAT, IELTS, IGCSE finals...) shown on transcripts, as they stood at issue. Absent when there were none, and on transcripts issued before they existed.",
+    }),
   })
   .openapi("TranscriptContent");
 

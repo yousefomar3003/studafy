@@ -38,3 +38,23 @@ export {
   nearestDescriptor,
   validateDescriptiveConfig,
 } from "./descriptive";
+export {
+  EXTERNAL_EXAM_LIMITS,
+  EXTERNAL_EXAM_PRESETS,
+  EXTERNAL_EXAM_PRESET_KEYS,
+  computeExternalExamTotal,
+  externalExamPreset,
+  isOnStep,
+  roundToStep,
+  validateExternalExamDefinition,
+  validateExternalExamScore,
+} from "./external-exams";
+export type {
+  ExternalExamComponentDefinition,
+  ExternalExamDefinition,
+  ExternalExamPreset,
+  ExternalExamPresetKey,
+  ExternalExamScoreType,
+  ExternalExamScoreValue,
+  ExternalExamTotalMode,
+} from "./external-exams";

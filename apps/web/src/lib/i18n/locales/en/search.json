@@ -320,6 +320,11 @@
       "where": "Principal › Academic setup › Scales",
       "keywords": "grading scale, grade scale, letter grades, grade boundaries, gpa, mark bands, grade bands"
     },
+    "academic-external-exams": {
+      "title": "External exams",
+      "where": "Principal › Academic setup › External exams",
+      "keywords": "external exams, test scores, sat, act, ap, ielts, toefl, igcse, a level, ib diploma, tawjihi, thanaweya amma, state test, national exams"
+    },
     "academic-approvals": {
       "title": "Mark sheet approvals",
       "where": "Principal › Academic setup › Approvals",

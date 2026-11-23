@@ -105,6 +105,7 @@ import { bulkInviteRoutes } from "./modules/auth/invitation/bulk-invite-routes";
 import { invitationRoutes } from "./modules/auth/invitation/route";
 import { customListRoutes } from "./modules/custom-lists";
 import { disciplineRoutes, evaluationRoutes } from "./modules/discipline";
+import { externalExamRoutes } from "./modules/external-exams";
 import { createFeatureService, featureRoutes, provideFeatures } from "./modules/features";
 import {
   EnvCredentialResolver,
@@ -1206,6 +1207,8 @@ export function createApp({
     app.route("/", gradingTranscriptRoutes(database));
     // Report card comments, attendance and conduct (000209).
     app.route("/", gradingReportCardRoutes(database));
+    // External exams and test scores: SAT, IELTS, IGCSE finals... (000255).
+    app.route("/", externalExamRoutes(database));
   }
 
   // Gradebook configuration (ST-112). Weighted assessment categories per gradebook and

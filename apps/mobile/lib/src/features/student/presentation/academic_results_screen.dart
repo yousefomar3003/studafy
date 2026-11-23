@@ -5,17 +5,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../design/layout/bottom_inset_padding.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
 import '../application/academic_results_providers.dart';
+import '../application/external_exam_results_providers.dart';
 import '../application/transcript_providers.dart';
 import '../application/student_context_providers.dart';
 import '../domain/academic_results.dart';
 import 'certificate_detail_screen.dart';
 import 'widgets/academic_result_widgets.dart';
+import 'widgets/test_scores_section.dart';
 import 'widgets/transcripts_section.dart';
 
 /// A student's official, finalized results — by academic year, each term report and the annual
 /// result with its overall standing (promoted / supplementary / retained / incomplete) and subject
 /// table — followed by their certificates and report cards, each opening
-/// [CertificateDetailScreen].
+/// [CertificateDetailScreen], their transcripts and their test scores (external exams).
 ///
 /// Shared by both audiences: the student opens it with no [studentId] (resolved from
 /// `currentStudentIdProvider`, i.e. `GET /api/students/me`); a parent opens it for the child
@@ -73,7 +75,8 @@ class _ResultsBody extends ConsumerWidget {
         ref
           ..invalidate(studentResultsProvider(studentId))
           ..invalidate(studentCertificatesProvider(studentId))
-          ..invalidate(studentTranscriptsProvider(studentId));
+          ..invalidate(studentTranscriptsProvider(studentId))
+          ..invalidate(studentExternalExamResultsProvider(studentId));
         await ref.read(studentResultsProvider(studentId).future);
       },
       child: results.when(
@@ -142,6 +145,8 @@ class _ResultsBody extends ConsumerWidget {
               ),
               const SizedBox(height: AppSpacing.space16),
               TranscriptsSection(studentId: studentId),
+              const SizedBox(height: AppSpacing.space16),
+              TestScoresSection(studentId: studentId),
             ],
           );
         },

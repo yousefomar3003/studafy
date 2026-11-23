@@ -10,6 +10,7 @@ import { ApprovalsTab } from "./ApprovalsTab";
 import { CertificateView } from "./CertificateView";
 import { YearStatusBadge } from "./components";
 import { SETUP_BASE } from "./context";
+import { ExternalExamsTab } from "./ExternalExamsTab";
 import { OverviewTab } from "./OverviewTab";
 import { useGradingOverview } from "./queries";
 import { ReportCardsTab } from "./ReportCardsTab";
@@ -34,6 +35,7 @@ const TABS: readonly TabDef[] = [
   { path: "subjects", key: "subjects", show: () => true },
   { path: "sections", key: "sections", show: () => true },
   { path: "scales", key: "scales", show: () => true },
+  { path: "external-exams", key: "externalExams", show: () => true },
   { path: "approvals", key: "approvals", show: (ctx) => ctx.can.review },
   { path: "results", key: "results", show: (ctx) => ctx.can.finalize || ctx.can.certify },
   {
@@ -52,6 +54,7 @@ const TABS: readonly TabDef[] = [
  * - subjects — per grade: grade policies and the default subjects every section inherits;
  * - sections — what each section inherits, overrides or excludes, its teachers and electives;
  * - scales — the year's grading scales;
+ * - external exams — the school's SAT, IELTS, IGCSE finals... (not tied to the year);
  * - approvals — submitted mark sheets and teacher-proposed assessments;
  * - results — preview, finalize, correct, and certificates; `certificates/:id` prints one.
  * - report cards — which sections report cards show, and the comments, conduct ratings and
@@ -150,6 +153,7 @@ export default function AcademicSetupPage() {
           <Route path="subjects" element={<SubjectsTab ctx={ctx} />} />
           <Route path="sections" element={<SectionsTab ctx={ctx} />} />
           <Route path="scales" element={<ScalesTab ctx={ctx} />} />
+          <Route path="external-exams" element={<ExternalExamsTab ctx={ctx} />} />
           {ctx.can.review ? <Route path="approvals" element={<ApprovalsTab ctx={ctx} />} /> : null}
           {ctx.can.finalize || ctx.can.certify ? (
             <Route path="results" element={<ResultsTab ctx={ctx} />} />

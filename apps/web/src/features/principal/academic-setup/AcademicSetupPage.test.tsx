@@ -363,7 +363,53 @@ const CERTIFICATE = {
   },
 };
 
+const IELTS_EXAM = {
+  id: "exam-ielts",
+  code: "IELTS",
+  name: "IELTS Academic",
+  preset_key: "ielts",
+  total_mode: "average",
+  total_rounding_step: 0.5,
+  total_min: 0,
+  total_max: 9,
+  per_subject: false,
+  show_on_transcript: true,
+  archived_at: null,
+  result_count: 3,
+  components: ["Listening", "Reading"].map((name, index) => ({
+    id: `c-${index}`,
+    name,
+    score_type: "numeric",
+    min_score: 0,
+    max_score: 9,
+    step: 0.5,
+    allowed_labels: null,
+    sort_order: index,
+    has_scores: true,
+  })),
+  created_at: "2026-09-01T00:00:00.000Z",
+  updated_at: "2026-09-01T00:00:00.000Z",
+};
+
+const EXTERNAL_EXAM_PRESETS = [
+  {
+    key: "tawjihi",
+    code: "TAWJIHI",
+    name: "Tawjihi (General Secondary Education Certificate)",
+    total_mode: "average",
+    total_rounding_step: null,
+    total_min: 0,
+    total_max: 100,
+    per_subject: false,
+    show_on_transcript: true,
+    note: "Default subjects.",
+    components: [],
+  },
+];
+
 const GET_RESPONSES: Record<string, unknown> = {
+  "/api/grading/external-exams": { exams: [IELTS_EXAM] },
+  "/api/grading/external-exam-presets": { presets: EXTERNAL_EXAM_PRESETS },
   "/api/grading/report-card-settings": REPORT_SETTINGS,
   "/api/grading/sections/{sectionId}/report-notes": REPORT_NOTES,
   "/api/grading/certificates/{certificateId}": CERTIFICATE,
@@ -936,6 +982,38 @@ describe("AcademicSetupPage", () => {
     expect(screen.getByText("Excellent")).toBeTruthy();
     const facts = screen.getByText("Days absent").closest("div")!;
     expect(within(facts).getByText("4")).toBeTruthy();
+  });
+
+  test("lists external exams, adds a preset under its translated name, and locks scored parts", async () => {
+    const { container } = await renderAt("/external-exams");
+    expect(await screen.findByText("IELTS Academic")).toBeTruthy();
+    expect(screen.getByText("Average, 0–9")).toBeTruthy();
+    await expectNoA11yViolations(container);
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Built-in exam" }));
+    fireEvent.click(
+      await screen.findByRole("option", {
+        name: "Tawjihi (General Secondary Education Certificate)",
+      }),
+    );
+    // The preset's note says which defaults to check.
+    expect(screen.getByRole("note").textContent).toContain("Default subjects, each marked 0-100");
+    fireEvent.click(screen.getByRole("button", { name: "Add exam" }));
+    await waitFor(() => expect(postMock).toHaveBeenCalledTimes(1));
+    const [path, init] = postMock.mock.calls[0] as [string, { body: unknown }];
+    expect(path).toBe("/api/grading/external-exams/from-preset");
+    expect(init.body).toEqual({
+      preset_key: "tawjihi",
+      name: "Tawjihi (General Secondary Education Certificate)",
+    });
+
+    // Results are recorded: how each part is scored is read-only.
+    fireEvent.click(screen.getByRole("button", { name: "Edit IELTS Academic" }));
+    const listening = await screen.findByRole("group", { name: "Part 1" });
+    expect((within(listening).getByLabelText("Highest") as HTMLInputElement).disabled).toBe(true);
+    expect((within(listening).getByLabelText(/Part name/) as HTMLInputElement).disabled).toBe(
+      false,
+    );
   });
 
   test("has no accessibility violations on the report cards screen", async () => {

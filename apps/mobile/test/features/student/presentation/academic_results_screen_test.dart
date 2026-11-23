@@ -5,11 +5,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:studafy_mobile/src/core/localization/app_locales.dart';
 import 'package:studafy_mobile/src/design/theme/app_theme.dart';
 import 'package:studafy_mobile/src/features/student/application/academic_results_providers.dart';
+import 'package:studafy_mobile/src/features/student/application/external_exam_results_providers.dart';
 import 'package:studafy_mobile/src/features/student/application/student_context_providers.dart';
 import 'package:studafy_mobile/src/features/student/application/transcript_providers.dart';
 import 'package:studafy_mobile/src/features/student/data/academic_results_client.dart';
+import 'package:studafy_mobile/src/features/student/data/external_exam_results_client.dart';
 import 'package:studafy_mobile/src/features/student/data/transcript_client.dart';
 import 'package:studafy_mobile/src/features/student/domain/academic_results.dart';
+import 'package:studafy_mobile/src/features/student/domain/external_exam_results.dart';
 import 'package:studafy_mobile/src/features/student/domain/transcript.dart';
 import 'package:studafy_mobile/src/features/student/presentation/academic_results_screen.dart';
 import 'package:studafy_mobile/src/features/student/presentation/certificate_detail_screen.dart';
@@ -206,9 +209,21 @@ class _NoTranscriptsClient implements TranscriptClient {
       throw UnimplementedError();
 }
 
+/// Test scores as the API sends them (parsed with the app's own parser).
+class _FakeTestScoresClient implements ExternalExamResultsClient {
+  _FakeTestScoresClient([this.body = const {'results': <Object?>[]}]);
+
+  final Object? body;
+
+  @override
+  Future<List<ExternalExamResult>> fetchResults(String studentId) async =>
+      parseExternalExamResults(body);
+}
+
 Future<void> _pump(
   WidgetTester tester,
   _FakeResultsClient client, {
+  ExternalExamResultsClient? testScores,
   Widget home = const AcademicResultsScreen(),
   String? currentStudentId = 'st-1',
   Locale locale = AppLocales.fallback,
@@ -223,6 +238,9 @@ Future<void> _pump(
         overrides: [
           academicResultsClientProvider.overrideWithValue(client),
           transcriptClientProvider.overrideWithValue(_NoTranscriptsClient()),
+          externalExamResultsClientProvider.overrideWithValue(
+            testScores ?? _FakeTestScoresClient(),
+          ),
           currentStudentIdProvider.overrideWithValue(currentStudentId),
         ],
         child: Builder(
@@ -244,6 +262,74 @@ Future<void> _pump(
 
 void main() {
   setUpAll(ensureDateFormattingInitialized);
+
+  testWidgets('lists test scores read-only, with a total out of its maximum', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      _FakeResultsClient(),
+      testScores: _FakeTestScoresClient({
+        'results': [
+          {
+            'id': 'r-sat',
+            'exam': {'id': 'e-sat', 'name': 'SAT', 'total_max': 1600},
+            'subject': null,
+            'sat_on': '2026-10-04',
+            'total_score': 1480,
+            'note': 'First sitting',
+            'scores': [
+              {
+                'component_name': 'Reading and Writing',
+                'numeric_score': 720,
+                'label_score': null,
+              },
+              {'component_name': 'Math', 'numeric_score': 760},
+            ],
+          },
+          {
+            'id': 'r-igcse',
+            'exam': {
+              'id': 'e-igcse',
+              'name': 'IGCSE (A*-G)',
+              'total_max': null,
+            },
+            'subject': {'id': 's-1', 'code': 'MAT', 'name': 'Mathematics'},
+            'sat_on': '2026-06-15',
+            'total_score': null,
+            'scores': [
+              {
+                'component_name': 'Grade',
+                'numeric_score': null,
+                'label_score': 'A*',
+              },
+            ],
+            // A field a newer API might add is ignored.
+            'future_field': {'x': 1},
+          },
+          // Malformed rows are skipped, not fatal.
+          {'exam': 'not a map'},
+          'not a row',
+        ],
+      }),
+    );
+
+    expect(find.text('Test scores'), findsOneWidget);
+    expect(find.text('SAT'), findsOneWidget);
+    expect(find.text('1480 / 1600'), findsOneWidget);
+    expect(find.text('Reading and Writing: 720'), findsOneWidget);
+    expect(find.text('First sitting'), findsOneWidget);
+    expect(find.text('IGCSE (A*-G) — Mathematics'), findsOneWidget);
+    expect(find.text('Grade: A*'), findsOneWidget);
+    // Read-only: nothing to add, edit or delete.
+    expect(find.byIcon(Icons.edit_outlined), findsNothing);
+    expect(find.byIcon(Icons.delete_outline), findsNothing);
+  });
+
+  testWidgets('says so when there are no test scores', (tester) async {
+    await _pump(tester, _FakeResultsClient());
+    expect(find.text('No external exam results recorded yet.'), findsOneWidget);
+  });
 
   testWidgets(
     'renders finalized results with overall status and subject table',
