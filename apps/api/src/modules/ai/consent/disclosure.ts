@@ -21,18 +21,20 @@
  * `llmProvider` is the AI_LLM_PROVIDER this disclosure describes; src/index.ts refuses to boot with
  * AI enabled against any other, so the modal can never name a company the inputs don't go to.
  *
- * History: 2026-09-28 named Anthropic (questions, study materials, account identifier).
+ * History: 2026-09-28 named Anthropic (questions, study materials, account identifier);
+ * 2026-10-11 named Together AI (questions, study materials); 2026-11-22 names OpenRouter, which runs
+ * Google's Gemma model through hosts that neither retain nor train on the data.
  */
 export const AI_DATA_CATEGORIES = ["questions", "study_materials", "account_identifier"] as const;
 export type AiDataCategory = (typeof AI_DATA_CATEGORIES)[number];
 
 export const AI_DATA_SHARING_DISCLOSURE = {
-  version: "2026-10-11",
+  version: "2026-11-22",
   llmProvider: "openai-compatible",
   provider: {
-    id: "together",
-    name: "Together AI",
-    privacyPolicyUrl: "https://www.together.ai/privacy",
+    id: "openrouter",
+    name: "OpenRouter",
+    privacyPolicyUrl: "https://openrouter.ai/privacy",
   },
   dataCategories: ["questions", "study_materials"] as const satisfies readonly AiDataCategory[],
 } as const;

@@ -16,6 +16,7 @@ import {
   reissueCertificate,
   revokeCertificate,
 } from "../certificate-service";
+import { attachClassRanks, topStudents } from "../class-rank-service";
 import { listReleasedStudentMarks } from "../marks-service";
 import {
   computationView,
@@ -44,11 +45,14 @@ import {
   issueCertificatesBodySchema,
   issueCertificatesResultSchema,
   periodQuerySchema,
+  programParamSchema,
   readinessSchema,
   reasonBodySchema,
   resultPreviewSchema,
   studentReleasedMarksSchema,
   studentResultsSchema,
+  topStudentsQuerySchema,
+  topStudentsSchema,
 } from "../schemas";
 
 import type { Database } from "../../../db/client";
@@ -279,6 +283,22 @@ const studentMarksRoute = createRoute({
   ),
 });
 
+const topStudentsRoute = createRoute({
+  method: "get",
+  path: "/api/grading/years/{yearId}/programs/{gradeLevelId}/top-students",
+  tags: TAGS,
+  operationId: "listTopStudents",
+  summary: "A grade level's top students for a term or the year",
+  description:
+    "The best places by class rank (ties included), from current finalized results: one list for a grade-level rank, one per section for a section rank. Empty while the grade does not rank. School leadership.",
+  security,
+  request: { params: programParamSchema, query: topStudentsQuerySchema },
+  responses: standardResponses(
+    { 200: { description: "Top students.", schema: topStudentsSchema } },
+    [400, 401, 403, 404, 500],
+  ),
+});
+
 function tenantFrom(c: Context<AppEnv>) {
   const auth = requireAuth(c);
   return { schoolId: auth.schoolId, userId: auth.userId, requestId: c.get("requestId") };
@@ -292,12 +312,22 @@ function finalizationJson(row: FinalizationRow) {
   };
 }
 
-/** Leadership, the student themself, or a linked parent. */
-async function assertStudentAccess(tx: TransactionSql, studentId: string): Promise<void> {
-  const [row] = await tx<{ allowed: boolean }[]>`
-    SELECT (app.current_user_is_school_admin() OR app.is_related_to_student(${studentId}::uuid)) AS allowed
+/**
+ * Leadership, the student themself, or a linked parent. Returns who is reading, for the parts
+ * (class rank) a grade may keep for staff.
+ */
+async function assertStudentAccess(
+  tx: TransactionSql,
+  studentId: string,
+): Promise<"staff" | "student_or_parent"> {
+  const [row] = await tx<{ admin: boolean; related: boolean }[]>`
+    SELECT app.current_user_is_school_admin() AS admin,
+           app.is_related_to_student(${studentId}::uuid) AS related
   `;
-  if (!row?.allowed) throw new CodedHttpException(403, ERROR_CODES.ACCESS_DENIED, "Access denied");
+  if (!row?.admin && !row?.related) {
+    throw new CodedHttpException(403, ERROR_CODES.ACCESS_DENIED, "Access denied");
+  }
+  return row.admin ? "staff" : "student_or_parent";
 }
 
 export function gradingResultsRoutes(database: Database): OpenAPIHono<AppEnv> {
@@ -342,6 +372,19 @@ export function gradingResultsRoutes(database: Database): OpenAPIHono<AppEnv> {
     requirePermission(PERMISSIONS.GRADE_READ),
   );
   routes.use("/api/grading/students/:studentId/marks", requirePermission(PERMISSIONS.GRADE_READ));
+  routes.use("/api/grading/years/:yearId/programs/:gradeLevelId/top-students", finalize);
+
+  routes.openapi(topStudentsRoute, async (c) => {
+    const { yearId, gradeLevelId } = c.req.valid("param");
+    const { term_id, limit } = c.req.valid("query");
+    const tenant = tenantFrom(c);
+    return c.json(
+      await withTenantTx(database, tenant, (tx) =>
+        topStudents(tx, tenant.schoolId, yearId, gradeLevelId, term_id ?? null, limit),
+      ),
+      200,
+    );
+  });
 
   routes.openapi(previewRoute, async (c) => {
     const { sectionId } = c.req.valid("param");
@@ -383,12 +426,12 @@ export function gradingResultsRoutes(database: Database): OpenAPIHono<AppEnv> {
   routes.openapi(finalizationRoute, async (c) => {
     const { finalizationId } = c.req.valid("param");
     const tenant = tenantFrom(c);
-    const detail = await withTenantTx(database, tenant, async (tx) => ({
-      finalization: finalizationJson(
-        await requireFinalization(tx, tenant.schoolId, finalizationId),
-      ),
-      results: await readFinalizationResults(tx, tenant.schoolId, finalizationId),
-    }));
+    const detail = await withTenantTx(database, tenant, async (tx) => {
+      const finalization = await requireFinalization(tx, tenant.schoolId, finalizationId);
+      const results = await readFinalizationResults(tx, tenant.schoolId, finalizationId);
+      await attachClassRanks(tx, tenant.schoolId, [{ finalizationId, results }], "staff");
+      return { finalization: finalizationJson(finalization), results };
+    });
     return c.json(detail, 200);
   });
 
@@ -475,8 +518,8 @@ export function gradingResultsRoutes(database: Database): OpenAPIHono<AppEnv> {
     const { studentId } = c.req.valid("param");
     const tenant = tenantFrom(c);
     const results = await withTenantTx(database, tenant, async (tx) => {
-      await assertStudentAccess(tx, studentId);
-      return listStudentResults(tx, tenant.schoolId, studentId);
+      const audience = await assertStudentAccess(tx, studentId);
+      return listStudentResults(tx, tenant.schoolId, studentId, audience);
     });
     return c.json({ results }, 200);
   });

@@ -3,9 +3,20 @@ import { useParams } from "react-router-dom";
 
 import { usePortalBack } from "../../../../layouts/portal/PortalBackLink";
 import { useFormatters, useTranslation } from "../../../../lib/i18n";
-import { Num, Percent, QueryState, ResultValue } from "../../academic-setup/components";
+import {
+  CourseLevel,
+  CreditsEarned,
+  DocumentRankFact,
+  Num,
+  Percent,
+  QueryState,
+  ResultValue,
+  WeightedGpa,
+} from "../../academic-setup/components";
 
 import { useTranscript } from "./queries";
+import { TranscriptExternalExams } from "./TranscriptExternalExams";
+import { TranscriptGraduation } from "./TranscriptGraduation";
 
 import type { TranscriptContent } from "./queries";
 
@@ -55,6 +66,11 @@ export default function TranscriptPage() {
       </QueryState>
     </>
   );
+}
+
+/** Transcripts issued before credits existed have none: the column only appears when used. */
+function yearHasCredits(year: TranscriptContent["years"][number]): boolean {
+  return year.subjects.some((subject) => typeof subject.credits === "number");
 }
 
 export function TranscriptDocument({
@@ -129,6 +145,9 @@ export function TranscriptDocument({
                 <th scope="col">{t("academicGrading.certificate.grade")}</th>
                 <th scope="col">{t("academicGrading.transcript.gpaPoints")}</th>
                 <th scope="col">{t("academicGrading.transcript.weight")}</th>
+                {yearHasCredits(year) ? (
+                  <th scope="col">{t("academicGrading.credits.column")}</th>
+                ) : null}
               </tr>
             </thead>
             <tbody>
@@ -136,6 +155,7 @@ export function TranscriptDocument({
                 <tr key={subject.code}>
                   <th scope="row">
                     {subject.name}
+                    <CourseLevel level={subject.course_level} />
                     {subject.descriptive && !subject.exempt && (subject.skills?.length ?? 0) > 0 ? (
                       <ul className="ag-transcript__skills">
                         {subject.skills!.map((skill, index) => (
@@ -168,10 +188,24 @@ export function TranscriptDocument({
                     )}
                   </td>
                   <td>{subject.grade_label ?? "—"}</td>
-                  <td>{subject.descriptive ? "—" : <Num value={subject.gpa_points} />}</td>
+                  <td>
+                    {subject.descriptive ? (
+                      "—"
+                    ) : (
+                      <>
+                        <Num value={subject.gpa_points} />
+                        <WeightedGpa value={subject.weighted_gpa_points} />
+                      </>
+                    )}
+                  </td>
                   <td>
                     {subject.include_in_average ? <Num value={subject.average_weight} /> : "—"}
                   </td>
+                  {yearHasCredits(year) ? (
+                    <td>
+                      <Num value={subject.credits} />
+                    </td>
+                  ) : null}
                 </tr>
               ))}
             </tbody>
@@ -183,9 +217,22 @@ export function TranscriptDocument({
                 <ResultValue
                   display={year.overall.display}
                   percentage={year.overall.average_percentage}
+                  weightedGpa={year.overall.weighted_gpa}
                 />
               </dd>
             </div>
+            {year.overall.credits_attempted == null ? null : (
+              <div>
+                <dt>{t("academicGrading.credits.label")}</dt>
+                <dd>
+                  <CreditsEarned
+                    attempted={year.overall.credits_attempted}
+                    earned={year.overall.credits_earned}
+                  />
+                </dd>
+              </div>
+            )}
+            <DocumentRankFact rank={year.overall.class_rank} />
             <div>
               <dt>{t("academicGrading.certificate.overallGrade")}</dt>
               <dd>{year.overall.grade_label ?? "—"}</dd>
@@ -215,8 +262,20 @@ export function TranscriptDocument({
           <dt>{t("academicGrading.transcript.cumulativeGpa")}</dt>
           <dd>
             <strong>{cumulative.gpa === null ? "—" : <Num value={cumulative.gpa} />}</strong>
+            {cumulative.gpa === null ? null : <WeightedGpa value={cumulative.weighted_gpa} />}
           </dd>
         </div>
+        {cumulative.credits_attempted == null ? null : (
+          <div>
+            <dt>{t("academicGrading.credits.cumulative")}</dt>
+            <dd>
+              <CreditsEarned
+                attempted={cumulative.credits_attempted}
+                earned={cumulative.credits_earned}
+              />
+            </dd>
+          </div>
+        )}
         <div>
           <dt>{t("academicGrading.transcript.yearsCovered")}</dt>
           <dd>
@@ -240,6 +299,10 @@ export function TranscriptDocument({
         </p>
       ) : null}
       <p className="ag-muted">{t("academicGrading.transcript.method")}</p>
+
+      <TranscriptExternalExams exams={content.external_exams} />
+
+      <TranscriptGraduation requirements={content.graduation_requirements} />
 
       <footer className="ag-certificate__footer">
         <p>

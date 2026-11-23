@@ -17,6 +17,7 @@ export {
   validateGradeScale,
 } from "./rounding";
 export { hasErrors, summarizeWeights, validateSubjectConfig } from "./validation";
+export type { SubjectWeighting } from "./validation";
 export {
   calculateCategory,
   calculateOverallResult,
@@ -24,16 +25,79 @@ export {
   resolveAssessment,
   resultDisplay,
 } from "./calculate";
-export { GPA_ROUNDING, calculateCumulativeResult } from "./cumulative";
+export { GPA_ROUNDING, calculateCumulativeResult, creditTotals } from "./cumulative";
 export type {
   CumulativeGpaUnavailableReason,
   CumulativeResult,
   CumulativeSubjectInput,
   CumulativeYearInput,
 } from "./cumulative";
+export { calculateRanks, rankValue, topRanked, validateRankSettings } from "./rank";
+export type { RankBasis, RankCandidate, RankOutcome, RankScope, RankedStudent } from "./rank";
 export {
   calculateDescriptiveResult,
   descriptorsWithPoints,
   nearestDescriptor,
   validateDescriptiveConfig,
 } from "./descriptive";
+export {
+  EXTERNAL_EXAM_LIMITS,
+  EXTERNAL_EXAM_PRESETS,
+  EXTERNAL_EXAM_PRESET_KEYS,
+  computeExternalExamTotal,
+  externalExamPreset,
+  isOnStep,
+  roundToStep,
+  validateExternalExamDefinition,
+  validateExternalExamScore,
+} from "./external-exams";
+export type {
+  ExternalExamComponentDefinition,
+  ExternalExamDefinition,
+  ExternalExamPreset,
+  ExternalExamPresetKey,
+  ExternalExamScoreType,
+  ExternalExamScoreValue,
+  ExternalExamTotalMode,
+} from "./external-exams";
+export {
+  CURRICULUM_TEMPLATE_IDS,
+  CURRICULUM_TEMPLATES,
+  MYP_TOTAL_BOUNDARIES,
+  buildTemplateTermStructure,
+  equalTermWeights,
+  getCurriculumTemplate,
+  localize,
+  templateScaleBands,
+} from "./templates";
+export type {
+  CurriculumFamily,
+  CurriculumTemplate,
+  CurriculumTemplateId,
+  LocalizedText,
+  TemplateBand,
+  TemplateCategory,
+  TemplateCourseLevel,
+  TemplateDescriptor,
+  TemplateLocale,
+  TemplateStructure,
+  TemplateSubjectDefaults,
+  TemplateTermStructure,
+} from "./templates";
+export {
+  GRADUATION_LIMITS,
+  GRADUATION_RULE_TYPES,
+  evaluateGraduationRequirements,
+  validateGraduationRule,
+} from "./graduation";
+export type {
+  GraduationEvaluation,
+  GraduationEvaluationInput,
+  GraduationExamResultInput,
+  GraduationRuleDefinition,
+  GraduationRuleEvaluation,
+  GraduationRuleType,
+  GraduationStatus,
+  GraduationSubjectInput,
+  GraduationYearInput,
+} from "./graduation";

@@ -36,10 +36,18 @@ class _FakeHistoryClient implements AskAiHistoryClient {
   _FakeHistoryClient(this.conversations);
 
   final List<AskAiConversationSummary> conversations;
+  final deleted = <String>[];
+  bool failDeletes = false;
 
   @override
   Future<AskAiConversationPage> list({required String studentId, String? before}) async =>
       AskAiConversationPage(conversations: conversations);
+
+  @override
+  Future<void> delete({required String studentId, required String conversationId}) async {
+    if (failDeletes) throw Exception('offline');
+    deleted.add(conversationId);
+  }
 
   @override
   Future<AskAiStoredConversation> get({
@@ -150,5 +158,96 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('No chats yet'), findsOneWidget);
+  });
+
+  group('deleting a chat', () {
+    AskAiConversationSummary chat(String id, String title) => AskAiConversationSummary(
+      id: id,
+      title: title,
+      messageCount: 1,
+      lastMessageAt: DateTime.now(),
+    );
+
+    Future<void> openHistory(WidgetTester tester) async {
+      await tester.tap(find.byIcon(Icons.history_rounded));
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> tapDeleteOn(WidgetTester tester, String title) async {
+      final tile = find.ancestor(of: find.text(title), matching: find.byType(InkWell)).first;
+      await tester.tap(find.descendant(of: tile, matching: find.byTooltip('Delete chat')));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('removes the chat after the student confirms', (tester) async {
+      final history = _FakeHistoryClient([
+        chat('conv-a', 'What is osmosis?'),
+        chat('conv-b', 'What is diffusion?'),
+      ]);
+      await tester.pumpWidget(_screen(client: _FakeAskAiClient(), history: history));
+      await tester.pumpAndSettle();
+      await openHistory(tester);
+
+      await tapDeleteOn(tester, 'What is osmosis?');
+      expect(find.text('Delete this chat?'), findsOneWidget);
+      await tester.tap(find.widgetWithText(TextButton, 'Delete'));
+      await tester.pumpAndSettle();
+
+      expect(history.deleted, ['conv-a']);
+      expect(find.text('What is osmosis?'), findsNothing);
+      expect(find.text('What is diffusion?'), findsOneWidget);
+    });
+
+    testWidgets('keeps the chat when the student cancels', (tester) async {
+      final history = _FakeHistoryClient([chat('conv-a', 'What is osmosis?')]);
+      await tester.pumpWidget(_screen(client: _FakeAskAiClient(), history: history));
+      await tester.pumpAndSettle();
+      await openHistory(tester);
+
+      await tapDeleteOn(tester, 'What is osmosis?');
+      await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(history.deleted, isEmpty);
+      expect(find.text('What is osmosis?'), findsOneWidget);
+    });
+
+    testWidgets('keeps the chat and says so when the delete fails', (tester) async {
+      final history = _FakeHistoryClient([chat('conv-a', 'What is osmosis?')])..failDeletes = true;
+      await tester.pumpWidget(_screen(client: _FakeAskAiClient(), history: history));
+      await tester.pumpAndSettle();
+      await openHistory(tester);
+
+      await tapDeleteOn(tester, 'What is osmosis?');
+      await tester.tap(find.widgetWithText(TextButton, 'Delete'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('What is osmosis?'), findsOneWidget);
+      expect(find.text("Couldn't delete that chat. Try again."), findsOneWidget);
+    });
+
+    testWidgets('deleting the open chat starts a new one when the sheet closes', (tester) async {
+      final history = _FakeHistoryClient([chat('conv-old', 'What is osmosis?')]);
+      await tester.pumpWidget(_screen(client: _FakeAskAiClient(), history: history));
+      await tester.pumpAndSettle();
+
+      await openHistory(tester);
+      await tester.tap(find.text('What is osmosis?'));
+      await tester.pumpAndSettle();
+      expect(find.text('Osmosis moves water across a membrane.'), findsOneWidget);
+
+      await openHistory(tester);
+      await tapDeleteOn(tester, 'What is osmosis?');
+      await tester.tap(find.widgetWithText(TextButton, 'Delete'));
+      await tester.pumpAndSettle();
+      expect(history.deleted, ['conv-old']);
+
+      // Dismiss the sheet by tapping its barrier.
+      await tester.tapAt(const Offset(10, 10));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Osmosis moves water across a membrane.'), findsNothing);
+      expect(find.text('Ask about your study materials'), findsOneWidget);
+    });
   });
 }

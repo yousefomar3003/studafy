@@ -1,11 +1,11 @@
 import { Button, Modal } from "@studafy/ui";
 import { useId, useState } from "react";
 
-import { useFormatters, useTranslation } from "../../../lib/i18n";
+import { useFormatters, useLocale, useTranslation } from "../../../lib/i18n";
 
 import { problemMessage } from "./errors";
 
-import type { GradingStatus, SubjectSource } from "./queries";
+import type { ClassRank, DocumentClassRank, GradingStatus, SubjectSource } from "./queries";
 import type { FormEvent, ReactNode } from "react";
 
 export type BadgeTone = "neutral" | "info" | "success" | "warning" | "danger" | "override";
@@ -178,9 +178,12 @@ export interface ResultDisplayValue {
 export function ResultValue({
   display,
   percentage,
+  weightedGpa,
 }: {
   display: ResultDisplayValue | null | undefined;
   percentage: number | null | undefined;
+  /** The weighted GPA beside a GPA (Honors/AP boosts); absent on older results. */
+  weightedGpa?: number | null;
 }) {
   const { t } = useTranslation();
   const { formatNumber } = useFormatters();
@@ -199,6 +202,7 @@ export function ResultValue({
   return (
     <>
       <bdi>{main}</bdi>
+      {display.format === "gpa" && value !== null ? <WeightedGpa value={weightedGpa} /> : null}
       {percentage === null || percentage === undefined ? null : (
         <>
           {" "}
@@ -208,6 +212,135 @@ export function ResultValue({
         </>
       )}
     </>
+  );
+}
+
+/** " (weighted 4.1)" after a GPA, when there is a weighted GPA; nothing otherwise. */
+export function WeightedGpa({ value }: { value: number | null | undefined }) {
+  const { t } = useTranslation();
+  const { formatNumber } = useFormatters();
+  if (value === null || value === undefined) return null;
+  return (
+    <>
+      {" "}
+      <small className="ag-result-weighted">
+        <bdi>
+          {t("academicGrading.credits.weighted", {
+            value: formatNumber(value, { maximumFractionDigits: 2 }),
+          })}
+        </bdi>
+      </small>
+    </>
+  );
+}
+
+/** A subject's course level ("Honors", "AP", "HL") as a small badge after its name. */
+export function CourseLevel({ level }: { level: string | null | undefined }) {
+  if (!level) return null;
+  return (
+    <>
+      {" "}
+      <span className="ag-course-level">
+        <bdi>{level}</bdi>
+      </span>
+    </>
+  );
+}
+
+type OrdinalCategory = "one" | "two" | "few" | "other";
+
+/** "3rd" in English, "3" in Arabic: the place as the locale says it. */
+export function useOrdinal(): (n: number) => string {
+  const { t } = useTranslation();
+  const { locale } = useLocale();
+  const { formatNumber } = useFormatters();
+  let rules: Intl.PluralRules | null = null;
+  try {
+    rules = new Intl.PluralRules(locale, { type: "ordinal" });
+  } catch {
+    rules = null;
+  }
+  return (n) => {
+    const category = rules?.select(n) ?? "other";
+    const key: OrdinalCategory =
+      category === "one" || category === "two" || category === "few" ? category : "other";
+    return t(`academicGrading.rank.ordinal.${key}`, { n: formatNumber(n) });
+  };
+}
+
+/**
+ * A result's class rank: "3rd of 120 · 84th percentile", "Not ranked" for an incomplete result, or
+ * "Rank pending" while a grade-wide rank waits for every section. Nothing without a rank.
+ */
+export function ClassRankLabel({ rank }: { rank: ClassRank | null | undefined }) {
+  const { t } = useTranslation();
+  const { formatNumber } = useFormatters();
+  const ordinal = useOrdinal();
+  if (!rank) return null;
+  if (rank.status === "pending") {
+    return (
+      <span title={t("academicGrading.rank.pendingHelp")}>{t("academicGrading.rank.pending")}</span>
+    );
+  }
+  if (rank.status !== "ranked" || rank.rank === null || rank.cohort_size === null) {
+    return (
+      <span title={t("academicGrading.rank.notRankedHelp")}>
+        {t("academicGrading.rank.notRanked")}
+      </span>
+    );
+  }
+  return (
+    <>
+      <bdi>
+        {t("academicGrading.rank.place", {
+          place: ordinal(rank.rank),
+          cohort: formatNumber(rank.cohort_size),
+        })}
+      </bdi>
+      {rank.percentile === null ? null : (
+        <div className="ag-muted">
+          {t("academicGrading.rank.percentile", { place: ordinal(rank.percentile) })}
+        </div>
+      )}
+    </>
+  );
+}
+
+/**
+ * The rank an issued certificate, report card or transcript kept, as a fact row; nothing when it
+ * has none (documents issued before class ranks, or without a visible rank).
+ */
+export function DocumentRankFact({ rank }: { rank: DocumentClassRank | null | undefined }) {
+  const { t } = useTranslation();
+  if (!rank) return null;
+  return (
+    <div>
+      <dt>{t("academicGrading.rank.column")}</dt>
+      <dd>
+        <ClassRankLabel rank={{ ...rank, status: "ranked" }} />
+      </dd>
+    </div>
+  );
+}
+
+/** "3 of 4 credits earned"; nothing when the result carries no credits. */
+export function CreditsEarned({
+  attempted,
+  earned,
+}: {
+  attempted: number | null | undefined;
+  earned: number | null | undefined;
+}) {
+  const { t } = useTranslation();
+  const { formatNumber } = useFormatters();
+  if (attempted === null || attempted === undefined) return null;
+  return (
+    <bdi>
+      {t("academicGrading.credits.earnedOf", {
+        earned: formatNumber(earned ?? 0, { maximumFractionDigits: 2 }),
+        attempted: formatNumber(attempted, { maximumFractionDigits: 2 }),
+      })}
+    </bdi>
   );
 }
 

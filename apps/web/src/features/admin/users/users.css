@@ -39,10 +39,13 @@
   max-width: 20rem;
 }
 
+/* A parent row carries four actions (Edit, Sessions, Records, Deactivate): they wrap as whole
+   words, so the table stays inside its card instead of pushing the last one out of view. */
 .users-list__actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-8);
+  gap: var(--space-4) var(--space-8);
   white-space: nowrap;
 }
 

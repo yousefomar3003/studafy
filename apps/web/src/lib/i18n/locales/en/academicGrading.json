@@ -14,7 +14,10 @@
     "scales": "Grading scales",
     "approvals": "Approvals",
     "results": "Results & certificates",
-    "reportCards": "Report cards"
+    "reportCards": "Report cards",
+    "externalExams": "External exams",
+    "topStudents": "Top students",
+    "graduation": "Graduation requirements"
   },
   "common": {
     "loading": "Loading…",
@@ -165,7 +168,8 @@
       "CONFLICT_STATE_MISMATCH": "That isn't possible in the current state.",
       "GRADE_CONCURRENT_EDIT": "Someone else changed this in the meantime. Reload and try again.",
       "VALIDATION_FAILED": "Some values aren't valid.",
-      "AUTHZ_FORBIDDEN": "You don't have permission to do this."
+      "AUTHZ_FORBIDDEN": "You don't have permission to do this.",
+      "PREDICTED_GRADES_DISABLED": "Predicted grades aren't switched on for this grade this year."
     }
   },
   "issues": {
@@ -184,7 +188,8 @@
     "DESCRIPTORS_REQUIRED": "Set up this grade's descriptor scale: at least two descriptors, such as Excellent and Needs improvement.",
     "DESCRIPTOR_POINTS_PARTIAL": "Give every descriptor points, or none. A subject descriptor is only worked out when all have points.",
     "DESCRIPTOR_NOT_ACHIEVED_UNUSED": "A descriptor is marked \"not achieved\", but without points no subject descriptor is worked out, so no pupil fails this subject.",
-    "NO_SKILLS": "Add at least one skill to assess."
+    "NO_SKILLS": "Add at least one skill to assess.",
+    "CREDITS_DIFFER_FROM_COEFFICIENT": "This subject's credits differ from its weight in the overall average. The weight is what counts in the average and GPA; schools that weight by credit hours set both to the same number."
   },
   "overview": {
     "statusHeading": "Grading for {{year}}",
@@ -360,7 +365,21 @@
       "outOfMax": "Out of",
       "outOfMaxHelp": "For example 20: an average of 82.5% shows as 16.5 / 20.",
       "gpaMax": "GPA out of",
-      "gpaMaxHelp": "Usually 4 or 5. Each subject's GPA points come from its grading scale and are weighted like the average."
+      "gpaMaxHelp": "Usually 4 or 5. Each subject's GPA points come from its grading scale and are weighted like the average.",
+      "predicted": "Teachers record predicted grades",
+      "predictedVisibility": "Predicted grades are seen by",
+      "predictedVisibilityHelp": "Teachers' notes on a predicted grade are always for staff only.",
+      "rank": {
+        "heading": "Class rank",
+        "enabled": "Rank students in this grade",
+        "enabledHelp": "Gives each student a rank and percentile on their finalized results, and lists the grade's top students. Only complete results are ranked; tied students share a place.",
+        "basis": "Rank by",
+        "basisHelp": "Ranking by GPA needs the final result shown as a GPA.",
+        "scope": "Rank among",
+        "scopeHelp": "A grade-wide rank appears once every section of the grade is finalized for the period.",
+        "visibility": "Who sees the rank",
+        "visibilityHelp": "When students and parents see it, it also appears in their app and on the report cards, certificates and transcripts issued to them."
+      }
     }
   },
   "editor": {
@@ -387,6 +406,12 @@
     "averageWeightHelp": "1 counts like any other subject; 2 counts double.",
     "averageWeightValue": "Counts as {{value}}×",
     "averageWeightExact": "Exact weight",
+    "credits": "Credits",
+    "creditsHelp": "Credit hours the subject is worth, for schools that use them (e.g. 1 or 0.5). Leave empty if you don't. Results show credits attempted and earned.",
+    "courseLevel": "Course level",
+    "courseLevelHelp": "Shown next to the subject, e.g. Honors, AP, HL or SL. Optional.",
+    "gpaBoost": "GPA boost",
+    "gpaBoostHelp": "Added to the subject's GPA points for the weighted GPA when it is passed: usually 0.5 for Honors and 1 for AP. The regular GPA doesn't change. 0 for none.",
     "roundingDecimals": "Decimal places",
     "roundingMode": "Rounding",
     "missingPolicy": "A missing mark",
@@ -825,6 +850,17 @@
     "withPercentage": "{{percentage}}%",
     "gpaUnavailable": "GPA not available"
   },
+  "credits": {
+    "label": "Credits",
+    "column": "Credits",
+    "cumulative": "Credits (all years)",
+    "earnedOf": "{{earned}} of {{attempted}} credits earned",
+    "weighted": "(weighted {{value}})"
+  },
+  "predictedVisibility": {
+    "staff": "Staff only",
+    "students_and_parents": "Staff, students and parents"
+  },
   "transcript": {
     "title": "Academic Transcript",
     "back": "Back to the student",
@@ -850,7 +886,26 @@
     "method": "The cumulative average and GPA weight every counted subject of every year by its weight in the year's average.",
     "reissueNote": "Replaces transcript {{serial}}. Reason: {{reason}}",
     "gpaScale": "{{year}}: out of {{max}}",
-    "skillLine": "{{skill}}: {{descriptor}}"
+    "skillLine": "{{skill}}: {{descriptor}}",
+    "externalExams": {
+      "heading": "External examinations",
+      "exam": "Examination",
+      "date": "Date",
+      "scores": "Scores",
+      "total": "Total",
+      "examSubject": "{{exam}} — {{subject}}",
+      "scoreLine": "{{component}}: {{score}}",
+      "outOf": "{{score}} / {{max}}"
+    },
+    "graduation": {
+      "heading": "Graduation requirements",
+      "status": {
+        "met": "Graduation requirements met",
+        "not_met": "Graduation requirements not met",
+        "pending": "Graduation requirements in progress"
+      },
+      "rules": "({{met}} of {{total}} requirements met)"
+    }
   },
   "reportCards": {
     "settingsHeading": "What report cards show",
@@ -931,5 +986,396 @@
     "useDefaults": "Use the default scale",
     "addDescriptor": "Add descriptor",
     "saveScale": "Save scale"
+  },
+  "externalExams": {
+    "heading": "External exams",
+    "help": "The external exams your students sit — SAT, IELTS, IGCSE finals, national exams and others. Add a built-in exam and adjust it, or define your own. Exams belong to the school, not to one academic year.",
+    "addCustom": "Add custom exam",
+    "preset": "Built-in exam",
+    "presetPlaceholder": "Choose an exam",
+    "addPreset": "Add exam",
+    "added": "{{name}} added.",
+    "addFailed": "The exam couldn't be added.",
+    "showArchived": "Show archived exams",
+    "caption": "The school's external exams",
+    "empty": "No external exams yet. Add a built-in exam to start.",
+    "columns": {
+      "name": "Exam",
+      "components": "Scored on",
+      "total": "Total",
+      "results": "Results recorded",
+      "actions": "Actions"
+    },
+    "perSubject": "Per subject",
+    "onTranscript": "On transcripts",
+    "archived": "Archived",
+    "numericSummary": "{{name}} ({{min}}–{{max}})",
+    "labelSummary": "{{name}} ({{labels}})",
+    "totalMode": {
+      "sum": "Sum",
+      "average": "Average",
+      "none": "No total"
+    },
+    "totalRange": "{{mode}}, {{min}}–{{max}}",
+    "editLabel": "Edit {{name}}",
+    "archive": "Archive",
+    "archiveLabel": "Archive {{name}}",
+    "archiveTitle": "Archive {{name}}?",
+    "archiveDescription": "No new results can be recorded for an archived exam. Results already recorded stay, and you can restore it later.",
+    "archivedToast": "Exam archived.",
+    "archiveFailed": "The exam couldn't be changed.",
+    "restore": "Restore",
+    "restoreLabel": "Restore {{name}}",
+    "restored": "Exam restored.",
+    "editTitle": "Edit {{name}}",
+    "lockedNote": "Results are recorded for this exam, so its total, the per-subject setting and how each scored part is scored can no longer change. Names, the total's range and transcript visibility still can.",
+    "details": "Exam",
+    "name": "Name",
+    "code": "Code",
+    "total": "Total",
+    "roundingStep": "Round the average to",
+    "roundingStepHelp": "For example 0.5 for an IELTS overall band. Leave empty for two decimals.",
+    "totalMin": "Lowest total",
+    "totalMax": "Highest total",
+    "perSubjectLabel": "One result per subject (for example IGCSE or AP)",
+    "onTranscriptLabel": "Show on transcripts",
+    "components": "Scored parts",
+    "componentsHelp": "Each part is scored as a number in a range, or as one grade from a list. A sum or an average needs every part scored as a number.",
+    "componentN": "Part {{n}}",
+    "componentName": "Part name",
+    "scoreType": "Scored as",
+    "scoreTypes": {
+      "numeric": "A number",
+      "label": "A grade"
+    },
+    "min": "Lowest",
+    "max": "Highest",
+    "step": "Step",
+    "labels": "Grades",
+    "labelsHelp": "Separated by commas, in the order to list them (for example A*, A, B, C).",
+    "removeComponent": "Remove part {{n}}",
+    "addComponent": "Add part",
+    "valid": "This exam is ready to save.",
+    "save": "Save exam",
+    "saved": "Exam saved.",
+    "presets": {
+      "sat": {
+        "name": "SAT"
+      },
+      "psat": {
+        "name": "PSAT/NMSQT"
+      },
+      "act": {
+        "name": "ACT"
+      },
+      "ap": {
+        "name": "AP Exam"
+      },
+      "ielts": {
+        "name": "IELTS Academic"
+      },
+      "toefl_ibt": {
+        "name": "TOEFL iBT",
+        "note": "TOEFL iBT is moving to a 1-6 band scale; edit the sections' ranges for new score reports."
+      },
+      "igcse_letter": {
+        "name": "IGCSE (A*-G)"
+      },
+      "igcse_numeric": {
+        "name": "IGCSE (9-1)"
+      },
+      "a_level": {
+        "name": "A Level"
+      },
+      "ib_dp": {
+        "name": "IB Diploma subject"
+      },
+      "tawjihi": {
+        "name": "Tawjihi (General Secondary Education Certificate)",
+        "note": "Default subjects, each marked 0-100, averaged into a percentage. Edit the subjects and their maximums to match the student's stream and the ministry's current rules; the ministry's weighting of subjects is not applied."
+      },
+      "thanaweya_amma": {
+        "name": "Thanaweya Amma (General Secondary Certificate)",
+        "note": "Default subjects, each marked out of 100, totalled. The ministry changes subjects and maximums: edit them, and the total's maximum, to match the student's track and year."
+      },
+      "state_assessment": {
+        "name": "State assessment",
+        "note": "Rename it after your state's test. The levels and the scale score's range differ by state and subject: edit them. The scale score is optional when recording a result."
+      }
+    }
+  },
+  "testScores": {
+    "heading": "Test scores",
+    "add": "Record a result",
+    "caption": "External exam results and test scores",
+    "empty": "No external exam results recorded.",
+    "error": "Test scores couldn't be loaded.",
+    "columns": {
+      "date": "Date",
+      "exam": "Exam",
+      "scores": "Scores",
+      "total": "Total",
+      "actions": "Actions"
+    },
+    "examSubject": "{{exam}} — {{subject}}",
+    "scoreLine": "{{component}}: {{score}}",
+    "outOf": "{{score}} / {{max}}",
+    "editLabel": "Edit the {{exam}} result",
+    "deleteLabel": "Delete the {{exam}} result",
+    "deleteTitle": "Delete this {{exam}} result?",
+    "deleteDescription": "The result and its scores are removed. Transcripts already issued keep it.",
+    "deleted": "Result deleted.",
+    "deleteFailed": "The result couldn't be deleted.",
+    "editTitle": "Edit {{exam}} result",
+    "noExams": "There are no external exams yet. Add them in Academic setup › External exams.",
+    "exam": "Exam",
+    "examPlaceholder": "Choose an exam",
+    "subject": "Subject",
+    "subjectPlaceholder": "Choose a subject",
+    "date": "Date sat",
+    "scores": "Scores",
+    "scoresHelp": "Leave a part empty if it wasn't scored; the total is worked out only when every part has a number.",
+    "range": "{{min}}–{{max}}",
+    "notScored": "Not scored",
+    "note": "Note",
+    "save": "Save result",
+    "saved": "Result saved."
+  },
+  "templates": {
+    "action": "Use a curriculum template",
+    "title": "Set up {{year}} from a curriculum template",
+    "description": "Creates the grading scale, result format and assessment categories of a curriculum for the grades you choose.",
+    "template": "Curriculum",
+    "editableDefaults": "Boundaries, weights and pass marks are editable defaults: change them afterwards under Scales and Subjects.",
+    "grades": "Grades to set up",
+    "noGrades": "Add grade levels first.",
+    "preview": "Preview",
+    "back": "Back",
+    "apply": "Apply",
+    "applyConfirm": "Apply and change existing set-up",
+    "confirmWarning": "Some of this is already set up. Applying makes the changes listed below. Subjects with marks are never changed.",
+    "nothingToChange": "Everything already matches this template.",
+    "applied": "{{name}} was applied. Review the grades before publishing.",
+    "result": {
+      "percentage": "Percentage",
+      "out_of": "Out of {{max}}",
+      "gpa": "GPA out of {{max}}"
+    },
+    "summary": {
+      "result": "Result",
+      "method": "Grading",
+      "pass": "Subject pass mark",
+      "credits": "Credits per subject",
+      "scale": "Scale “{{name}}”:",
+      "descriptors": "Descriptors:",
+      "categories": "Categories:",
+      "examStructure": "your exam system from School Settings",
+      "courseLevels": "Course levels:"
+    },
+    "band": "{{label}} ≥ {{min}}%",
+    "bandGpa": "{{label}} ≥ {{min}}% ({{gpa}})",
+    "category": "{{name}} {{weight}}%",
+    "categoryOutOf": "{{name}} (out of {{max}})",
+    "courseLevelBoost": "{{label}} (+{{boost}})",
+    "plan": {
+      "scale": {
+        "create": "Create the scale “{{name}}”.",
+        "update": "Replace the bands of the existing scale “{{name}}”.",
+        "unchanged": "Use the existing scale “{{name}}”."
+      },
+      "program": {
+        "create": "Set up the grade for this year.",
+        "update": "Change the grade's {{changes}}.",
+        "unchanged": "The grade's settings already match."
+      },
+      "changes": {
+        "grade_scale": "grading scale",
+        "result_format": "result format",
+        "rounding": "rounding"
+      },
+      "descriptors": {
+        "create": "Add the descriptor scale.",
+        "replace": "Replace the descriptor scale.",
+        "unchanged": "The descriptor scale already matches."
+      },
+      "noSubjects": "No subjects yet. Subjects added later start from your exam system; apply the template again to bring them in line.",
+      "subject": {
+        "update": "Rebuilt on the template",
+        "unchanged": "Already matches",
+        "skip": "Left as it is"
+      },
+      "reason": {
+        "has_marks": "it already has marks",
+        "section_assessments": "sections added their own assessments",
+        "no_terms": "the year has no terms yet",
+        "invalid": "it could not be saved"
+      },
+      "gradeError": "This grade could not be set up: {{error}}"
+    }
+  },
+  "rank": {
+    "column": "Rank",
+    "place": "{{place}} of {{cohort}}",
+    "percentile": "{{place}} percentile",
+    "notRanked": "Not ranked",
+    "notRankedHelp": "Only complete results are ranked.",
+    "pending": "Rank pending",
+    "pendingHelp": "Shown once every section of the grade is finalized for this period.",
+    "ordinal": {
+      "one": "{{n}}st",
+      "two": "{{n}}nd",
+      "few": "{{n}}rd",
+      "other": "{{n}}th"
+    },
+    "basis": {
+      "average": "Average",
+      "gpa": "GPA",
+      "weighted_gpa": "Weighted GPA"
+    },
+    "scope": {
+      "section": "Their section",
+      "grade_level": "The whole grade"
+    },
+    "visibility": {
+      "staff": "Staff only",
+      "students_and_parents": "Staff, students and parents"
+    }
+  },
+  "topStudents": {
+    "heading": "Top students",
+    "help": "The best places in a grade for a term or the whole year, from finalized results. Tied students share a place.",
+    "grade": "Grade",
+    "limit": "Places",
+    "disabled": "{{grade}} doesn't rank its students. Turn on class rank in Grades & subjects.",
+    "setUp": "Open {{grade}} policies",
+    "notSetUp": "{{grade}} isn't set up for this year.",
+    "gradeWide": "Whole grade",
+    "pending": "Waiting for finalized results from: {{sections}}",
+    "cohort_one": "{{count}} student ranked",
+    "cohort_other": "{{count}} students ranked",
+    "empty": "No students are ranked yet.",
+    "caption": "Top students of {{group}}",
+    "rankedBy": "Ranked by {{basis}}",
+    "columns": {
+      "rank": "Rank",
+      "student": "Student",
+      "section": "Section",
+      "value": "Result",
+      "percentile": "Percentile"
+    }
+  },
+  "graduation": {
+    "heading": "Graduation requirements",
+    "help": "What a student needs to graduate: credits, credits in a group of subjects, subjects passed, a cumulative GPA or average, or an external exam. Students are checked against their finalized annual results of every year and their recorded test scores. A set applies to the grade levels you choose, from an academic year on if you set one.",
+    "add": "Add requirement set",
+    "caption": "Graduation requirement sets",
+    "empty": "No graduation requirements yet.",
+    "columns": {
+      "name": "Set",
+      "grades": "Grade levels",
+      "rules": "Requirements",
+      "actions": "Actions",
+      "requirement": "Requirement",
+      "needs": "Needs",
+      "progress": "Student",
+      "status": "Status"
+    },
+    "inactive": "Inactive",
+    "visible": "Shown to students and parents",
+    "fromYear": "From {{year}}",
+    "editLabel": "Edit {{name}}",
+    "deleteLabel": "Remove {{name}}",
+    "deleteTitle": "Remove {{name}}?",
+    "deleteDescription": "Students will no longer be checked against it. Transcripts already issued keep what they say.",
+    "deleted": "Requirement set removed.",
+    "deleteFailed": "Couldn't remove the requirement set.",
+    "editTitle": "Edit {{name}}",
+    "details": "Set",
+    "name": "Name",
+    "fromYearLabel": "Applies from",
+    "everyYear": "Every year",
+    "activeLabel": "Active: check students against this set",
+    "visibleLabel": "Show students and parents their checklist in the app",
+    "gradesLegend": "Applies to grade levels",
+    "rulesLegend": "Requirements",
+    "rulesHelp": "Name a group of subjects (English, Core sciences) and choose its subjects; subjects have no group of their own.",
+    "ruleN": "Requirement {{n}}",
+    "ruleTypeLabel": "Type",
+    "ruleType": {
+      "total_credits": "Total credits",
+      "group_credits": "Credits in a group of subjects",
+      "subjects_passed": "Subjects passed",
+      "cumulative_gpa": "Cumulative GPA",
+      "cumulative_average": "Cumulative average",
+      "external_exam": "External exam"
+    },
+    "minLabel": {
+      "total_credits": "Credits earned, at least",
+      "group_credits": "Credits earned, at least",
+      "cumulative_gpa": "GPA, at least",
+      "cumulative_average": "Average %, at least",
+      "external_exam": "Total, at least (optional)"
+    },
+    "groupName": "Group name",
+    "groupNameHelp": "Shown to staff, students and parents, e.g. English.",
+    "subjectsLabel": "Subjects of requirement {{n}}",
+    "exam": "Exam",
+    "examPlaceholder": "Choose an exam",
+    "removeRule": "Remove requirement {{n}}",
+    "addRule": "Add requirement",
+    "nameRequired": "Name the set.",
+    "gradesRequired": "Choose at least one grade level.",
+    "ruleIssue": "Requirement {{n}}: {{message}}",
+    "valid": "The requirements are complete.",
+    "save": "Save requirements",
+    "saved": "Graduation requirements saved.",
+    "rule": {
+      "groupCredits": "Credits in {{group}}",
+      "subjectsPassed": "Pass {{group}}"
+    },
+    "atLeast": "At least {{value}}",
+    "recorded": "Recorded",
+    "progressOf": "{{current}} of {{required}}",
+    "missing": "Not passed yet: {{subjects}}",
+    "rulesMet": "{{met}} of {{total}} met",
+    "checklistCaption": "{{name}} requirements",
+    "noRules": "This set has no requirements.",
+    "status": {
+      "met": "Met",
+      "not_met": "Not met",
+      "pending": "In progress"
+    },
+    "currentYearPending": "This year is not finalized yet, so requirements not met yet are in progress.",
+    "preview": {
+      "heading": "Check a student",
+      "help": "See how a student of the selected year stands against a set as saved, even before it applies to them.",
+      "set": "Requirement set",
+      "section": "Section",
+      "sectionPlaceholder": "Choose a section",
+      "student": "Student",
+      "studentPlaceholder": "Choose a student",
+      "applies": "This set applies to the student.",
+      "doesNotApply": "This set does not apply to the student yet (inactive, another grade level or a later year)."
+    },
+    "report": {
+      "heading": "Students not on track",
+      "help": "Students placed in a grade level in {{year}} who have not met a requirement set that applies to them.",
+      "grade": "Grade level",
+      "gradePlaceholder": "Choose a grade level",
+      "includePending": "Also show students whose year is still in progress",
+      "summary": "{{shown}} shown of {{checked}} students checked.",
+      "empty": "Every student checked is on track.",
+      "columns": {
+        "student": "Student",
+        "section": "Section",
+        "status": "Status",
+        "unmet": "Not met yet"
+      }
+    },
+    "panel": {
+      "heading": "Graduation requirements",
+      "empty": "No graduation requirements apply to this student.",
+      "basis": "Academic years with finalized results counted: {{years}}."
+    }
   }
 }

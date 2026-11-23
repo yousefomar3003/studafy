@@ -4,7 +4,16 @@ import { useParams } from "react-router-dom";
 import { usePortalBack } from "../../../layouts/portal/PortalBackLink";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 
-import { Num, Percent, QueryState, ResultValue } from "./components";
+import {
+  CourseLevel,
+  CreditsEarned,
+  DocumentRankFact,
+  Num,
+  Percent,
+  QueryState,
+  ResultValue,
+  WeightedGpa,
+} from "./components";
 import { setupHref } from "./context";
 import { useCertificate } from "./queries";
 import { ReportNotesBlock } from "./ReportNotesBlock";
@@ -63,6 +72,8 @@ export function CertificateDocument({
   const { t } = useTranslation();
   const { formatDate } = useFormatters();
   // Term columns, in the order the stored subjects list them (annual certificates only).
+  // Certificates issued before credits existed have none: the column only appears when used.
+  const hasCredits = content.subjects.some((subject) => typeof subject.credits === "number");
   const termColumns =
     content.kind === "annual_certificate"
       ? (content.subjects[0]?.terms ?? []).filter((term) => term.term_id !== null)
@@ -126,13 +137,17 @@ export function CertificateDocument({
             <th scope="col">{t("academicGrading.certificate.marks")}</th>
             <th scope="col">{t("academicGrading.certificate.percentage")}</th>
             <th scope="col">{t("academicGrading.certificate.grade")}</th>
+            {hasCredits ? <th scope="col">{t("academicGrading.credits.column")}</th> : null}
             <th scope="col">{t("academicGrading.certificate.result")}</th>
           </tr>
         </thead>
         <tbody>
           {content.subjects.map((subject) => (
             <tr key={subject.code}>
-              <th scope="row">{subject.name}</th>
+              <th scope="row">
+                {subject.name}
+                <CourseLevel level={subject.course_level} />
+              </th>
               {termColumns.map((column) => (
                 <td key={column.term_id}>
                   <Percent
@@ -158,7 +173,15 @@ export function CertificateDocument({
                   <Percent value={subject.percentage} />
                 )}
               </td>
-              <td>{subject.grade_label ?? "—"}</td>
+              <td>
+                {subject.grade_label ?? "—"}
+                <WeightedGpa value={subject.weighted_gpa_points} />
+              </td>
+              {hasCredits ? (
+                <td>
+                  <Num value={subject.credits} />
+                </td>
+              ) : null}
               <td>
                 {subject.exempt
                   ? t("academicGrading.certificate.exempt")
@@ -182,9 +205,22 @@ export function CertificateDocument({
             <ResultValue
               display={content.overall.display}
               percentage={content.overall.average_percentage}
+              weightedGpa={content.overall.weighted_gpa}
             />
           </dd>
         </div>
+        {content.overall.credits_attempted == null ? null : (
+          <div>
+            <dt>{t("academicGrading.credits.label")}</dt>
+            <dd>
+              <CreditsEarned
+                attempted={content.overall.credits_attempted}
+                earned={content.overall.credits_earned}
+              />
+            </dd>
+          </div>
+        )}
+        <DocumentRankFact rank={content.overall.class_rank} />
         <div>
           <dt>{t("academicGrading.certificate.total")}</dt>
           <dd>

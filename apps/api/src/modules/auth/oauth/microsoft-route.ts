@@ -107,6 +107,9 @@ export function microsoftOAuthRoutes(
       code_challenge: codeChallenge,
       code_challenge_method: "S256",
       response_mode: "query",
+      // Always show the account chooser, so a signed-out user can pick a different account instead
+      // of being signed straight back in to the one Microsoft remembers.
+      prompt: "select_account",
     });
 
     return c.redirect(`${MICROSOFT_AUTH_ENDPOINT}?${params.toString()}`, 302);

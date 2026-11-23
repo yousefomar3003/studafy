@@ -189,6 +189,48 @@ export async function loadConversation(
 }
 
 /**
+ * Delete one of the student's own Ask AI conversations and everything in it, for good. A
+ * conversation that is not this student's answers 404, the same as reading it.
+ *
+ * Nothing the school still needs is lost: a moderation decision keeps its record and text hash
+ * with the message link cleared (the account-erasure job does the same), and a report keeps the
+ * reported text as its own snapshot (`ai_content_reports.content_snapshot`). Citations cascade.
+ */
+export async function deleteConversation(
+  tx: TransactionSql,
+  input: LoadConversationInput,
+): Promise<void> {
+  const [conversation] = await tx<{ id: string }[]>`
+    SELECT id FROM app.ai_conversations
+    WHERE id = ${input.conversationId}::uuid AND student_id = ${input.studentId}::uuid
+    FOR UPDATE
+  `;
+  if (!conversation) {
+    throw new CodedHttpException(
+      404,
+      ERROR_CODES.AI_CONVERSATION_NOT_FOUND,
+      getLocalizedMessage(ERROR_CODES.AI_CONVERSATION_NOT_FOUND, input.locale),
+    );
+  }
+
+  await tx`
+    UPDATE app.ai_moderation_decisions AS d
+    SET message_id = NULL
+    FROM app.ai_messages AS m
+    WHERE m.conversation_id = ${conversation.id}::uuid
+      AND d.school_id = m.school_id AND d.message_id = m.id
+  `;
+  await tx`
+    DELETE FROM app.ai_message_citations AS ci
+    USING app.ai_messages AS m
+    WHERE m.conversation_id = ${conversation.id}::uuid
+      AND ci.school_id = m.school_id AND ci.ai_message_id = m.id
+  `;
+  await tx`DELETE FROM app.ai_messages WHERE conversation_id = ${conversation.id}::uuid`;
+  await tx`DELETE FROM app.ai_conversations WHERE id = ${conversation.id}::uuid`;
+}
+
+/**
  * The `[N]` each persisted citation row was written as. `citation_order` is the row's 1-based
  * first-appearance position, not the model's source number, but the answer text still carries the
  * original markers. `resolveCitations` only drops ids past the source count, so every dropped id is

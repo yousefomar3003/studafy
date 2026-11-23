@@ -29,6 +29,16 @@
   margin: 0;
 }
 
+/* In a card header the title and its filter chips share one centre line (top-aligned, the chips sat
+   ~17px below "Seat change requests"). */
+.sf-card__header .platform-header__row {
+  align-items: center;
+}
+
+.sf-card__header .platform-header__row > * {
+  margin-block: 0;
+}
+
 .platform-header__description {
   margin: var(--space-4) 0 0;
   color: var(--color-muted-foreground);
@@ -40,6 +50,24 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-8);
+}
+
+/* A card footer with a note and its actions: the note takes the room, the buttons stay together on
+   one line at the end (a long note squeezed them into a stack), and the whole footer wraps on a
+   narrow screen instead. */
+.sf-card__footer:has(> .platform-actions) {
+  flex-wrap: wrap;
+}
+
+.sf-card__footer > p {
+  flex: 1 1 20rem;
+  margin: 0;
+}
+
+.sf-card__footer > .platform-actions {
+  flex: none;
+  flex-wrap: nowrap;
+  margin-inline-start: auto;
 }
 
 /* Grouped section links (ShortcutGroupList): no overflow clipping, so a group's list can open. */
@@ -91,6 +119,17 @@
 .platform-stack + *,
 .platform-grid + section {
   margin-top: var(--space-16);
+}
+
+/* Inside a stack the gap is the spacing. Margins don't collapse in a flex column, so a heading's and
+   a paragraph's default margins piled up on top of the gap (~60px between "Needs attention" and the
+   line under it). */
+.platform-stack > :is(h2, h3, p) {
+  margin-block: 0;
+}
+
+section.platform-stack {
+  margin-block-start: var(--space-32);
 }
 
 .platform-breakdown {
@@ -169,9 +208,11 @@
   color: var(--color-danger-subtle-foreground);
 }
 
+/* Labels take what they need up to 55% and wrap past it, so a long label in a narrow card no longer
+   squeezes its value down to a sliver ("Never" broke as "Ne / ver"). */
 .platform-dl {
   display: grid;
-  grid-template-columns: max-content 1fr;
+  grid-template-columns: fit-content(55%) minmax(0, 1fr);
   gap: var(--space-8) var(--space-16);
   margin: 0;
 }
@@ -183,7 +224,9 @@
 
 .platform-dl dd {
   margin: 0;
-  overflow-wrap: anywhere;
+  /* break-word, not anywhere: a long token (an ID) still breaks, but a short word never does. */
+  overflow-wrap: break-word;
+  min-inline-size: 0;
 }
 
 .platform-flag-list {
@@ -297,36 +340,177 @@
 }
 
 /* School usage panel and exports table (SchoolUsageCard, SchoolExportsCard). */
-.platform-usage {
-  display: grid;
-  gap: var(--space-20);
-  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+/* School usage card: a row of headline tiles, then accounts by role beside licence and features. */
+.platform-usage-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-12);
+  margin: 0;
 }
 
-.platform-usage h3 {
+.platform-usage-stat {
+  /* Four across on a desktop, two across on a phone. */
+  flex: 1 1 8.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-16);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface);
+}
+
+.platform-usage-stat dd {
+  margin: 0;
+}
+
+.platform-usage-stat__label {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.platform-usage-stat__value {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.platform-usage-stat__extra {
+  padding-block: var(--space-4);
+}
+
+.platform-usage-stat__hint {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+}
+
+.platform-usage-bar {
+  display: block;
+  block-size: 6px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-border);
+  overflow: hidden;
+}
+
+.platform-usage-bar__fill {
+  display: block;
+  block-size: 100%;
+  min-inline-size: 2px;
+  border-radius: inherit;
+  background-color: var(--color-accent);
+}
+
+.platform-usage-bar__fill[data-tone="warning"] {
+  background-color: var(--color-warning);
+}
+
+.platform-usage-bar__fill[data-tone="danger"] {
+  background-color: var(--color-danger);
+}
+
+.platform-usage-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  gap: var(--space-24) var(--space-32);
+  margin-block-start: var(--space-24);
+}
+
+.platform-usage-details h3 {
   margin: 0 0 var(--space-8);
-  font-size: 1rem;
+  font-size: var(--font-size-base);
+}
+
+.platform-usage-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-24);
+}
+
+.platform-usage-side p {
+  margin: 0;
 }
 
 .platform-usage-table {
   width: 100%;
   border-collapse: collapse;
+  font-size: var(--font-size-sm);
 }
 
 .platform-usage-table th,
 .platform-usage-table td {
-  padding: var(--space-8);
+  padding: var(--space-8) var(--space-12);
   border-block-end: 1px solid var(--color-border);
   text-align: start;
 }
 
-.platform-usage-meter {
-  inline-size: 100%;
-  block-size: 0.75rem;
+.platform-usage-table thead th {
+  color: var(--color-muted-foreground);
+  font-weight: var(--font-weight-medium);
+}
+
+.platform-usage-table tbody th {
+  font-weight: var(--font-weight-medium);
+}
+
+/* Counts line up on the right, in their own narrow columns. */
+.platform-usage-table :is(th, td):not(:first-child) {
+  inline-size: 7rem;
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.platform-usage-table td[data-zero] {
+  color: var(--color-muted-foreground);
+}
+
+.platform-usage-table tbody tr:last-child :is(th, td) {
+  border-block-end: none;
+}
+
+.platform-usage-seats {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  margin: var(--space-8) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.platform-usage-seats li {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.platform-usage-seats__row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-8);
+  font-size: var(--font-size-sm);
 }
 
 .platform-card-actions {
   display: flex;
   justify-content: flex-end;
   margin-block-start: var(--space-12);
+}
+
+/* A card's description and its main action on one line above the card's table, with room before
+   the table (the button sat straight on its border). Wraps with the button under the text on a
+   narrow screen. */
+.platform-card-intro {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12) var(--space-24);
+  margin-block-end: var(--space-16);
+}
+
+.platform-card-intro > p {
+  flex: 1 1 20rem;
+  margin: 0;
 }

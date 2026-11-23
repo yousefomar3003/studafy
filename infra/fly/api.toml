@@ -58,9 +58,9 @@ kill_timeout = "30s"
   CLAMAV_PORT = "3310"
   AI_LLM_ENABLED = "true"
   AI_LLM_PROVIDER = "openai-compatible"
-  AI_LLM_BASE_URL = "https://api.together.xyz/v1"
-  AI_LLM_SMALL_MODEL = "Qwen/Qwen3.5-9B"
-  AI_LLM_LARGE_MODEL = "Qwen/Qwen3.5-9B"
+  AI_LLM_BASE_URL = "https://openrouter.ai/api/v1"
+  AI_LLM_SMALL_MODEL = "google/gemma-4-31b-it"
+  AI_LLM_LARGE_MODEL = "google/gemma-4-31b-it"
   AI_STORE_PRODUCT_ID = "studafy_ai_monthly"
   # One store account holds one subscription per product: a family buying for several children on
   # one phone uses the next product per child. Until a product exists in the store, the app says it

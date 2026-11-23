@@ -691,7 +691,13 @@
       "emptyBody": "تظهر محادثاتك مع المساعد الدراسي هنا لمدة 90 يومًا.",
       "error": "تعذّر تحميل سجل المحادثات.",
       "retry": "حاول مرة أخرى",
-      "openError": "تعذّر فتح هذه المحادثة. ربما انتهت صلاحيتها."
+      "openError": "تعذّر فتح هذه المحادثة. ربما انتهت صلاحيتها.",
+      "delete": "حذف المحادثة",
+      "deleteTitle": "حذف هذه المحادثة؟",
+      "deleteBody": "ستُحذف هذه المحادثة نهائيًا، ولا يمكن التراجع عن ذلك.",
+      "deleteCancel": "إلغاء",
+      "deleteConfirm": "حذف",
+      "deleteError": "تعذّر حذف المحادثة. حاول مرة أخرى."
     },
     "title": "اسأل الذكاء الاصطناعي",
     "attach": {
@@ -1827,6 +1833,23 @@
         "scoreRequired": "أدخل درجة قبل النشر.",
         "failed": "تعذّر حفظ الدرجة. تحقق من اتصالك وحاول مرة أخرى."
       }
+    },
+    "predicted": {
+      "entry": "الدرجات المتوقعة",
+      "entrySubtitle": "الدرجة التي تتوقعها لكل طالب",
+      "title": "الدرجات المتوقعة",
+      "help": "توقّعك للدرجة التي سيحققها كل طالب في هذه المادة، للعام أو لفصل دراسي.",
+      "period": "الفترة",
+      "wholeYear": "العام كاملًا",
+      "none": "بلا توقّع",
+      "save": "حفظ",
+      "saved": "حُفظت الدرجات المتوقعة",
+      "error": "تعذّر تحميل الدرجات المتوقعة.",
+      "noSection": "هذا الفصل غير مرتبط بشعبة صف، لذا لا توجد له درجات متوقعة.",
+      "disabled": "لم تفعّل مدرستك الدرجات المتوقعة لهذا الصف.",
+      "readOnly": "هذا العام مغلق، لذا لم يعد بالإمكان تغيير الدرجات المتوقعة.",
+      "invalid": "إحدى الدرجات ليست ضمن سلم تقدير هذه المادة.",
+      "noStudents": "لا يدرس أي طالب هذه المادة في هذه الشعبة."
     }
   },
   "parent": {
@@ -2538,6 +2561,17 @@
     "valueOutOf": "{value} / {max}",
     "gpaValue": "المعدل التراكمي {value} / {max}",
     "gpaUnavailable": "المعدل التراكمي غير متاح",
+    "weightedGpa": "المعدل الموزون",
+    "creditsEarned": "الساعات المكتسبة",
+    "subjectCredits": "الساعات: {value}",
+    "weightedPoints": "الموزون {value}",
+    "rank": {
+      "label": "الترتيب",
+      "place": "المرتبة {place} من {cohort}",
+      "percentile": "المئين {place}",
+      "notRanked": "غير مُرتَّب",
+      "pending": "الترتيب قيد الانتظار"
+    },
     "total": "المجموع",
     "grade": "التقدير",
     "failed": "مواد الرسوب",
@@ -2560,6 +2594,11 @@
     "certificates": "الشهادات وبطاقات التقارير",
     "certificatesEmpty": "لم تصدر أي شهادات أو بطاقات تقارير بعد.",
     "certificatesError": "تعذّر تحميل الشهادات.",
+    "predicted": {
+      "title": "الدرجات المتوقعة",
+      "help": "ما يتوقع المعلمون أن تحققه. هذه ليست نتائج.",
+      "wholeYear": "العام كاملًا"
+    },
     "transcripts": "السجلات الأكاديمية",
     "transcriptsEmpty": "لم يصدر سجل أكاديمي بعد. تصدره المدرسة عند الحاجة، مثلاً للتقديم إلى الجامعات.",
     "transcriptsError": "تعذّر تحميل السجلات الأكاديمية.",
@@ -2569,6 +2608,8 @@
       "cumulative": "النتيجة التراكمية",
       "cumulativeAverage": "المعدل التراكمي",
       "cumulativeGpa": "المعدل التراكمي بالنقاط (GPA)",
+      "cumulativeWeightedGpa": "المعدل التراكمي الموزون",
+      "cumulativeCredits": "الساعات المكتسبة (كل السنوات)",
       "yearsCovered": "عدد السنوات",
       "gpaScale": "{year}: من {max}",
       "gpaReason": {
@@ -2576,7 +2617,9 @@
         "incomplete": "لا توجد أرقام تراكمية: بعض النتائج غير مكتملة.",
         "noSubjects": "لا توجد أرقام تراكمية: لا توجد مادة تُحتسب في المعدل.",
         "mixedGpaScales": "لا يوجد معدل تراكمي بالنقاط: السنوات تستخدم مقاييس مختلفة ({scales})، فلا يمكن حساب متوسط نقاطها."
-      }
+      },
+      "graduation": "متطلبات التخرج: {name}",
+      "graduationValue": "{status} ({met} من {total})"
     },
     "kind": {
       "annualCertificate": "شهادة",
@@ -2608,6 +2651,39 @@
       "issueDate": "تاريخ الإصدار",
       "serialLabel": "الرقم التسلسلي",
       "finalization": "نسخة النتائج {version}، اعتُمدت في {date}"
+    },
+    "testScores": {
+      "title": "نتائج الاختبارات",
+      "empty": "لا توجد نتائج امتحانات خارجية مسجلة بعد.",
+      "error": "تعذّر تحميل نتائج الاختبارات.",
+      "examSubject": "{exam} — {subject}",
+      "satOn": "بتاريخ {date}",
+      "scoreLine": "{component}: {score}"
+    },
+    "graduation": {
+      "title": "متطلبات التخرج",
+      "setProgress": "تحقّق {met} من {total} من المتطلبات",
+      "status": {
+        "met": "متحقّق",
+        "notMet": "غير متحقّق",
+        "pending": "قيد الإنجاز",
+        "unknown": "غير متاح"
+      },
+      "rule": {
+        "totalCredits": "مجموع الساعات المعتمدة",
+        "groupCredits": "الساعات المعتمدة في {group}",
+        "subjectsPassed": "النجاح في {group}",
+        "cumulativeGpa": "المعدل التراكمي (GPA)",
+        "cumulativeAverage": "المعدل التراكمي",
+        "unknown": "متطلب"
+      },
+      "progress": {
+        "of": "{current} من {required}",
+        "minimum": "{current} (الحد الأدنى {required})",
+        "recorded": "مسجّل",
+        "notRecorded": "لم يُسجَّل بعد"
+      },
+      "missing": "لم يتم النجاح بعد في: {subjects}"
     }
   },
   "features": {

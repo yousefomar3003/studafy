@@ -105,6 +105,7 @@ import { bulkInviteRoutes } from "./modules/auth/invitation/bulk-invite-routes";
 import { invitationRoutes } from "./modules/auth/invitation/route";
 import { customListRoutes } from "./modules/custom-lists";
 import { disciplineRoutes, evaluationRoutes } from "./modules/discipline";
+import { externalExamRoutes } from "./modules/external-exams";
 import { createFeatureService, featureRoutes, provideFeatures } from "./modules/features";
 import {
   EnvCredentialResolver,
@@ -140,11 +141,14 @@ import {
 } from "./modules/grades";
 import {
   gradingConfigRoutes,
+  gradingCurriculumTemplateRoutes,
   gradingMarksRoutes,
+  gradingPredictedGradesRoutes,
   gradingReportCardRoutes,
   gradingResultsRoutes,
   gradingTranscriptRoutes,
 } from "./modules/grading";
+import { graduationRequirementRoutes } from "./modules/graduation-requirements";
 import { importRoutes, importSignalRoutes } from "./modules/imports";
 import { inquiryRoutes } from "./modules/inquiries";
 import {
@@ -1206,6 +1210,14 @@ export function createApp({
     app.route("/", gradingTranscriptRoutes(database));
     // Report card comments, attendance and conduct (000209).
     app.route("/", gradingReportCardRoutes(database));
+    // External exams and test scores: SAT, IELTS, IGCSE finals... (000255).
+    app.route("/", externalExamRoutes(database));
+    // Predicted grades (000254).
+    app.route("/", gradingPredictedGradesRoutes(database));
+    // Curriculum templates (IGCSE, IB, American...) applied to a year's grades.
+    app.route("/", gradingCurriculumTemplateRoutes(database));
+    // Graduation requirements: the credits, subjects, GPA and exams a diploma needs (000258).
+    app.route("/", graduationRequirementRoutes(database));
   }
 
   // Gradebook configuration (ST-112). Weighted assessment categories per gradebook and

@@ -30,10 +30,10 @@ describe("usage/costs", () => {
       expect(mixed).toBeLessThanOrEqual(pureLarge);
     });
 
-    test("prices Qwen3.5-9B on Together: a full 3M-token month costs well under $1", () => {
-      // 0.7 × $0.17 + 0.3 × $0.25 = $0.194 per 1M tokens.
-      expect(estimateCostByTier(3_000_000, 0)).toBe(0.58);
-      expect(estimateCostByTier(0, 3_000_000)).toBe(0.58);
+    test("prices Gemma 4 31B on OpenRouter: a full 3M-token month costs under $1", () => {
+      // 0.7 × $0.20 + 0.3 × $0.40 = $0.26 per 1M tokens.
+      expect(estimateCostByTier(3_000_000, 0)).toBe(0.78);
+      expect(estimateCostByTier(0, 3_000_000)).toBe(0.78);
     });
 
     test("cost is rounded to cents", () => {
@@ -56,8 +56,8 @@ describe("usage/costs", () => {
     });
 
     test("blended cost per token is between small and large tier costs", () => {
-      const smallTierCost = (0.7 * 0.17 + 0.3 * 0.25) / 1_000_000;
-      const largeTierCost = (0.7 * 0.17 + 0.3 * 0.25) / 1_000_000;
+      const smallTierCost = (0.7 * 0.2 + 0.3 * 0.4) / 1_000_000;
+      const largeTierCost = (0.7 * 0.2 + 0.3 * 0.4) / 1_000_000;
       expect(BLENDED_COST_PER_TOKEN).toBeGreaterThanOrEqual(smallTierCost - 1e-15);
       expect(BLENDED_COST_PER_TOKEN).toBeLessThanOrEqual(largeTierCost + 1e-15);
     });

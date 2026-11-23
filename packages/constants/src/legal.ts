@@ -14,7 +14,7 @@
  * school agreement).
  */
 export const LEGAL_DOCUMENT_VERSIONS = {
-  terms: "2026-11-11",
-  privacy: "2026-11-17",
-  schoolAgreement: "2026-11-11",
+  terms: "2026-11-22",
+  privacy: "2026-11-22",
+  schoolAgreement: "2026-11-22",
 } as const;

@@ -118,17 +118,6 @@
   gap: var(--space-4);
 }
 
-.custom-lists__file input[type="file"]::file-selector-button {
-  margin-inline-end: var(--space-12);
-  padding: var(--space-8) var(--space-16);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-background);
-  color: var(--color-foreground);
-  font: inherit;
-  cursor: pointer;
-}
-
 .custom-lists__draft-column,
 .custom-lists__inline-form {
   border: 1px solid var(--color-border);

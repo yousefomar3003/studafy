@@ -461,7 +461,9 @@ describeDb("report card notes", () => {
     expect(certificate.content.report?.attendance?.days_absent).toBe(1);
     expect(certificate.content.subjects[0]!.comment).toBe("Strong problem solver.");
 
-    const own = await as(ids.s1User!, (tx) => listStudentResults(tx, tenant.schoolId, ids.s1!));
+    const own = await as(ids.s1User!, (tx) =>
+      listStudentResults(tx, tenant.schoolId, ids.s1!, "student_or_parent"),
+    );
     expect(own[0]!.result.report?.conduct?.label).toBe("Very good");
     expect(own[0]!.result.subjects[0]!.comment).toBe("Strong problem solver.");
   });

@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterEach, describe, expect, mock, test } from "bun:test";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 
 import { expectNoA11yViolations } from "../../lib/test/axe";
 
@@ -14,6 +14,11 @@ const loadUserMenu = async () => {
   const { UserMenu } = await import("./UserMenu");
   return { AuthProvider, createSessionStore, UserMenu };
 };
+
+/** Renders the router's current path, so a test can see where sign-out leads. */
+function LocationProbe() {
+  return <output data-testid="location">{useLocation().pathname}</output>;
+}
 
 async function renderMenu(logoutSpy: () => Promise<void>) {
   const { AuthProvider, createSessionStore, UserMenu } = await loadUserMenu();
@@ -34,8 +39,9 @@ async function renderMenu(logoutSpy: () => Promise<void>) {
   return render(
     <QueryClientProvider client={queryClient}>
       <AuthProvider store={store}>
-        <MemoryRouter>
+        <MemoryRouter initialEntries={["/portal/admin"]}>
           <UserMenu />
+          <LocationProbe />
         </MemoryRouter>
       </AuthProvider>
     </QueryClientProvider>,
@@ -81,6 +87,8 @@ describe("UserMenu", () => {
     fireEvent.click(screen.getByText("Sign out"));
 
     await waitFor(() => expect(called).toBe(true));
+    // Signing out ends on the landing page.
+    await waitFor(() => expect(screen.getByTestId("location").textContent).toBe("/"));
   });
 
   test("has no accessibility violations with the panel and the devices dialog open", async () => {

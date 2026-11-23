@@ -267,7 +267,9 @@
     "statusOk": "ok",
     "statusUnavailable": "unavailable",
     "statusUnavailableRef": "unavailable (ref {{requestId}})",
-    "unknownRef": "unknown"
+    "unknownRef": "unknown",
+    "forbiddenTitle": "No access",
+    "backHome": "Go to your home page"
   },
   "legal": {
     "deleteAccount": {

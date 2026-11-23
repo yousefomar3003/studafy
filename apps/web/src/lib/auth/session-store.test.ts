@@ -419,8 +419,27 @@ describe("cross-tab refresh (QA-033)", () => {
         latest = tokens;
       },
       latest: () => latest,
+      clear() {
+        latest = null;
+      },
     };
   }
+
+  test("after signing out, the next sign-in check asks the server instead of adopting the old token", async () => {
+    // The bug: logout left the shared token behind, the login page's restore adopted it without a
+    // request, reported "authenticated" and sent the user to the portal, whose check failed (400)
+    // and sent them back: an endless loop between the login page and the portal.
+    const server = fakeServer();
+    const browser = sharedBrowser();
+    const tab = createSessionStore({ refreshClient: server.client, crossTab: browser });
+    expect(await tab.restore()).toBe("authenticated");
+    await tab.logout();
+    expect(browser.latest()).toBeNull();
+
+    const callsBefore = server.calls();
+    await tab.restore();
+    expect(server.calls()).toBe(callsBefore + 1);
+  });
 
   test("five tabs restoring at once all end up signed in, with one rotation", async () => {
     const server = fakeServer();

@@ -11,6 +11,7 @@ import '../application/teacher_providers.dart';
 import 'class_announcement_composer_screen.dart';
 import 'grade_entry_screen.dart';
 import 'incident_report_screen.dart';
+import 'predicted_grades_screen.dart';
 import 'teacher_content_screen.dart';
 import 'widgets/roster_entry_tile.dart';
 
@@ -91,6 +92,8 @@ class TeacherClassDetailScreen extends ConsumerWidget {
                     orElse: () => const SizedBox.shrink(),
                   ),
                   const SizedBox(height: AppSpacing.space16),
+                  _PredictedGradesTile(classId: classId, classCode: classCode),
+                  const SizedBox(height: AppSpacing.space8),
                   // The class's rows in the school's custom lists (a bus group, a homeroom); takes
                   // no space when there are none.
                   LinkedCustomListsSection(
@@ -218,6 +221,35 @@ class _ClassHero extends StatelessWidget {
           : 'teacher.classes.roster'.tr(
               namedArgs: {'count': '$rosterSize'},
             ),
+    );
+  }
+}
+
+/// Opens [PredictedGradesScreen] for the class's section and subject. Always offered: the screen
+/// itself explains when the class has no section or the school has not switched predicted grades
+/// on, so this row costs no request until it is tapped.
+class _PredictedGradesTile extends StatelessWidget {
+  const _PredictedGradesTile({required this.classId, required this.classCode});
+
+  final String classId;
+  final String classCode;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: EdgeInsets.zero,
+      child: ListTile(
+        leading: const Icon(Icons.insights_outlined),
+        title: Text('teacher.predicted.entry'.tr()),
+        subtitle: Text('teacher.predicted.entrySubtitle'.tr()),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) =>
+                PredictedGradesScreen(classId: classId, classCode: classCode),
+          ),
+        ),
+      ),
     );
   }
 }

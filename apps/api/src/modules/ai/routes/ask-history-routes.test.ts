@@ -214,6 +214,43 @@ describe("GET /api/ai/students/{studentId}/conversations/{conversationId}", () =
   });
 });
 
+describe("DELETE /api/ai/students/{studentId}/conversations/{conversationId}", () => {
+  test("deletes the student's own conversation and everything in it", async () => {
+    const db = fakeDatabase({ conversationExists: true });
+    const res = await buildApp(db).request(
+      `/api/ai/students/${STUDENT_ID}/conversations/${CONVERSATION_ID}`,
+      { method: "DELETE" },
+    );
+
+    expect(res.status).toBe(204);
+    // Ownership is checked against the path's student before anything is touched.
+    const queries = db.queries.filter((q) => !q.sql.includes("set_config"));
+    const lookup = queries[0]!;
+    expect(lookup.sql).toContain("FROM app.ai_conversations");
+    expect(lookup.params).toEqual([CONVERSATION_ID, STUDENT_ID]);
+    // Moderation decisions are unlinked first (their FK restricts), then the rows go, children first.
+    const steps = queries.slice(1).map((q) => q.sql.replace(/\s+/g, " "));
+    expect(steps[0]).toContain("UPDATE app.ai_moderation_decisions");
+    expect(steps[0]).toContain("SET message_id = NULL");
+    expect(steps[1]).toContain("DELETE FROM app.ai_message_citations");
+    expect(steps[2]).toContain("DELETE FROM app.ai_messages");
+    expect(steps[3]).toContain("DELETE FROM app.ai_conversations");
+  });
+
+  test("answers 404 and deletes nothing for a conversation that is not this student's", async () => {
+    const db = fakeDatabase({ conversationExists: false });
+    const res = await buildApp(db).request(
+      `/api/ai/students/${STUDENT_ID}/conversations/${OTHER_CONVERSATION_ID}`,
+      { method: "DELETE" },
+    );
+
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe(ERROR_CODES.AI_CONVERSATION_NOT_FOUND);
+    expect(db.queries.some((q) => /DELETE FROM|UPDATE app\./.test(q.sql))).toBe(false);
+  });
+});
+
 describe("restoreCitationOrders", () => {
   test("drops the out-of-range ids the resolver discarded", () => {
     expect(restoreCitationOrders("a [9] b [2] c [1] d [2]", 2)).toEqual([2, 1]);

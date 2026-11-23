@@ -6,6 +6,7 @@ import { useFormatters, useTranslation } from "../../../lib/i18n";
 
 import { ConfirmModal, SeverityBadge } from "./components";
 import { newKey } from "./config-form";
+import { CurriculumTemplateDialog } from "./CurriculumTemplateDialog";
 import { problemMessage } from "./errors";
 import { useDeleteGradeScale, useSaveGradeScale } from "./mutations";
 import { useGradeScales } from "./queries";
@@ -40,6 +41,7 @@ export function ScalesTab({ ctx }: { ctx: SetupContext }) {
   const remove = useDeleteGradeScale();
   const [editing, setEditing] = useState<{ scale: GradeScale | null } | null>(null);
   const [pendingDelete, setPendingDelete] = useState<GradeScale | null>(null);
+  const [pickingTemplate, setPickingTemplate] = useState(false);
   const canEdit = ctx.can.manage && ctx.configEditable;
 
   if (editing) {
@@ -51,9 +53,14 @@ export function ScalesTab({ ctx }: { ctx: SetupContext }) {
       <div className="ag-head">
         <h2 id="ag-scales-heading">{t("academicGrading.scales.heading")}</h2>
         {canEdit ? (
-          <Button type="button" onClick={() => setEditing({ scale: null })}>
-            {t("academicGrading.scales.add")}
-          </Button>
+          <div className="ag-actions">
+            <Button type="button" variant="secondary" onClick={() => setPickingTemplate(true)}>
+              {t("academicGrading.templates.action")}
+            </Button>
+            <Button type="button" onClick={() => setEditing({ scale: null })}>
+              {t("academicGrading.scales.add")}
+            </Button>
+          </div>
         ) : null}
       </div>
       <p className="ag-muted">{t("academicGrading.scales.help")}</p>
@@ -126,6 +133,9 @@ export function ScalesTab({ ctx }: { ctx: SetupContext }) {
           ))}
         </Table.Body>
       </Table>
+      {pickingTemplate ? (
+        <CurriculumTemplateDialog ctx={ctx} onClose={() => setPickingTemplate(false)} />
+      ) : null}
       <ConfirmModal
         open={pendingDelete !== null}
         title={t("academicGrading.scales.deleteTitle", { name: pendingDelete?.name ?? "" })}

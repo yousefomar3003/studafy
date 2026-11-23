@@ -9,6 +9,7 @@ import {
   openAiResponseText,
   openAiStopReason,
   openAiUsage,
+  routingPrivacy,
 } from "./openai-compatible";
 
 import type { OpenAiChatResponse, OpenAiStreamChunk } from "./openai-compatible";
@@ -499,7 +500,10 @@ export class AnthropicProvider implements LlmProvider {
 
   private body(input: LlmGenerateInput, stream: boolean): Record<string, unknown> {
     if (this.apiFormat === "openai-compatible") {
-      return openAiRequestBody(input, input.maxTokens ?? this.defaultMaxTokens, stream);
+      return {
+        ...openAiRequestBody(input, input.maxTokens ?? this.defaultMaxTokens, stream),
+        ...routingPrivacy(this.baseUrl),
+      };
     }
     const body: Record<string, unknown> = {
       model: input.model,

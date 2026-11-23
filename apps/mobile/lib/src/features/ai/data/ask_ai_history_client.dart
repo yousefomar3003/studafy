@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 
+import '../../../core/api/api_exception.dart';
+
 import '../domain/ask_ai_conversation.dart';
 import '../domain/ask_ai_history.dart';
 
@@ -72,6 +74,22 @@ class AskAiHistoryClient {
               ),
       ],
     );
+  }
+
+  /// Deletes one of the student's conversations for good. A conversation that is already gone
+  /// (expired, or deleted from another device) counts as deleted, so a 404 completes normally.
+  Future<void> delete({
+    required String studentId,
+    required String conversationId,
+  }) async {
+    try {
+      await _dio.delete<void>(
+        '/api/ai/students/$studentId/conversations/$conversationId',
+      );
+    } on DioException catch (error) {
+      if (error.apiError?.status == 404) return;
+      rethrow;
+    }
   }
 
   List<AskAiCitation> _citations(Object? raw) {

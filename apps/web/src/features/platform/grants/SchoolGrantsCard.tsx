@@ -29,8 +29,8 @@ export function SchoolGrantsCard({
         <h2 id="platform-grants-title">{t("platformLicensing.grants.cardTitle")}</h2>
       </Card.Header>
       <Card.Body>
-        <p className="platform-muted">{t("platformLicensing.grants.cardDescription")}</p>
-        <div className="platform-actions">
+        <div className="platform-card-intro">
+          <p className="platform-muted">{t("platformLicensing.grants.cardDescription")}</p>
           <Button type="button" variant="primary" onClick={() => setGranting(true)}>
             {t("platformLicensing.grants.grantStorage")}
           </Button>
@@ -44,6 +44,7 @@ export function SchoolGrantsCard({
               : t("platformLicensing.grants.emptySchool")
           }
           caption={t("platformLicensing.grants.cardTitle")}
+          hideCaption
           showSchool={false}
         />
       </Card.Body>

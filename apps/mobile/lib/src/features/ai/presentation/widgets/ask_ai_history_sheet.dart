@@ -24,13 +24,16 @@ class AskAiOpenChatChoice extends AskAiHistoryChoice {
 }
 
 /// Opens the Ask AI chat history as a draggable bottom sheet. Resolves to the student's choice, or
-/// null when they dismiss it. [currentConversationId] is highlighted as the open chat.
+/// null when they dismiss it. [currentConversationId] is highlighted as the open chat; if the
+/// student deletes it and then dismisses the sheet, this resolves to a new chat so the screen does
+/// not keep showing a conversation that no longer exists.
 Future<AskAiHistoryChoice?> showAskAiHistorySheet(
   BuildContext context, {
   required String studentId,
   String? currentConversationId,
-}) {
-  return showModalBottomSheet<AskAiHistoryChoice>(
+}) async {
+  final deleted = <String>{};
+  final choice = await showModalBottomSheet<AskAiHistoryChoice>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
@@ -44,9 +47,16 @@ Future<AskAiHistoryChoice?> showAskAiHistorySheet(
         studentId: studentId,
         currentConversationId: currentConversationId,
         scrollController: scrollController,
+        onDeleted: deleted.add,
       ),
     ),
   );
+  if (choice == null &&
+      currentConversationId != null &&
+      deleted.contains(currentConversationId)) {
+    return const AskAiNewChatChoice();
+  }
+  return choice;
 }
 
 /// The age bucket a conversation is listed under, by when it was last added to.
@@ -71,11 +81,15 @@ class _AskAiHistorySheet extends ConsumerStatefulWidget {
     required this.studentId,
     required this.currentConversationId,
     required this.scrollController,
+    required this.onDeleted,
   });
 
   final String studentId;
   final String? currentConversationId;
   final ScrollController scrollController;
+
+  /// Told each conversation id the student deletes.
+  final void Function(String conversationId) onDeleted;
 
   @override
   ConsumerState<_AskAiHistorySheet> createState() => _AskAiHistorySheetState();
@@ -87,6 +101,9 @@ class _AskAiHistorySheetState extends ConsumerState<_AskAiHistorySheet> {
   bool _loading = true;
   bool _loadingMore = false;
   bool _failed = false;
+
+  /// Conversations whose delete request is in flight.
+  final _deleting = <String>{};
 
   @override
   void initState() {
@@ -152,8 +169,61 @@ class _AskAiHistorySheetState extends ConsumerState<_AskAiHistorySheet> {
     }
   }
 
+  Future<void> _delete(AskAiConversationSummary conversation) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('askAi.history.deleteTitle'.tr()),
+        content: Text('askAi.history.deleteBody'.tr()),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text('askAi.history.deleteCancel'.tr()),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(dialogContext).colorScheme.error,
+            ),
+            child: Text('askAi.history.deleteConfirm'.tr()),
+          ),
+        ],
+      ),
+    );
+    if (!(confirmed ?? false) || !mounted) return;
+
+    setState(() => _deleting.add(conversation.id));
+    try {
+      await ref
+          .read(askAiHistoryClientProvider)
+          .delete(studentId: widget.studentId, conversationId: conversation.id);
+      widget.onDeleted(conversation.id);
+      if (!mounted) return;
+      setState(
+        () => _conversations.removeWhere((c) => c.id == conversation.id),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('askAi.history.deleteError'.tr())));
+    } finally {
+      if (mounted) setState(() => _deleting.remove(conversation.id));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Its own messenger so a failed-delete snackbar shows on the sheet, not under its barrier.
+    return ScaffoldMessenger(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: Builder(builder: _content),
+      ),
+    );
+  }
+
+  Widget _content(BuildContext context) {
     final theme = Theme.of(context);
 
     return Column(
@@ -223,8 +293,10 @@ class _AskAiHistorySheetState extends ConsumerState<_AskAiHistorySheet> {
           conversation: conversation,
           showTime: next == _HistoryGroup.today,
           selected: conversation.id == widget.currentConversationId,
+          deleting: _deleting.contains(conversation.id),
           onTap: () =>
               Navigator.of(context).pop(AskAiOpenChatChoice(conversation.id)),
+          onDelete: () => _delete(conversation),
         ),
       );
     }
@@ -281,7 +353,9 @@ class _ConversationTile extends StatelessWidget {
     required this.conversation,
     required this.showTime,
     required this.selected,
+    required this.deleting,
     required this.onTap,
+    required this.onDelete,
   });
 
   final AskAiConversationSummary conversation;
@@ -289,7 +363,11 @@ class _ConversationTile extends StatelessWidget {
   /// Today's chats show the time of day; older ones the date.
   final bool showTime;
   final bool selected;
+
+  /// The delete request is in flight: the tile is inert and shows progress.
+  final bool deleting;
   final VoidCallback onTap;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -310,11 +388,13 @@ class _ConversationTile extends StatelessWidget {
         borderRadius: AppRadius.lgRadius,
         clipBehavior: Clip.antiAlias,
         child: InkWell(
-          onTap: onTap,
+          onTap: deleting ? null : onTap,
           child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.space12,
-              vertical: AppSpacing.space12,
+            padding: const EdgeInsetsDirectional.fromSTEB(
+              AppSpacing.space12,
+              AppSpacing.space12,
+              AppSpacing.space4,
+              AppSpacing.space12,
             ),
             child: Row(
               children: [
@@ -372,6 +452,29 @@ class _ConversationTile extends StatelessWidget {
                     ),
                   ),
                 ],
+                const SizedBox(width: AppSpacing.space4),
+                if (deleting)
+                  const SizedBox.square(
+                    dimension: 48,
+                    child: Center(
+                      child: SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                  )
+                else
+                  IconButton(
+                    onPressed: onDelete,
+                    tooltip: 'askAi.history.delete'.tr(),
+                    icon: Icon(
+                      Icons.delete_outline_rounded,
+                      size: 20,
+                      color: selected
+                          ? colorScheme.onPrimaryContainer
+                          : colorScheme.onSurfaceVariant,
+                    ),
+                  ),
               ],
             ),
           ),

@@ -152,6 +152,9 @@ export function activationOAuthRoutes({
       code_challenge_method: "S256",
     });
     if (provider === "microsoft") params.set("response_mode", "query");
+    // Activating an invitation links whichever account the user picks, so always let them pick:
+    // without this the provider silently reuses the account the browser is signed in to.
+    params.set("prompt", "select_account");
     // The mock IdP has no consent screen or account picker: whichever seeded persona's email is
     // passed here is who the callback activates as. A real IdP resolves this from whoever is signed
     // in there instead — see mock-route.ts's identical use for the login (not activation) flow.

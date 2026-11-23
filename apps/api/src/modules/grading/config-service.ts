@@ -3,6 +3,7 @@ import {
   hasErrors,
   summarizeWeights,
   validateGradeScale,
+  validateRankSettings,
   validateSubjectConfig,
 } from "@studafy/grading-engine";
 
@@ -16,6 +17,7 @@ import {
   replaceDescriptors,
 } from "./descriptor-service";
 import {
+  configWeighting,
   effectiveSubjects,
   loadConfigDetail,
   loadConfigDetails,
@@ -40,7 +42,9 @@ import type {
   ConfigDetails,
   EffectiveSubject,
   LoadedConfig,
+  PredictedGradesVisibility,
   ProgramRow,
+  RankVisibility,
   SectionRow,
   SubjectConfigRow,
   TermRow,
@@ -51,6 +55,8 @@ import type {
   CategoryScope,
   EngineDescriptor,
   GradeBand,
+  RankBasis,
+  RankScope,
   ResultFormatKind,
   RoundingMode,
   SubjectGradingConfig,
@@ -77,6 +83,12 @@ export interface ProgramInput {
   average_rounding_mode?: RoundingMode;
   result_format?: ResultFormatKind;
   result_scale_max?: number | null;
+  predicted_grades_enabled?: boolean;
+  predicted_grades_visibility?: PredictedGradesVisibility;
+  rank_enabled?: boolean;
+  rank_basis?: RankBasis;
+  rank_scope?: RankScope;
+  rank_visibility?: RankVisibility;
   /** Replaces the grade's descriptor scale (highest first) when given. */
   descriptors?: DescriptorInput[];
 }
@@ -112,6 +124,12 @@ export interface SubjectConfigInput {
   include_in_average: boolean;
   include_on_certificate: boolean;
   average_weight: number;
+  /** Credit hours; null (or omitted) when the school does not use credits. */
+  credits?: number | null;
+  /** A short course level label (Honors, AP, HL); null or omitted for none. */
+  course_level?: string | null;
+  /** Weighted GPA boost (0-5); 0 or omitted for none. */
+  gpa_boost?: number;
   grading_method: "weighted" | "total_points" | "descriptive";
   max_marks: number;
   pass_percentage: number;
@@ -153,6 +171,9 @@ export interface ConfigView {
   include_in_average: boolean;
   include_on_certificate: boolean;
   average_weight: number;
+  credits: number | null;
+  course_level: string | null;
+  gpa_boost: number;
   grading_method: "weighted" | "total_points" | "descriptive";
   max_marks: number;
   pass_percentage: number;
@@ -271,6 +292,7 @@ function inputToEngine(
       mandatory: assessment.is_mandatory,
     })),
     ...(input.grading_method === "descriptive" ? { descriptors } : {}),
+    gpaBoost: input.gpa_boost ?? 0,
   };
 }
 
@@ -349,6 +371,8 @@ function signatureFlags(source: {
   include_in_average: boolean;
   include_on_certificate: boolean;
   average_weight: number | string;
+  credits?: number | string | null;
+  gpa_boost?: number | string;
   grade_scale_id: string | null;
 }): Record<string, unknown> {
   return {
@@ -356,6 +380,10 @@ function signatureFlags(source: {
     include_in_average: source.include_in_average,
     include_on_certificate: source.include_on_certificate,
     average_weight: Number(source.average_weight),
+    // Credits and the boost change credit totals and the weighted GPA; the course level is a label.
+    credits:
+      source.credits === null || source.credits === undefined ? null : Number(source.credits),
+    gpa_boost: Number(source.gpa_boost ?? 0),
     grade_scale_id: source.grade_scale_id,
   };
 }
@@ -566,6 +594,8 @@ export async function listPrograms(
            program.max_failed_subjects_for_supplementary, program.mark_approval_required,
            program.average_rounding_decimals, program.average_rounding_mode,
            program.result_format, program.result_scale_max::float8 AS result_scale_max,
+           program.predicted_grades_enabled, program.predicted_grades_visibility,
+           program.rank_enabled, program.rank_basis, program.rank_scope, program.rank_visibility,
            program.updated_at
     FROM app.grade_programs AS program
     JOIN app.grade_levels AS grade
@@ -609,6 +639,36 @@ function resultFormatValues(
   return { result_format: format, result_scale_max: max };
 }
 
+type RankSettings = Pick<
+  ProgramRow,
+  "rank_enabled" | "rank_basis" | "rank_scope" | "rank_visibility"
+>;
+
+/**
+ * The class rank settings a program saves: the request's choices merged onto the saved ones. A GPA
+ * basis is refused on a grade whose result is not a GPA (also when the format is what changes).
+ */
+function rankValues(
+  input: ProgramInput,
+  existing: RankSettings | undefined,
+  resultFormat: ResultFormatKind,
+): RankSettings {
+  const values: RankSettings = {
+    rank_enabled: input.rank_enabled ?? existing?.rank_enabled ?? false,
+    rank_basis: input.rank_basis ?? existing?.rank_basis ?? "average",
+    rank_scope: input.rank_scope ?? existing?.rank_scope ?? "section",
+    rank_visibility: input.rank_visibility ?? existing?.rank_visibility ?? "staff",
+  };
+  const issues = validateRankSettings(
+    { enabled: values.rank_enabled, basis: values.rank_basis },
+    resultFormat,
+  );
+  if (hasErrors(issues)) {
+    throw new CodedHttpException(400, ERROR_CODES.VALIDATION_FAILED, issues[0]!.message);
+  }
+  return values;
+}
+
 /** Sets up a grade for a year (or updates its policies). Idempotent per grade and year. */
 export async function upsertProgram(
   tx: TransactionSql,
@@ -628,7 +688,9 @@ export async function upsertProgram(
   const [existing] = await tx<ProgramRow[]>`
     SELECT id, grade_scale_id, max_failed_subjects_for_supplementary, mark_approval_required,
            average_rounding_decimals, average_rounding_mode,
-           result_format, result_scale_max::float8 AS result_scale_max
+           result_format, result_scale_max::float8 AS result_scale_max,
+           predicted_grades_enabled, predicted_grades_visibility,
+           rank_enabled, rank_basis, rank_scope, rank_visibility
     FROM app.grade_programs
     WHERE school_id = ${schoolId}::uuid AND academic_year_id = ${yearId}::uuid
       AND grade_level_id = ${gradeLevelId}::uuid
@@ -650,6 +712,7 @@ export async function upsertProgram(
     }
   }
 
+  const format = resultFormatValues(input, existing);
   const values = {
     grade_scale_id: scaleId,
     max_failed_subjects_for_supplementary:
@@ -662,7 +725,12 @@ export async function upsertProgram(
       input.average_rounding_decimals ?? existing?.average_rounding_decimals ?? 2,
     average_rounding_mode:
       input.average_rounding_mode ?? existing?.average_rounding_mode ?? "half_up",
-    ...resultFormatValues(input, existing),
+    ...format,
+    ...rankValues(input, existing, format.result_format),
+    predicted_grades_enabled:
+      input.predicted_grades_enabled ?? existing?.predicted_grades_enabled ?? false,
+    predicted_grades_visibility:
+      input.predicted_grades_visibility ?? existing?.predicted_grades_visibility ?? "staff",
   };
 
   if (existing) {
@@ -675,6 +743,12 @@ export async function upsertProgram(
         average_rounding_mode = ${values.average_rounding_mode},
         result_format = ${values.result_format},
         result_scale_max = ${values.result_scale_max},
+        predicted_grades_enabled = ${values.predicted_grades_enabled},
+        predicted_grades_visibility = ${values.predicted_grades_visibility},
+        rank_enabled = ${values.rank_enabled},
+        rank_basis = ${values.rank_basis},
+        rank_scope = ${values.rank_scope},
+        rank_visibility = ${values.rank_visibility},
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ${existing.id}::uuid AND school_id = ${schoolId}::uuid
     `;
@@ -683,12 +757,16 @@ export async function upsertProgram(
       INSERT INTO app.grade_programs (
         school_id, academic_year_id, grade_level_id, grade_scale_id,
         max_failed_subjects_for_supplementary, mark_approval_required,
-        average_rounding_decimals, average_rounding_mode, result_format, result_scale_max
+        average_rounding_decimals, average_rounding_mode, result_format, result_scale_max,
+        predicted_grades_enabled, predicted_grades_visibility,
+        rank_enabled, rank_basis, rank_scope, rank_visibility
       ) VALUES (
         ${schoolId}::uuid, ${yearId}::uuid, ${gradeLevelId}::uuid, ${values.grade_scale_id}::uuid,
         ${values.max_failed_subjects_for_supplementary}, ${values.mark_approval_required},
         ${values.average_rounding_decimals}, ${values.average_rounding_mode},
-        ${values.result_format}, ${values.result_scale_max}
+        ${values.result_format}, ${values.result_scale_max},
+        ${values.predicted_grades_enabled}, ${values.predicted_grades_visibility},
+        ${values.rank_enabled}, ${values.rank_basis}, ${values.rank_scope}, ${values.rank_visibility}
       )
     `;
   }
@@ -727,7 +805,7 @@ export async function toConfigView(
 function configViewOf(loaded: LoadedConfig, allCounts: ReadonlyMap<string, number>): ConfigView {
   const { config } = loaded;
   const engine = toEngineConfig(loaded);
-  const issues = config.is_excluded ? [] : validateSubjectConfig(engine);
+  const issues = config.is_excluded ? [] : validateSubjectConfig(engine, configWeighting(config));
   // Only this config's assessments, in the order a per-config count query would have listed them.
   const counts = new Map(
     loaded.assessments
@@ -745,6 +823,9 @@ function configViewOf(loaded: LoadedConfig, allCounts: ReadonlyMap<string, numbe
     include_in_average: config.include_in_average,
     include_on_certificate: config.include_on_certificate,
     average_weight: Number(config.average_weight),
+    credits: config.credits === null ? null : Number(config.credits),
+    course_level: config.course_level,
+    gpa_boost: Number(config.gpa_boost),
     grading_method: config.grading_method,
     max_marks: Number(config.max_marks),
     pass_percentage: Number(config.pass_percentage),
@@ -880,7 +961,7 @@ export async function listConfigSummaries(
     if (row.is_excluded) continue;
     const loaded = details.get(row.id);
     const engine = toEngineConfig(loaded);
-    const issues = validateSubjectConfig(engine);
+    const issues = validateSubjectConfig(engine, configWeighting(loaded.config));
     const weights = summarizeWeights(engine);
     summaries.push({
       config_id: row.id,
@@ -1081,7 +1162,13 @@ async function validateInputForYear(
         )
       : [];
   const engine = inputToEngine(input, terms, scale.bands, descriptors);
-  const issues = [...checkInputReferences(input, terms), ...validateSubjectConfig(engine)];
+  const issues = [
+    ...checkInputReferences(input, terms),
+    ...validateSubjectConfig(engine, {
+      averageWeight: input.average_weight,
+      credits: input.credits ?? null,
+    }),
+  ];
   // A live (active) year never runs on a broken configuration; a draft may be saved half-done.
   if (year.grading_config_status === "active" && hasErrors(issues)) invalid(issues);
   if (
@@ -1105,7 +1192,7 @@ const CONFIG_INSERT_COLUMNS = `
   pass_percentage, final_exam_pass_percentage, grade_scale_id, rounding_decimals, rounding_mode,
   missing_mark_policy, absent_policy, retake_policy, retake_cap_percentage,
   teachers_can_add_assessments, teacher_assessments_require_approval, instructions,
-  is_excluded, based_on_revision`;
+  is_excluded, based_on_revision, credits, course_level, gpa_boost`;
 
 /**
  * Create a subject's grade default (`sectionId` null) or a section-only subject (a subject the
@@ -1168,7 +1255,8 @@ export async function createSubjectConfig(
           ${input.rounding_decimals}, ${input.rounding_mode}, ${input.missing_mark_policy},
           ${input.absent_policy}, ${input.retake_policy}, ${input.retake_cap_percentage},
           ${input.teachers_can_add_assessments}, ${input.teacher_assessments_require_approval},
-          ${input.instructions}, false, NULL
+          ${input.instructions}, false, NULL, ${input.credits ?? null},
+          ${input.course_level ?? null}, ${input.gpa_boost ?? 0}
         )
         RETURNING id
       `,
@@ -1429,6 +1517,9 @@ export async function updateSubjectConfig(
       include_in_average = ${input.include_in_average},
       include_on_certificate = ${input.include_on_certificate},
       average_weight = ${input.average_weight},
+      credits = ${input.credits ?? null},
+      course_level = ${input.course_level ?? null},
+      gpa_boost = ${input.gpa_boost ?? 0},
       grading_method = ${input.grading_method},
       max_marks = ${input.max_marks},
       pass_percentage = ${input.pass_percentage},
@@ -1763,7 +1854,7 @@ export async function createSectionOverride(
       ${g.rounding_mode}, ${g.missing_mark_policy}, ${g.absent_policy}, ${g.retake_policy},
       ${g.retake_cap_percentage}, ${g.teachers_can_add_assessments},
       ${g.teacher_assessments_require_approval}, ${g.instructions}, ${mode === "exclude"},
-      ${g.revision}
+      ${g.revision}, ${g.credits}, ${g.course_level}, ${g.gpa_boost}
     )
     RETURNING id
   `;
@@ -2236,7 +2327,8 @@ export async function collectPublishIssues(
   for (const row of configs) {
     if (row.is_excluded) continue;
     const loadedConfig = context.details.get(row.id);
-    for (const issue of validateSubjectConfig(toEngineConfig(loadedConfig))) {
+    const weighting = configWeighting(loadedConfig.config);
+    for (const issue of validateSubjectConfig(toEngineConfig(loadedConfig), weighting)) {
       issues.push({
         severity: issue.severity,
         code: issue.code,

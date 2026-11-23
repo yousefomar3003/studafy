@@ -57,7 +57,8 @@
     "STUDENT": "طالب",
     "PARENT": "ولي أمر",
     "GUEST": "ضيف",
-    "SUPPORT_AGENT": "موظف دعم"
+    "SUPPORT_AGENT": "موظف دعم",
+    "ATTENDANCE_OFFICER": "مسؤول الحضور"
   },
   "common": {
     "previous": "السابق",
@@ -418,7 +419,26 @@
         "student": "الطلاب",
         "teacher": "المعلمون",
         "parent": "أولياء الأمور"
-      }
+      },
+      "accountsTotal": "الحسابات النشطة",
+      "invitedCount_zero": "{{count}} غير مفعّل",
+      "invitedCount_one": "{{count}} غير مفعّل",
+      "invitedCount_two": "{{count}} غير مفعّلين",
+      "invitedCount_few": "{{count}} غير مفعّلين",
+      "invitedCount_many": "{{count}} غير مفعّل",
+      "invitedCount_other": "{{count}} غير مفعّل",
+      "storageCap": "من {{cap}} · {{percent}}",
+      "activeLast30Count_zero": "لم يسجّل أحد الدخول خلال آخر 30 يومًا",
+      "activeLast30Count_one": "سجّل {{count}} الدخول خلال آخر 30 يومًا",
+      "activeLast30Count_two": "سجّل {{count}} الدخول خلال آخر 30 يومًا",
+      "activeLast30Count_few": "سجّل {{count}} الدخول خلال آخر 30 يومًا",
+      "activeLast30Count_many": "سجّل {{count}} الدخول خلال آخر 30 يومًا",
+      "activeLast30Count_other": "سجّل {{count}} الدخول خلال آخر 30 يومًا",
+      "aiTile": "الذكاء الاصطناعي للطلاب",
+      "aiTileHint": "طلاب لديهم الإضافة · {{tokens}} رمزًا للذكاء الاصطناعي في فترة الفوترة هذه",
+      "peopleByRole": "الحسابات حسب الدور",
+      "featureUse": "استخدام الميزات هذا الشهر",
+      "seatsLabel": "مقاعد {{audience}}"
     },
     "exports": {
       "title": "تصدير البيانات",
@@ -762,7 +782,8 @@
       "noMethod": "لم يُعدّ تسجيل الدخول بعد",
       "provider": {
         "google": "Google",
-        "microsoft": "Microsoft"
+        "microsoft": "Microsoft",
+        "mock": "تسجيل الدخول التجريبي (للتطوير فقط)"
       },
       "locked": "القفل",
       "lockedUntil": "مقفل حتى {{time}} بسبب كلمات مرور خاطئة",

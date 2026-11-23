@@ -214,6 +214,78 @@ const TRANSCRIPT_READY = {
   cumulative: TRANSCRIPT_CONTENT.cumulative,
 };
 
+const SAT_RESULT = {
+  id: "ext-result-1",
+  student_id: "student-1",
+  exam: {
+    id: "exam-sat",
+    code: "SAT",
+    name: "SAT",
+    total_mode: "sum",
+    total_min: 400,
+    total_max: 1600,
+    per_subject: false,
+    archived: false,
+  },
+  subject: null,
+  sat_on: "2026-10-04",
+  total_score: 1480,
+  note: null,
+  scores: [
+    {
+      component_id: "c-rw",
+      component_name: "Reading and Writing",
+      score_type: "numeric",
+      numeric_score: 720,
+      label_score: null,
+      max_score: 800,
+    },
+    {
+      component_id: "c-math",
+      component_name: "Math",
+      score_type: "numeric",
+      numeric_score: 760,
+      label_score: null,
+      max_score: 800,
+    },
+  ],
+  recorded_by_user_id: "principal-1",
+  created_at: "2026-10-20T10:00:00.000Z",
+  updated_at: "2026-10-20T10:00:00.000Z",
+};
+
+const PREDICTED = {
+  student_id: "student-1",
+  years: [
+    {
+      academic_year_id: "year-2",
+      academic_year_name: "2026–2027",
+      section_id: "section-1",
+      section_name: "A",
+      grade_level_name: "Year 13",
+      enabled: true,
+      visibility: "staff",
+      can_edit: true,
+      subjects: [
+        { subject_id: "subject-math", subject_name: "Mathematics", labels: ["A*", "A", "B"] },
+        { subject_id: "subject-phys", subject_name: "Physics", labels: [] },
+      ],
+      terms: [{ term_id: "term-1", term_name: "Term 1" }],
+      grades: [
+        {
+          term_id: null,
+          term_name: null,
+          subject_id: "subject-math",
+          subject_name: "Mathematics",
+          grade_label: "A",
+          note: "Strong mocks",
+          updated_at: "2026-11-01T10:00:00.000Z",
+        },
+      ],
+    },
+  ],
+};
+
 let studentRecords = recordsFor("student", null);
 let transcripts: (typeof TRANSCRIPT)[] = [];
 /** The document GET /api/grading/transcripts/{transcriptId} answers with (TRANSCRIPT when null). */
@@ -221,7 +293,11 @@ let transcriptDocument: unknown = null;
 
 interface RequestInit {
   params?: { path?: Record<string, string> };
-  body?: { answers?: { field_id: string; value: string }[] };
+  body?: {
+    answers?: { field_id: string; value: string }[];
+    term_id?: string | null;
+    grades?: { student_id: string; grade_label: string | null; note: string | null }[];
+  };
 }
 
 const PARENT_SUMMARY = {
@@ -245,7 +321,66 @@ const PARENT_SUMMARY = {
   ],
 };
 
+const GRADUATION_CHECKLIST = {
+  student_id: "student-1",
+  grade_level: { id: "grade-12", name: "Grade 12" },
+  current_year_pending: true,
+  years_counted: 3,
+  sets: [
+    {
+      set: { id: "set-1", name: "High school diploma", visible_to_students_and_parents: false },
+      status: "pending",
+      rules_met: 1,
+      rules_total: 3,
+      rules: [
+        {
+          id: "r1",
+          type: "total_credits",
+          min_value: 24,
+          group_name: null,
+          subjects: [],
+          external_exam: null,
+          status: "pending",
+          current: 18.5,
+          required: 24,
+          missing_subjects: [],
+        },
+        {
+          id: "r2",
+          type: "subjects_passed",
+          min_value: null,
+          group_name: "Core sciences",
+          subjects: [
+            { id: "bio", code: "BIO", name: "Biology" },
+            { id: "chem", code: "CHEM", name: "Chemistry" },
+          ],
+          external_exam: null,
+          status: "pending",
+          current: 1,
+          required: 2,
+          missing_subjects: [{ id: "chem", code: "CHEM", name: "Chemistry" }],
+        },
+        {
+          id: "r3",
+          type: "external_exam",
+          min_value: 1200,
+          group_name: null,
+          subjects: [],
+          external_exam: { id: "sat", code: "SAT", name: "SAT" },
+          status: "met",
+          current: 1480,
+          required: 1200,
+          missing_subjects: [],
+        },
+      ],
+    },
+  ],
+};
+
 const getMock = mock((path: string, _init?: RequestInit) => {
+  if (path === "/api/grading/students/{studentId}/graduation-requirements") {
+    return Promise.resolve<unknown>({ data: GRADUATION_CHECKLIST });
+  }
   if (path === "/api/students") {
     return Promise.resolve<unknown>({ data: { students: [STUDENT], next_cursor: null } });
   }
@@ -287,8 +422,14 @@ const getMock = mock((path: string, _init?: RequestInit) => {
   if (path === "/api/grading/students/{studentId}/transcripts") {
     return Promise.resolve<unknown>({ data: { transcripts } });
   }
+  if (path === "/api/grading/students/{studentId}/external-exam-results") {
+    return Promise.resolve<unknown>({ data: { results: [SAT_RESULT] } });
+  }
   if (path === "/api/grading/transcripts/{transcriptId}") {
     return Promise.resolve<unknown>({ data: transcriptDocument ?? TRANSCRIPT });
+  }
+  if (path === "/api/grading/students/{studentId}/predicted-grades") {
+    return Promise.resolve<unknown>({ data: PREDICTED });
   }
   return Promise.resolve<unknown>({ data: {} });
 });
@@ -306,11 +447,18 @@ const putMock = mock((path: string, init?: RequestInit) => {
     studentRecords = recordsFor("student", init?.body?.answers?.[0]?.value ?? null);
     return Promise.resolve<unknown>({ data: studentRecords });
   }
+  if (path === "/api/grading/sections/{sectionId}/subjects/{subjectId}/predicted-grades") {
+    return Promise.resolve<unknown>({ data: { students: [] } });
+  }
   return Promise.resolve<unknown>({ data: {} });
 });
 
+const deleteMock = mock((_path: string, _init?: RequestInit) =>
+  Promise.resolve<unknown>({ data: undefined }),
+);
+
 mock.module("../../../lib/api", () => ({
-  api: { GET: getMock, PUT: putMock, POST: postMock, PATCH: mock(), DELETE: mock() },
+  api: { GET: getMock, PUT: putMock, POST: postMock, PATCH: mock(), DELETE: deleteMock },
 }));
 
 function fakeJwt(payload: unknown): string {
@@ -372,6 +520,7 @@ afterEach(() => {
   getMock.mockClear();
   putMock.mockClear();
   postMock.mockClear();
+  deleteMock.mockClear();
 });
 
 describe("Principal > Students", () => {
@@ -451,6 +600,34 @@ describe("Principal > Students", () => {
     ).toBe("/portal/attendance/students/student-1");
   });
 
+  test("a principal reads a student's predicted grades and sets one from the scale", async () => {
+    await renderAsPrincipal("/portal/principal/students/student-1");
+
+    const panel = await screen.findByRole("region", { name: "Predicted grades" });
+    expect(
+      await within(panel).findByRole("heading", { name: "2026–2027 · Year 13 A" }),
+    ).toBeTruthy();
+    expect(within(panel).getByText("Seen by staff only.")).toBeTruthy();
+    expect(within(panel).getByText("Strong mocks")).toBeTruthy();
+
+    fireEvent.click(within(panel).getByRole("button", { name: "Add a predicted grade" }));
+    const form = within(panel).getByRole("group", { name: "Predicted grade" });
+    fireEvent.click(within(form).getByRole("combobox", { name: "Period" }));
+    fireEvent.click(within(form).getByRole("option", { name: "Term 1" }));
+    fireEvent.click(within(form).getByRole("combobox", { name: "Predicted grade" }));
+    fireEvent.click(within(form).getByRole("option", { name: "A*" }));
+    fireEvent.click(within(form).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(putMock).toHaveBeenCalledTimes(1));
+    const [path, init] = putMock.mock.calls[0] as [string, RequestInit];
+    expect(path).toBe("/api/grading/sections/{sectionId}/subjects/{subjectId}/predicted-grades");
+    expect(init.params?.path).toEqual({ sectionId: "section-1", subjectId: "subject-math" });
+    expect(init.body).toEqual({
+      term_id: "term-1",
+      grades: [{ student_id: "student-1", grade_label: "A*", note: null }],
+    });
+  });
+
   test("a principal sees what a transcript would cover and issues it", async () => {
     await renderAsPrincipal("/portal/principal/students/student-1");
 
@@ -487,6 +664,115 @@ describe("Principal > Students", () => {
     expect(within(document).getByText("81.25%")).toBeTruthy();
     expect(within(document).getByText("3.13")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Print" })).toBeTruthy();
+    // Issued without external exams (or before they existed): no such section.
+    expect(within(document).queryByRole("heading", { name: "External examinations" })).toBeNull();
+  });
+
+  test("the student page lists test scores and leadership can delete one", async () => {
+    await renderAsPrincipal("/portal/principal/students/student-1");
+
+    const panel = await screen.findByRole("region", { name: "Test scores" });
+    expect(await within(panel).findByText("Reading and Writing: 720 · Math: 760")).toBeTruthy();
+    expect(within(panel).getByText("1,480 / 1,600")).toBeTruthy();
+    expect(within(panel).getByRole("button", { name: "Record a result" })).toBeTruthy();
+
+    fireEvent.click(within(panel).getByRole("button", { name: "Delete the SAT result" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Remove" }));
+    await waitFor(() => expect(deleteMock).toHaveBeenCalledTimes(1));
+    const [path, init] = deleteMock.mock.calls[0] as [string, RequestInit];
+    expect(path).toBe("/api/grading/external-exam-results/{resultId}");
+    expect(init.params?.path).toEqual({ resultId: "ext-result-1" });
+  });
+
+  test("the student page shows the graduation requirements checklist", async () => {
+    await renderAsPrincipal("/portal/principal/students/student-1");
+
+    const panel = await screen.findByRole("region", { name: "Graduation requirements" });
+    expect(await within(panel).findByText("High school diploma")).toBeTruthy();
+    expect(within(panel).getByText("1 of 3 met")).toBeTruthy();
+    expect(within(panel).getByText(/This year is not finalized yet/)).toBeTruthy();
+    const credits = within(panel).getByText("Total credits").closest("tr")!;
+    expect(within(credits).getByText("18.5 of 24")).toBeTruthy();
+    expect(within(credits).getByText("In progress")).toBeTruthy();
+    const sciences = within(panel).getByText("Pass Core sciences").closest("tr")!;
+    expect(within(sciences).getByText("Not passed yet: Chemistry")).toBeTruthy();
+    const sat = within(panel).getByText("SAT").closest("tr")!;
+    expect(within(sat).getByText("At least 1,200")).toBeTruthy();
+    expect(within(sat).getByText("Met")).toBeTruthy();
+  });
+
+  test("a transcript says whether the graduation requirements were met, as issued", async () => {
+    transcriptDocument = {
+      ...TRANSCRIPT,
+      content: {
+        ...TRANSCRIPT_CONTENT,
+        graduation_requirements: [
+          { name: "High school diploma", status: "met", rules_met: 5, rules_total: 5 },
+        ],
+      },
+    };
+    await renderAsPrincipal("/portal/principal/students/student-1/transcripts/transcript-1");
+
+    const document = await screen.findByRole("article", { name: "Academic Transcript" });
+    const section = within(document).getByRole("region", { name: "Graduation requirements" });
+    expect(within(section).getByText("Graduation requirements met")).toBeTruthy();
+    expect(within(section).getByText("(5 of 5 requirements met)")).toBeTruthy();
+  });
+
+  test("a transcript shows its external examinations as issued", async () => {
+    transcriptDocument = {
+      ...TRANSCRIPT,
+      content: {
+        ...TRANSCRIPT_CONTENT,
+        external_exams: [
+          {
+            code: "IGCSE",
+            name: "IGCSE (A*-G)",
+            total_max: null,
+            results: [
+              {
+                subject: { code: "MATH", name: "Mathematics" },
+                sat_on: "2026-06-15",
+                total_score: null,
+                scores: [
+                  { component: "Grade", numeric_score: null, label_score: "A*", max_score: null },
+                ],
+              },
+            ],
+          },
+          {
+            code: "SAT",
+            name: "SAT",
+            total_max: 1600,
+            results: [
+              {
+                subject: null,
+                sat_on: "2026-10-04",
+                total_score: 1480,
+                scores: [
+                  {
+                    component: "Reading and Writing",
+                    numeric_score: 720,
+                    label_score: null,
+                    max_score: 800,
+                  },
+                  { component: "Math", numeric_score: 760, label_score: null, max_score: 800 },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    };
+    await renderAsPrincipal("/portal/principal/students/student-1/transcripts/transcript-1");
+
+    const document = await screen.findByRole("article", { name: "Academic Transcript" });
+    const section = within(document).getByRole("region", { name: "External examinations" });
+    expect(
+      within(section).getByRole("rowheader", { name: "IGCSE (A*-G) — Mathematics" }),
+    ).toBeTruthy();
+    expect(within(section).getByText("Grade: A*")).toBeTruthy();
+    expect(within(section).getByText("1,480 / 1,600")).toBeTruthy();
   });
 
   test("a transcript lists a descriptive subject's skills and explains a GPA it cannot give", async () => {

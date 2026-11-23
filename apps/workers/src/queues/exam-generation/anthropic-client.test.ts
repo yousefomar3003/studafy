@@ -135,6 +135,23 @@ describe("AnthropicClient.generate with apiFormat: openai-compatible", () => {
     });
   });
 
+  test("on OpenRouter, allows only hosts that neither retain nor train on the data", async () => {
+    const { fetch, calls } = stubFetch(() =>
+      jsonResponse({ choices: [{ message: { content: "{}" } }] }, 200),
+    );
+    const client = createAnthropicClient({
+      apiKey: API_KEY,
+      apiFormat: "openai-compatible",
+      baseUrl: "https://openrouter.ai/api/v1",
+      fetch,
+    });
+
+    await client.generate({ model: "google/gemma-4-31b-it", system: "sys", prompt: "go" });
+
+    expect(calls[0]!.url).toBe("https://openrouter.ai/api/v1/chat/completions");
+    expect(JSON.parse(calls[0]!.init.body as string).provider).toEqual({ data_collection: "deny" });
+  });
+
   test("json: true turns on the host's JSON mode", async () => {
     const { fetch, calls } = stubFetch(() =>
       jsonResponse({ choices: [{ message: { content: "{}" } }] }, 200),

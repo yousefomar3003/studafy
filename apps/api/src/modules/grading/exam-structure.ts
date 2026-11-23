@@ -169,13 +169,16 @@ export function buildExamTemplate(
   };
 }
 
-interface SchoolExamSettings {
+export interface SchoolExamSettings {
   exam_structure: ExamStructure;
   exam_weights: ExamWeights;
   locale: string;
 }
 
-async function loadExamSettings(tx: TransactionSql, schoolId: string): Promise<SchoolExamSettings> {
+export async function loadExamSettings(
+  tx: TransactionSql,
+  schoolId: string,
+): Promise<SchoolExamSettings> {
   const [row] = await tx<SchoolExamSettings[]>`
     SELECT exam_structure, exam_weights, locale
     FROM app.school_settings
@@ -227,6 +230,9 @@ function inputFrom(view: ConfigView, template: ExamTemplate): SubjectConfigInput
     include_in_average: view.include_in_average,
     include_on_certificate: view.include_on_certificate,
     average_weight: view.average_weight,
+    credits: view.credits,
+    course_level: view.course_level,
+    gpa_boost: view.gpa_boost,
     grading_method: "weighted",
     max_marks: view.max_marks,
     pass_percentage: view.pass_percentage,
