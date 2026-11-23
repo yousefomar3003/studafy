@@ -2585,6 +2585,14 @@
       "issueDate": "Issue date",
       "serialLabel": "Serial number",
       "finalization": "Results version {version}, finalized {date}"
+    },
+    "testScores": {
+      "title": "Test scores",
+      "empty": "No external exam results recorded yet.",
+      "error": "Test scores couldn't be loaded.",
+      "examSubject": "{exam} — {subject}",
+      "satOn": "Sat on {date}",
+      "scoreLine": "{component}: {score}"
     }
   },
   "features": {

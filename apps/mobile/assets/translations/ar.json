@@ -2608,6 +2608,14 @@
       "issueDate": "تاريخ الإصدار",
       "serialLabel": "الرقم التسلسلي",
       "finalization": "نسخة النتائج {version}، اعتُمدت في {date}"
+    },
+    "testScores": {
+      "title": "نتائج الاختبارات",
+      "empty": "لا توجد نتائج امتحانات خارجية مسجلة بعد.",
+      "error": "تعذّر تحميل نتائج الاختبارات.",
+      "examSubject": "{exam} — {subject}",
+      "satOn": "بتاريخ {date}",
+      "scoreLine": "{component}: {score}"
     }
   },
   "features": {
