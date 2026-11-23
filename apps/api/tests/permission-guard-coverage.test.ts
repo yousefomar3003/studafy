@@ -165,6 +165,16 @@ const EXPECTED_MUTATING_ROUTES = [
   "PUT /api/grading/sections/{sectionId}/report-notes",
   "PUT /api/grading/sections/{sectionId}/subjects/{subjectId}/report-comments",
   "POST /api/grading/finalizations/{finalizationId}/certificates",
+  // External exams and test scores (000255): leadership behind academicConfig:manage; each write
+  // records its old and new values in the service.
+  "POST /api/grading/external-exams",
+  "POST /api/grading/external-exams/from-preset",
+  "PUT /api/grading/external-exams/{examId}",
+  "POST /api/grading/external-exams/{examId}/archive",
+  "POST /api/grading/external-exams/{examId}/restore",
+  "POST /api/grading/students/{studentId}/external-exam-results",
+  "PUT /api/grading/external-exam-results/{resultId}",
+  "DELETE /api/grading/external-exam-results/{resultId}",
   // Transcripts (000207): issue, reissue and revoke behind academicCertificate:issue.
   "POST /api/grading/students/{studentId}/transcripts",
   "POST /api/grading/transcripts/{transcriptId}/reissue",

@@ -243,6 +243,16 @@ const EXPECTED_MUTATING_ROUTES = [
   "PUT /api/grading/report-card-settings",
   "PUT /api/grading/sections/{sectionId}/report-notes",
   "PUT /api/grading/sections/{sectionId}/subjects/{subjectId}/report-comments",
+  // External exams and test scores (000255): leadership behind academicConfig:manage; each write
+  // records its old and new values in the service.
+  "POST /api/grading/external-exams",
+  "POST /api/grading/external-exams/from-preset",
+  "PUT /api/grading/external-exams/{examId}",
+  "POST /api/grading/external-exams/{examId}/archive",
+  "POST /api/grading/external-exams/{examId}/restore",
+  "POST /api/grading/students/{studentId}/external-exam-results",
+  "PUT /api/grading/external-exam-results/{resultId}",
+  "DELETE /api/grading/external-exam-results/{resultId}",
   // Timetable (ST-101). Version lifecycle + slot CRUD with conflict detection.
   "POST /api/academics/timetable-versions",
   "PATCH /api/academics/timetable-versions/{versionId}",

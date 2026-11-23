@@ -5,11 +5,13 @@ import { calculateCumulativeResult } from "@studafy/grading-engine";
 
 import { CodedHttpException } from "../../coded-http-exception";
 import { emitAuditLog } from "../../middleware/auditEmitter";
+import { transcriptExternalExams } from "../external-exams/service";
 
 import { blockingReasons } from "./certificate-service";
 import { readFinalizationResults } from "./results-service";
 
 import type { StoredStudentResult } from "./results-service";
+import type { TranscriptExternalExam } from "../external-exams/service";
 import type { CumulativeResult, ResultDisplay, RoundingRule } from "@studafy/grading-engine";
 import type { TransactionSql } from "postgres";
 
@@ -91,6 +93,11 @@ export interface TranscriptContent {
   cumulative: TranscriptCumulative;
   issued_by: { user_id: string; name: string | null };
   reissue: { supersedes_serial: string; reason: string } | null;
+  /**
+   * External examinations (SAT, IELTS, IGCSE finals...) of exams shown on transcripts, as they
+   * stood at issue (000255). Absent when the student had none, and on transcripts issued before.
+   */
+  external_exams?: TranscriptExternalExam[];
 }
 
 export interface TranscriptView {
@@ -338,6 +345,7 @@ async function renderContent(
     FROM app.schools AS school WHERE school.id = ${schoolId}::uuid
   `;
   const student = years[0]!.result;
+  const externalExams = await transcriptExternalExams(tx, schoolId, student.student_id);
   return {
     version: 1,
     kind: "transcript",
@@ -354,6 +362,7 @@ async function renderContent(
     cumulative: cumulativeOf(years),
     issued_by: { user_id: userId, name: names?.issuer_name ?? null },
     reissue,
+    ...(externalExams.length > 0 ? { external_exams: externalExams } : {}),
   };
 }
 
