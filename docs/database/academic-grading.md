@@ -198,6 +198,68 @@ read back with all of them null. Transcripts add the cumulative weighted GPA (sa
 reasons as the cumulative GPA) and cumulative credits; certificates and transcripts gain the subject
 and overall fields only when they are set, so documents issued earlier still render unchanged.
 
+### Class rank and percentile (000257)
+
+For American transcripts and the top students ("الأوائل") of Jordanian and Egyptian schools, a grade
+program may rank its students. Four columns on `app.grade_programs`, copied with the year:
+
+| Column            | Values                           | Default   |
+| ----------------- | -------------------------------- | --------- |
+| `rank_enabled`    | true / false                     | `false`   |
+| `rank_basis`      | `average`, `gpa`, `weighted_gpa` | `average` |
+| `rank_scope`      | `section`, `grade_level`         | `section` |
+| `rank_visibility` | `staff`, `students_and_parents`  | `staff`   |
+
+Rules (`@studafy/grading-engine` `calculateRanks`, pure and unit-tested):
+
+- **Who is ranked**: students with a complete overall result in the cohort. An incomplete result (or
+  one without a value on the basis, e.g. a GPA with a subject that has no GPA points) takes no place
+  and is not counted in the cohort size.
+- **Basis**: `average` ranks by `average_percentage`; `gpa` by the GPA (`result_value` of a GPA
+  result); `weighted_gpa` by `weighted_result_value`, falling back to the plain GPA for a student
+  without a boosted subject (000253 stores the weighted GPA only then). A GPA basis needs
+  `result_format = gpa`: the API refuses it otherwise (400 `VALIDATION_FAILED`, from the engine's
+  `RANK_BASIS_NEEDS_GPA` issue), also when the format is what changes, and
+  `ck_grade_programs_rank_gpa_basis` backs it up.
+- **Ties**: values are compared after the program's overall rounding; equal values share a rank and
+  the next rank skips (1, 2, 2, 4).
+- **Percentile**: the share of ranked students with a strictly lower value, as a whole-number
+  percentage rounded down (the top of 200 is the 99th; a cohort of one is the 0th).
+- **Scope**: `section` ranks a section's current finalization of the period (a term, or the year);
+  `grade_level` ranks every section of the grade together, and only once every section that has
+  students (and is not archived) has a current finalization for the period. Until then the rank is
+  `pending`, never a rank among the sections that happen to be done. A student finalized in two
+  sections of the grade for the same period (they moved) counts once, with the later finalization.
+
+Rank is **computed on read**, never stored on results: from the current (not superseded) finalized
+overall results, which change only through audited corrections. A correction therefore re-ranks the
+whole cohort, and a superseded finalization has no rank. The rank settings are live configuration
+(not part of `config_snapshot`): turning ranking on or off, or changing its basis or scope, changes
+what results show from then on, but never an issued document.
+
+Reading a cohort is one query through `app.class_rank_cohort(year, grade_level, term, section)`
+(SECURITY DEFINER). A student's rank depends on classmates' results that RLS keeps from the student
+and their parents, so the function returns the cohort's sections, current finalizations and overall
+values itself; it returns nothing unless the grade ranks and the caller is leadership or the rank is
+`students_and_parents`, and names only the students whose results the caller may read
+(`app.can_read_student_result`): a student sees their own row and anonymous values. It uses the
+existing indexes (`uq_sections_school_year_grade_name`, the partial current-finalization unique
+indexes, `uq_student_overall_results_finalization_student`).
+
+Where it shows (`class_rank`: `status` `ranked` / `not_ranked` / `pending`, `basis`, `scope`,
+`rank`, `cohort_size`, `percentile`; null when off, hidden from the caller, or superseded):
+
+- Staff: the finalization detail (`GET /api/grading/finalizations/{id}`) and leadership reading a
+  student's results. Top students (`GET /api/grading/years/{yearId}/programs/{gradeLevelId}/top-students`,
+  `result:finalize`): the best `limit` places with ties included (every student ranked ≤ limit),
+  one list for a grade-level rank or one per section for a section rank, for a term or the year.
+- Students and parents (`GET /api/grading/students/{id}/results`): only when `rank_visibility` is
+  `students_and_parents`.
+- Documents: report cards, certificates and transcripts store `overall.class_rank` (`rank`,
+  `cohort_size`, `percentile`, `basis`, `scope`) in their immutable content at issue, when the grade
+  ranks, the rank is visible to students and parents (the documents are issued to them) and the
+  student was ranked. Absent otherwise and on documents issued before 000257.
+
 ## Certificates and report cards
 
 Issued from a **current** finalization: annual → `annual_certificate`, term → `term_report`. Only a
