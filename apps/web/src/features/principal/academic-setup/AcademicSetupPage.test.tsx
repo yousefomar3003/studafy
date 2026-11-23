@@ -1240,7 +1240,16 @@ describe("AcademicSetupPage", () => {
   test("reports the students of a grade not on track, in progress ones on request", async () => {
     await renderAt("/graduation-requirements");
     await screen.findByRole("button", { name: "Edit High school diploma" });
-    fireEvent.click(screen.getByRole("combobox", { name: "Grade level" }));
+    // The grade select stays disabled until the grade levels load; opening it earlier shows no
+    // options (seen on slower CI runners).
+    const gradeSelect = () => screen.getByRole("combobox", { name: "Grade level" });
+    await waitFor(() => {
+      const select = gradeSelect();
+      expect(
+        select.hasAttribute("disabled") || select.getAttribute("aria-disabled") === "true",
+      ).toBe(false);
+    });
+    fireEvent.click(gradeSelect());
     fireEvent.click(await screen.findByRole("option", { name: "Grade 10" }));
     const badr = await screen.findByText("Badr Nasser");
     const row = badr.closest("tr")!;
