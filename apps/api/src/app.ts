@@ -141,6 +141,7 @@ import {
 } from "./modules/grades";
 import {
   gradingConfigRoutes,
+  gradingCurriculumTemplateRoutes,
   gradingMarksRoutes,
   gradingPredictedGradesRoutes,
   gradingReportCardRoutes,
@@ -1212,6 +1213,8 @@ export function createApp({
     app.route("/", externalExamRoutes(database));
     // Predicted grades (000254).
     app.route("/", gradingPredictedGradesRoutes(database));
+    // Curriculum templates (IGCSE, IB, American...) applied to a year's grades.
+    app.route("/", gradingCurriculumTemplateRoutes(database));
   }
 
   // Gradebook configuration (ST-112). Weighted assessment categories per gradebook and

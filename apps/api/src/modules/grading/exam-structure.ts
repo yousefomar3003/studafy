@@ -169,13 +169,16 @@ export function buildExamTemplate(
   };
 }
 
-interface SchoolExamSettings {
+export interface SchoolExamSettings {
   exam_structure: ExamStructure;
   exam_weights: ExamWeights;
   locale: string;
 }
 
-async function loadExamSettings(tx: TransactionSql, schoolId: string): Promise<SchoolExamSettings> {
+export async function loadExamSettings(
+  tx: TransactionSql,
+  schoolId: string,
+): Promise<SchoolExamSettings> {
   const [row] = await tx<SchoolExamSettings[]>`
     SELECT exam_structure, exam_weights, locale
     FROM app.school_settings

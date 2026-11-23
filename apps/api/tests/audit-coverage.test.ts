@@ -235,6 +235,10 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/grading/certificates/{certificateId}/reissue",
   "POST /api/grading/certificates/{certificateId}/revoke",
   "POST /api/grading/exam-structure/apply",
+  // Curriculum templates: the apply writes through the configuration services (each audited) and
+  // records one summary entry; the preview writes nothing and declares the table its apply audits.
+  "POST /api/grading/years/{yearId}/curriculum-template/preview",
+  "POST /api/grading/years/{yearId}/curriculum-template/apply",
   // Transcripts (000207).
   "POST /api/grading/students/{studentId}/transcripts",
   "POST /api/grading/transcripts/{transcriptId}/reissue",
