@@ -118,17 +118,17 @@
     }
   },
   "staff": {
-    "title": "Principal & finance accounts",
-    "description": "Give your principal and finance staff their own Studafy accounts.",
+    "title": "Admin, principal & finance accounts",
+    "description": "Give other school admins, your principal and finance staff their own Studafy accounts.",
     "invite": {
-      "title": "Invite a principal or finance staff member",
+      "title": "Invite an admin, principal or finance staff member",
       "signInNote": "We email them an invitation link. They open it and sign in with their Google or Microsoft (Outlook) account using this exact email address — there is no password to set.",
       "submit": "Send invitation",
       "sentToast": "Invitation sent to {{email}}.",
       "error": "Couldn't send the invitation."
     },
     "list": {
-      "caption": "Principal and finance invitations",
+      "caption": "Admin, principal and finance invitations",
       "columns": {
         "email": "Email",
         "role": "Role",
@@ -142,7 +142,7 @@
       "revokedToast": "Invitation for {{email}} revoked.",
       "actionError": "Couldn't update the invitation.",
       "loadError": "Couldn't load invitations.",
-      "empty": "No principal or finance invitations yet."
+      "empty": "No admin, principal or finance invitations yet."
     },
     "status": {
       "pending": "Waiting for sign-in",

@@ -317,6 +317,100 @@ describe("account activation", () => {
     });
   });
 
+  describe("the same sign-in account at a second school", () => {
+    async function activeSecondSchool(name: string): Promise<string> {
+      const school = await createSchool(sql, { name });
+      await sql.begin(async (tx) => {
+        await tx.unsafe("SET LOCAL ROLE studafy_admin");
+        await tx`UPDATE app.schools SET status = 'active'::app.school_status WHERE id = ${school.id}`;
+      });
+      return school.id;
+    }
+
+    /** Activates `email` at the first school, then sets that account's status. */
+    async function accountAtFirstSchool(status: "active" | "suspended" | "archived") {
+      const { token, email } = await seedInvitation(activeSchool.id);
+      const identity = {
+        provider: "microsoft" as const,
+        subject: `sub-${crypto.randomUUID()}`,
+        email,
+      };
+      const first = await activateAccount(sql, config, {
+        rawToken: token,
+        identity,
+        channel: "web",
+      });
+      expect(first.outcome).toBe("ACTIVATED");
+      await readAsAdmin(
+        activeSchool.id,
+        (tx) => tx`
+        UPDATE app.users SET status = ${status}::app.user_status WHERE normalized_email = ${email}
+      `,
+      );
+      return { identity, email };
+    }
+
+    function identityOwners(subject: string, schoolIds: string[]) {
+      return Promise.all(
+        schoolIds.map((schoolId) =>
+          readAsAdmin(schoolId, async (tx) => {
+            const [row] = await tx<{ count: string }[]>`
+              SELECT count(*)::text AS count FROM app.oauth_identities WHERE subject = ${subject}
+            `;
+            return Number(row!.count);
+          }),
+        ),
+      );
+    }
+
+    for (const status of ["suspended", "archived"] as const) {
+      integrationTest(
+        `an account ${status} at one school accepts another school's invitation`,
+        async () => {
+          const { identity, email } = await accountAtFirstSchool(status);
+          const secondSchoolId = await activeSecondSchool(`Second ${status} Academy`);
+          const { token } = await seedInvitation(secondSchoolId, { email });
+
+          const result = await activateAccount(sql, config, {
+            rawToken: token,
+            identity,
+            channel: "web",
+          });
+
+          expect(result.outcome).toBe("ACTIVATED");
+          expect(result.schoolId).toBe(secondSchoolId);
+          // The sign-in moved: the first school's account keeps its status but no longer has it.
+          expect(await identityOwners(identity.subject, [activeSchool.id, secondSchoolId])).toEqual(
+            [0, 1],
+          );
+          const [firstStatus] = await readAsAdmin(
+            activeSchool.id,
+            (tx) => tx<{ status: string }[]>`
+          SELECT status FROM app.users WHERE normalized_email = ${email}
+        `,
+          );
+          expect(firstStatus!.status).toBe(status);
+        },
+      );
+    }
+
+    integrationTest(
+      "an account still active at another school keeps OAUTH_IDENTITY_EXISTS",
+      async () => {
+        const { identity, email } = await accountAtFirstSchool("active");
+        const secondSchoolId = await activeSecondSchool("Second Active Academy");
+        const { token } = await seedInvitation(secondSchoolId, { email });
+
+        const attempt = activateAccount(sql, config, { rawToken: token, identity, channel: "web" });
+
+        await expect(attempt).rejects.toMatchObject({ status: 409, code: "OAUTH_IDENTITY_EXISTS" });
+        expect(await identityOwners(identity.subject, [activeSchool.id, secondSchoolId])).toEqual([
+          1, 0,
+        ]);
+      },
+    );
+  });
+
   integrationTest("a malformed token is the generic INVITATION_INVALID problem", async () => {
     nextIdentity = { subject: "sub", email: "anyone@example.test" };
     const response = await activateViaHttp("not-a-valid-token");

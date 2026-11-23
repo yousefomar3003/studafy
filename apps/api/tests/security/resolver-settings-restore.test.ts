@@ -93,6 +93,14 @@ describeDb("resolver settings are restored (QA-018)", () => {
     expect([state.school, state.provider, state.subject]).toEqual([schoolA, "", ""]);
   });
 
+  test("after releasing an inactive identity, school A sees only its own user again", async () => {
+    const { state, schools } = await afterResolver(
+      "SELECT * FROM app.release_inactive_oauth_identity('google', 'subject-1')",
+    );
+    expect(schools).toEqual([schoolA]);
+    expect([state.school, state.provider, state.subject]).toEqual([schoolA, "", ""]);
+  });
+
   test("after a member-code lookup, the caller's school is armed again", async () => {
     const { state } = await afterResolver(
       "SELECT * FROM app.resolve_member_code_for_login('STU-1000001')",
