@@ -183,10 +183,17 @@ sees no change anywhere.
   subject boosted. The same mean as the GPA (`Σ points × average_weight / Σ average_weight`, program
   rounding) with each boosted subject's weighted points; null whenever the GPA is null. The GPA
   itself never changes.
-- **Credits attempted / earned**: the credits of the counted (in the average, not exempt, not
-  descriptive), complete subjects that carry credits, and of those passed. Null when no counted
-  subject carries credits. `average_weight` remains the coefficient that weights the average and
-  GPA; a subject whose credits differ from it gets the `CREDITS_DIFFER_FROM_COEFFICIENT` warning.
+- **Credits attempted / earned**: the credits of every complete, non-exempt subject that carries
+  credits, and of those passed — including subjects left out of the average (PE, electives) and
+  descriptive (pass/fail) subjects, which earn their credits when passed (no descriptor marked "not
+  achieved"), as in American schools. Null when no such subject carries credits. The average, GPA
+  and weighted GPA still count only the subjects in the average. `average_weight` remains the
+  coefficient that weights the average and GPA; a subject whose credits differ from it gets the
+  `CREDITS_DIFFER_FROM_COEFFICIENT` warning.
+- Until WS-F (000258) credits counted only the subjects in the average. Results finalized before
+  then keep the totals stored on `student_overall_results` (snapshots, never recomputed); new
+  finalizations, previews, and the cumulative credits of transcripts issued from then on (worked
+  out from the subject rows) use the rule above.
 - Changing `credits` or `gpa_boost` on a config with marks asks for impact confirmation like the
   coefficient; `course_level` is a label and does not.
 

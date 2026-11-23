@@ -186,15 +186,19 @@ function input(overrides: Partial<SubjectConfigInput> = {}): SubjectConfigInput 
   };
 }
 
-async function recordFinal(subjectId: string, scores: Record<string, number>) {
-  const sheet = await admin((tx) => getMarkSheet(tx, tenant.schoolId, ids.section!, subjectId));
+async function recordFinal(
+  subjectId: string,
+  scores: Record<string, number>,
+  sectionId = ids.section!,
+) {
+  const sheet = await admin((tx) => getMarkSheet(tx, tenant.schoolId, sectionId, subjectId));
   const finalId = sheet.assessments.find((assessment) => assessment.name === "Final")!.id;
   await admin((tx) =>
     saveMarks(
       tx,
       tenant.schoolId,
       tenant.users.ORG_ADMIN.id,
-      ids.section!,
+      sectionId,
       subjectId,
       Object.entries(scores).map(([studentKey, score]) => ({
         assessment_id: finalId,
@@ -532,6 +536,45 @@ describeDb("credits, course levels and the weighted GPA", () => {
       course_level: "Honors",
       weighted_gpa_points: 0,
     });
+  });
+
+  test("a subject left out of the average still earns its credits; finalized results keep theirs", async () => {
+    // 11A's marks are finalized; a new student in 11B takes the new subject.
+    const chadi = await createStudent(db.sql, tenant.schoolId, { firstName: "Chadi" });
+    ids.chadi = chadi.id;
+    await admin((tx) => placeStudentInSection(tx, tenant.schoolId, ids.section2!, chadi.id));
+    ids.pe = (
+      await createSubject(db.sql, tenant.schoolId, { code: "PE", name: "Physical Education" })
+    ).id;
+    await admin((tx) =>
+      createSubjectConfig(
+        tx,
+        tenant.schoolId,
+        tenant.users.ORG_ADMIN.id,
+        {
+          yearId: tenant.academicYear.id,
+          gradeLevelId: ids.grade!,
+          sectionId: null,
+          subjectId: ids.pe!,
+        },
+        input({ credits: 0.5, include_in_average: false }),
+      ),
+    );
+    await recordFinal(ids.pe!, { chadi: 90 }, ids.section2!);
+
+    const preview = computationView(
+      await admin((tx) => computeSection(tx, tenant.schoolId, ids.section2!, null)),
+    );
+    const student = preview.students.find((candidate) => candidate.student_id === ids.chadi)!;
+    // Only PE is complete. Out of the average, it still earns its half credit (before, credits
+    // counted only the subjects in the average: none here).
+    expect(student).toMatchObject({ credits_attempted: 0.5, credits_earned: 0.5 });
+
+    // Results finalized before keep the totals they were finalized with.
+    const [stored] = await admin((tx) =>
+      readFinalizationResults(tx, tenant.schoolId, ids.finalization!, { studentId: ids.amal! }),
+    );
+    expect(stored).toMatchObject({ credits_attempted: 4, credits_earned: 4 });
   });
 
   test("results finalized before 000253 read back without credits or a weighted GPA", async () => {
