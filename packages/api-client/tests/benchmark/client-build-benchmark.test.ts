@@ -32,21 +32,36 @@ const benchmarkTest = test.skipIf(process.env.CLIENT_BUILD_BENCHMARK !== "1");
 const WARMUP_ITERATIONS = 1;
 const MEASURED_ITERATIONS = 5;
 /**
- * The CI budget. 3 s, the ticket's figure, flapped: on GitHub's shared runners the same pipeline over
- * an unchanged spec measured a 1.7-3.3 s median from run to run (dev at 95ebda9d: 1760 ms; dev at
- * 6bd2ac11: 3258 ms, a failure on unchanged code), while two specs 1.3% apart timed 1317 ms and
- * 1321 ms side by side on one laptop. A budget within ~1x of the runner's own spread measures the
- * host, not the code -- the reason openapi-generate-benchmark.test.ts gives for widening an absolute
- * budget that flaps, as the NFR-05 probe was. 5 s keeps ~1.5x headroom over the worst run seen while
- * still failing a real regression of the kind this guards (a heavy import, a much fatter spec).
+ * The budget on a reference-speed host. 3 s, the ticket's figure, flapped: on GitHub's shared runners
+ * the same pipeline over an unchanged spec measured a 1.7-3.3 s median from run to run (dev at
+ * 95ebda9d: 1760 ms; dev at 6bd2ac11: 3258 ms, a failure on unchanged code), while two specs 1.3%
+ * apart timed 1317 ms and 1321 ms side by side on one laptop. A budget within ~1x of the runner's own
+ * spread measures the host, not the code -- the reason openapi-generate-benchmark.test.ts gives for
+ * widening an absolute budget that flaps, as the NFR-05 probe was. It was widened to 5 s, and as the
+ * spec grew that flapped too: one commit on dev timed a 3662 ms median on its push run and 5071 ms on
+ * its stage PR a minute later. So the budget now also scales with host speed (CONTROL_REFERENCE_MS).
  */
 const TARGET_MS = 5_000;
+
+/**
+ * What the control arm (pipeline-control.ts: the same spawn, compiler load, lib.es2022 type-check
+ * and Bun.build, minus the codegen) takes on a host the 5 s budget was set for. A slower runner, by
+ * its own control time, gets a proportionally wider budget; a faster one never gets a tighter one.
+ * A regression in what the API client owns -- a heavy import, a much fatter spec -- moves the
+ * pipeline and not the control, so it still fails on any host.
+ */
+const CONTROL_REFERENCE_MS = Number.POSITIVE_INFINITY; // DATA RUN: placeholder, set from CI
+
+function budgetFor(controlMs: number): number {
+  return TARGET_MS * Math.max(1, controlMs / CONTROL_REFERENCE_MS);
+}
 
 /** Routes the synthesized types must contain, so a pipeline that emitted nothing cannot pass. */
 const EXPECTED_PATHS = ['"/healthz"', '"/readyz"', '"/erpnext/webhooks"'];
 
 const PACKAGE_ROOT = path.join(import.meta.dir, "..", "..");
 const PIPELINE_SCRIPT = path.join(PACKAGE_ROOT, "scripts", "verify-pipeline.ts");
+const CONTROL_SCRIPT = path.join(import.meta.dir, "pipeline-control.ts");
 
 function percentile(sorted: readonly number[], fraction: number): number {
   const index = Math.min(sorted.length - 1, Math.ceil(fraction * sorted.length) - 1);
@@ -64,12 +79,13 @@ function report(label: string, samples: number[]): number {
 }
 
 /**
- * Runs the full acceptance pipeline as one `bun run` spawn — codegen → TypeScript verification →
- * bundle export — writing only into `scratch`, so the git tree is never disturbed.
+ * Runs `script` as one `bun run` spawn -- the full acceptance pipeline (codegen → TypeScript
+ * verification → bundle export) or its control -- writing only into `scratch`, so the git tree is
+ * never disturbed.
  */
-async function runPipelineSpawn(scratch: string): Promise<number> {
+async function runSpawn(script: string, scratch: string): Promise<number> {
   const startedAt = performance.now();
-  const proc = Bun.spawn(["bun", "run", PIPELINE_SCRIPT], {
+  const proc = Bun.spawn(["bun", "run", script], {
     cwd: PACKAGE_ROOT,
     env: { ...process.env, CLIENT_PIPELINE_OUT: scratch },
     stdout: "pipe",
@@ -80,24 +96,28 @@ async function runPipelineSpawn(scratch: string): Promise<number> {
 
   if (exitCode !== 0) {
     throw new Error(
-      `verify-pipeline.ts exited ${exitCode}: ${await new Response(proc.stderr).text()}`,
+      `${path.basename(script)} exited ${exitCode}: ${await new Response(proc.stderr).text()}`,
     );
   }
   return elapsed;
 }
 
 benchmarkTest(
-  `codegen → typecheck → bundle completes in under ${TARGET_MS}ms`,
+  `codegen → typecheck → bundle completes within its host-scaled ${TARGET_MS}ms budget`,
   async () => {
     const scratch = await mkdtemp(path.join(tmpdir(), "studafy-client-build-"));
     try {
       for (let index = 0; index < WARMUP_ITERATIONS; index += 1) {
-        await runPipelineSpawn(scratch);
+        await runSpawn(CONTROL_SCRIPT, scratch);
+        await runSpawn(PIPELINE_SCRIPT, scratch);
       }
 
+      // Interleaved, so a burst of noise on the runner lands on both arms rather than skewing one.
       const samples: number[] = [];
+      const controlSamples: number[] = [];
       for (let index = 0; index < MEASURED_ITERATIONS; index += 1) {
-        samples.push(await runPipelineSpawn(scratch));
+        controlSamples.push(await runSpawn(CONTROL_SCRIPT, scratch));
+        samples.push(await runSpawn(PIPELINE_SCRIPT, scratch));
       }
 
       // Proof the pipeline did the work: a run that emitted nothing would otherwise post a great time.
@@ -106,9 +126,14 @@ benchmarkTest(
         expect(synthesized).toContain(route);
       }
 
+      const control = report("control (no codegen)", controlSamples);
       const median = report("api-client build", samples);
-      console.log(`api-client build: ${median.toFixed(1)}ms (target < ${TARGET_MS}ms)`);
-      expect(median).toBeLessThan(TARGET_MS);
+      const budget = budgetFor(control);
+      console.log(
+        `api-client build: ${median.toFixed(1)}ms (budget ${budget.toFixed(0)}ms for a ` +
+          `${control.toFixed(0)}ms control, headroom ${(budget / median).toFixed(2)}x)`,
+      );
+      expect(median).toBeLessThan(budget);
     } finally {
       await rm(scratch, { recursive: true, force: true });
     }
