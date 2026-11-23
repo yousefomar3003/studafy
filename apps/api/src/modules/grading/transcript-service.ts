@@ -6,12 +6,14 @@ import { calculateCumulativeResult } from "@studafy/grading-engine";
 import { CodedHttpException } from "../../coded-http-exception";
 import { emitAuditLog } from "../../middleware/auditEmitter";
 import { transcriptExternalExams } from "../external-exams/service";
+import { transcriptGraduationRequirements } from "../graduation-requirements/service";
 
 import { blockingReasons } from "./certificate-service";
 import { readFinalizationResults } from "./results-service";
 
 import type { StoredStudentResult } from "./results-service";
 import type { TranscriptExternalExam } from "../external-exams/service";
+import type { TranscriptGraduationRequirement } from "../graduation-requirements/service";
 import type { CumulativeResult, ResultDisplay, RoundingRule } from "@studafy/grading-engine";
 import type { TransactionSql } from "postgres";
 
@@ -117,6 +119,12 @@ export interface TranscriptContent {
    * stood at issue (000255). Absent when the student had none, and on transcripts issued before.
    */
   external_exams?: TranscriptExternalExam[];
+  /**
+   * Whether the student met each graduation requirement set applying to them, as it stood at issue
+   * (000258): met, not met, or pending while the current year is not finalized. Absent when no set
+   * applied, and on transcripts issued before.
+   */
+  graduation_requirements?: TranscriptGraduationRequirement[];
 }
 
 export interface TranscriptView {
@@ -380,6 +388,7 @@ async function renderContent(
   `;
   const student = years[0]!.result;
   const externalExams = await transcriptExternalExams(tx, schoolId, student.student_id);
+  const graduation = await transcriptGraduationRequirements(tx, schoolId, student.student_id);
   return {
     version: 1,
     kind: "transcript",
@@ -397,6 +406,7 @@ async function renderContent(
     issued_by: { user_id: userId, name: names?.issuer_name ?? null },
     reissue,
     ...(externalExams.length > 0 ? { external_exams: externalExams } : {}),
+    ...(graduation.length > 0 ? { graduation_requirements: graduation } : {}),
   };
 }
 
