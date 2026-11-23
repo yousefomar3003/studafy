@@ -14,12 +14,17 @@ nothing about existing results, report cards or transcripts changes.
 
 ## Scope
 
-| WS  | Feature                                     | Covers                                          | Migration          | Branch                              |
-| --- | ------------------------------------------- | ----------------------------------------------- | ------------------ | ----------------------------------- |
-| B   | Credit hours + weighted GPA (Honours/AP/HL) | American, IB                                    | 000253             | `feat/grading-credits-weighted-gpa` |
-| C   | Predicted grades                            | IGCSE, A-Level, IB                              | 000254             | `feat/grading-predicted-grades`     |
-| D   | External exams and test scores              | SAT, ACT, AP, IELTS, TOEFL, Cambridge/IB finals | 000255             | `feat/grading-external-exams`       |
-| A   | Curriculum templates                        | Everyone                                        | 000256 (if needed) | `feat/grading-curriculum-templates` |
+| WS  | Feature                                     | Covers                                          | Migration          | Branch                                 |
+| --- | ------------------------------------------- | ----------------------------------------------- | ------------------ | -------------------------------------- |
+| B   | Credit hours + weighted GPA (Honours/AP/HL) | American, IB                                    | 000253             | `feat/grading-credits-weighted-gpa`    |
+| C   | Predicted grades                            | IGCSE, A-Level, IB                              | 000254             | `feat/grading-predicted-grades`        |
+| D   | External exams and test scores              | SAT, ACT, AP, IELTS, TOEFL, Cambridge/IB finals | 000255             | `feat/grading-external-exams`          |
+| A   | Curriculum templates                        | Everyone                                        | 000256 (if needed) | `feat/grading-curriculum-templates`    |
+| E   | Class rank and percentile                   | American, Jordan, Egypt, everyone               | 000257             | `feat/grading-class-rank`              |
+| F   | Graduation requirements checker             | American, any credit or exam-based diploma      | 000258             | `feat/grading-graduation-requirements` |
+
+D also carries national and state exam presets: Jordan Tawjihi (التوجيهي), Egypt Thanaweya Amma
+(الثانوية العامة) and a generic US state assessment (performance levels 1–4).
 
 **Out of scope here (phase 2):** IB Diploma total out of 45 with the TOK / Extended Essay / CAS core
 and bonus matrix; Cambridge/IB exam entries and entry fees through finance.
@@ -30,7 +35,8 @@ and bonus matrix; Cambridge/IB exam entries and entry fees through finance.
    tables and mostly different code. Shared hotspots are listed under "Integration".
 2. **Integration:** merge B, C, D into `feat/curriculum-support`, then regenerate shared artifacts
    and run the full checks.
-3. **A runs after B is merged**, because the American template sets credits and course levels.
+3. **A, E and F run in parallel after integration.** A needs B's credits and course levels; E
+   ranks by B's weighted GPA too; F checks B's credits and D's exam results.
 
 ## Rules for every workstream
 
@@ -171,6 +177,55 @@ Boundary percentages are sensible defaults the school edits. Applying a template
 year and chosen grade levels creates the scales and program settings; it never overwrites an
 existing configuration without an explicit confirmation. Web: a template picker in Academic setup.
 
+## WS-E: class rank and percentile
+
+Common in American transcripts and in Jordan and Egypt (top students, "الأوائل").
+
+**Settings (000257, `app.grade_programs`):** `rank_enabled` (default false), `rank_basis`
+(`average`, `gpa`, `weighted_gpa`), `rank_scope` (`section` or `grade_level`),
+`rank_visibility` (`staff`, `students_and_parents`).
+
+**Rules (`packages/grading-engine`, pure and unit-tested):**
+
+- Ranked: students with a complete finalized result (term or annual) in the scope; incomplete
+  results are not ranked and do not take a place.
+- Ties share a rank and the next rank skips (1, 2, 2, 4). Rounding follows the program's overall
+  rounding before comparing.
+- Percentile: the share of ranked students with a lower value, as a whole-number percentage.
+- Grade-level scope ranks only once every section of the grade level is finalized for that period;
+  until then the API reports it as pending, never a partial rank.
+
+**Storage:** rank is computed from finalized results on read (results change only through audited
+corrections). Report cards, certificates and transcripts store the rank, cohort size and percentile
+in their immutable content at issue, when enabled.
+
+**API / web / mobile:** rank and percentile on results, a "top students" list per grade level and
+period for leadership (web), and rank on the student and parent result screens when visible.
+
+## WS-F: graduation requirements checker
+
+**Data (000258):** `app.graduation_requirement_sets` (per school, name, applies to grade levels,
+optional academic year from which it applies, active flag) and `app.graduation_requirements`
+(rules). Subjects have no group today, so a rule names its subjects directly (a named subject group
+inside the rule).
+
+**Rule types:**
+
+- Total credits earned ≥ N
+- Credits earned in a named group of subjects ≥ N (e.g. "English": 4 credits)
+- Specific subjects passed
+- Cumulative GPA (or average) ≥ X
+- An external exam recorded, optionally with a minimum total (e.g. Tawjihi, SAT)
+
+**Rules (pure and unit-tested):** evaluate a student against a set using finalized annual results
+across years (the same rows transcripts read) and D's exam results; per rule: met, not met (with
+the gap, e.g. "2 of 4 English credits"), or pending (current-year results not finalized).
+
+**API / web / mobile:** leadership manages sets in Academic setup; a per-student checklist in the
+student overview; a grade-level report of students not on track. Students and parents see their own
+checklist in the app when the school enables it. Transcripts can show "Graduation requirements met"
+when issued.
+
 ## Integration
 
 Shared hotspots, resolved when merging into `feat/curriculum-support`:
@@ -192,4 +247,6 @@ After merging: `bun run ci:local`, the API integration tests for grades/academic
 - [ ] WS-D external exams and test scores
 - [ ] Integration of B, C, D
 - [ ] WS-A curriculum templates
+- [ ] WS-E class rank and percentile
+- [ ] WS-F graduation requirements checker
 - [ ] Phase 2: IB Diploma points and core; exam entries
