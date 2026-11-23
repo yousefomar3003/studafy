@@ -8,15 +8,16 @@ import type { components } from "@studafy/api-client";
 export type StaffInvitation = components["schemas"]["InvitationWithStatus"];
 
 /**
- * School-leadership roles an admin invites from this page. Each invitee signs in with Google or
- * Microsoft (Outlook) through the invitation link — there is no password to set.
+ * School-leadership roles an admin invites from this page, another school admin included. Each
+ * invitee signs in with Google or Microsoft (Outlook) through the invitation link — there is no
+ * password to set.
  */
-export const STAFF_ROLES = [ROLES.PRINCIPAL, ROLES.FINANCE] as const;
+export const STAFF_ROLES = [ROLES.PRINCIPAL, ROLES.FINANCE, ROLES.ORG_ADMIN] as const;
 export type StaffRole = (typeof STAFF_ROLES)[number];
 
 export const STAFF_INVITATIONS_KEY = ["invitations", "staff"] as const;
 
-/** Upper bound per role; a school has a handful of principals and finance staff, not pages of them. */
+/** Upper bound per role; a school has a handful of admins, principals and finance staff. */
 const PER_ROLE_LIMIT = 100;
 
 async function fetchStaffInvitations(): Promise<StaffInvitation[]> {
