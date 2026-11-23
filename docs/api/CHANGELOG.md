@@ -13,6 +13,19 @@ when it required the `version-bump` label.
 
 ### Added
 
+- Credits, course levels and the weighted GPA (migration 000253; docs/database/academic-grading.md
+  "Credits, course levels and the weighted GPA"). No new paths. `CreateSubjectConfigBody` /
+  `UpdateSubjectConfigBody` take optional `credits` (0–100, nullable), `course_level` (≤ 40,
+  nullable) and `gpa_boost` (0–5, default 0); `SubjectConfig` returns them. `FinalizedSubjectResult`
+  adds `weighted_gpa_points`, `credits` and `course_level`; `FinalizedStudentResult` and
+  `ResultPreviewStudent` add `weighted_gpa`, `credits_attempted` and `credits_earned`;
+  `ResultPreviewSubject` adds `credits` and `course_level`. Certificate and transcript content gain
+  the same optional subject (`credits`, `course_level`, `weighted_gpa_points`) and overall
+  (`weighted_gpa`, `credits_attempted`, `credits_earned`) fields, absent when not set and on
+  documents issued before; `TranscriptCumulative` / `TranscriptReadinessCumulative` add optional
+  `weighted_gpa`, `credits_attempted` and `credits_earned`. New validation warning code
+  `CREDITS_DIFFER_FROM_COEFFICIENT`.
+
 - The Student AI programme's dashboards (phase 6; docs/billing/ai-programme.md "Dashboards").
   School (`aiRevenueShare:read`: the school admin, the principal and finance):
   `schoolGetAiProgrammeDashboard` (`GET /api/school/ai-revenue-share/summary`,

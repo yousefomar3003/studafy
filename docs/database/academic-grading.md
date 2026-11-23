@@ -169,6 +169,35 @@ Overall: subjects counted in the average (`include_in_average`, not exempt); if 
 max marks, failures count mandatory and elective subjects only, and the academic status is
 `promoted` (0 failures), `supplementary` (≤ `max_failed_subjects_for_supplementary`) or `retained`.
 
+### Credits, course levels and the weighted GPA (000253)
+
+For American and IB schools a subject config may also carry `credits` (credit hours, 0–100; null
+when the school does not use them), `course_level` (a label such as "Honors", "AP", "HL", ≤ 40
+characters) and `gpa_boost` (0–5, default 0). All three are opt-in; a school that leaves them empty
+sees no change anywhere.
+
+- **Weighted points** (per subject): `gpa_points + gpa_boost` when the subject is passed; its plain
+  `gpa_points` when failed. Null when the subject has no boost, is incomplete or its band has no GPA
+  points. Descriptive subjects never have a boost.
+- **Weighted GPA** (overall): only for a GPA result (`result_format = gpa`) with at least one counted
+  subject boosted. The same mean as the GPA (`Σ points × average_weight / Σ average_weight`, program
+  rounding) with each boosted subject's weighted points; null whenever the GPA is null. The GPA
+  itself never changes.
+- **Credits attempted / earned**: the credits of the counted (in the average, not exempt, not
+  descriptive), complete subjects that carry credits, and of those passed. Null when no counted
+  subject carries credits. `average_weight` remains the coefficient that weights the average and
+  GPA; a subject whose credits differ from it gets the `CREDITS_DIFFER_FROM_COEFFICIENT` warning.
+- Changing `credits` or `gpa_boost` on a config with marks asks for impact confirmation like the
+  coefficient; `course_level` is a label and does not.
+
+Finalization snapshots `credits`, `course_level`, `gpa_boost` and `weighted_gpa_points` on each
+`student_subject_results` row (also in `config_snapshot`), and `weighted_result_value`,
+`credits_attempted` and `credits_earned` on `student_overall_results`. Section overrides, copied
+years and the exam-structure rebuild carry the three config fields over. Rows finalized before 000253
+read back with all of them null. Transcripts add the cumulative weighted GPA (same unavailable
+reasons as the cumulative GPA) and cumulative credits; certificates and transcripts gain the subject
+and overall fields only when they are set, so documents issued earlier still render unchanged.
+
 ## Certificates and report cards
 
 Issued from a **current** finalization: annual → `annual_certificate`, term → `term_report`. Only a
