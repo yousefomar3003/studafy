@@ -1,4 +1,4 @@
-/** Principal & finance accounts. Header, pills and the table reuse `../users/users.css`. */
+/** Admin, principal & finance accounts. Header, pills and the table reuse `../users/users.css`. */
 
 .staff-invite {
   margin-bottom: var(--space-16);

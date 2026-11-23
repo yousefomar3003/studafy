@@ -28,7 +28,7 @@ const PILL_STATUS: Record<StaffInvitation["status"], string> = {
 };
 
 /**
- * Principal and finance accounts (`/portal/accounts`, the sidebar item under "Admin"), gated by
+ * Admin, principal and finance accounts (`/portal/accounts`, the sidebar item under "Admin"), gated by
  * `organization:manageSettings` like `/portal/admin`. The admin enters an email and a role; the API emails an
  * invitation link, and the invitee activates the account by signing in with Google or Microsoft
  * (Outlook) on `/invite/:token` — the account only exists once they have.

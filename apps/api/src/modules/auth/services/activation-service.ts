@@ -153,7 +153,7 @@ async function resolveInvitationTenant(
  *
  * @throws CodedHttpException(400 INVITATION_INVALID) — malformed or unknown token.
  * @throws CodedHttpException(409 EXPIRED|REVOKED|CONSUMED|SCHOOL_SUSPENDED) — invitation unusable.
- * @throws CodedHttpException(409 CONFLICT_DUPLICATE_ENTRY) — the identity is already linked elsewhere.
+ * @throws CodedHttpException(409 OAUTH_IDENTITY_EXISTS) — the identity is already linked elsewhere.
  */
 export async function activateAccount(
   db: Database,
@@ -287,6 +287,26 @@ export async function activateAccount(
       ON CONFLICT DO NOTHING
     `;
 
+    // A sign-in account belongs to one school at a time. If it is still linked to an account another
+    // school has suspended or archived, that school no longer lets it in, so unlink it there and let
+    // this school's invitation claim it (migration 000259). An identity on an active account, or in
+    // this school, is left alone and still collides below.
+    const [release] = await tx<{ released: boolean; previousSchoolId: string | null }[]>`
+      SELECT released, previous_school_id AS "previousSchoolId"
+      FROM app.release_inactive_oauth_identity(${identity.provider}, ${identity.subject})
+    `;
+    if (release?.released) {
+      params.logger?.info(
+        {
+          invitation_id: invitationId,
+          school_id: schoolId,
+          previous_school_id: release.previousSchoolId,
+          provider: identity.provider,
+        },
+        "released sign-in from an inactive account at another school",
+      );
+    }
+
     // Link the Microsoft identity. A (provider, subject) collision means this external account is
     // already bound to some user; under the invitation lock a concurrent duplicate never reaches
     // here, so a collision is a genuine cross-account conflict rather than a race.
@@ -305,9 +325,13 @@ export async function activateAccount(
       identityId = linked!.id;
     } catch (error) {
       if (isUniqueViolation(error)) {
+        // The Google/Microsoft account already signs in to another, still active Studafy account
+        // (one provider account belongs to one Studafy account, in one school). The web's error
+        // page tells the user to accept with a different account, such as their email at this
+        // school.
         throw new CodedHttpException(
           409,
-          ERROR_CODES.CONFLICT_DUPLICATE_ENTRY,
+          ERROR_CODES.OAUTH_IDENTITY_EXISTS,
           "This account is already linked to another user.",
         );
       }
@@ -335,7 +359,13 @@ export async function activateAccount(
       action: "insert",
       targetTable: "oauth_identities",
       targetId: identityId,
-      newValues: { provider: identity.provider, user_id: userId },
+      newValues: {
+        provider: identity.provider,
+        user_id: userId,
+        // The other school is not named: this school's audit trail must not reveal where else the
+        // person had an account.
+        ...(release?.released ? { released_from_inactive_account: true } : {}),
+      },
     });
     await emitAuditLog(tx, {
       action: "update",

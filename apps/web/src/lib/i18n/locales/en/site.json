@@ -251,6 +251,10 @@
     "mobileOnly": {
       "heading": "Use the Studafy mobile app",
       "message": "Students, parents, teachers and attendance officers sign in on the Studafy mobile app. The website is for school administrators, principals and finance staff."
+    },
+    "accountInUse": {
+      "heading": "This account is already used for another school",
+      "message": "The Google or Microsoft account you chose already signs in to another Studafy account. Open your invitation link again and choose a different account, such as your email at this school. Your invitation is still valid."
     }
   },
   "help": {

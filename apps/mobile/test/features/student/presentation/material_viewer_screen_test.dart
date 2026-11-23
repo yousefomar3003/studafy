@@ -2,7 +2,9 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart' hide Material;
+import 'package:flutter_pdfview/flutter_pdfview.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/material.dart';
@@ -129,6 +131,27 @@ void main() {
     await tester.pump();
 
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
+  });
+
+  testWidgets('a downloaded PDF takes its own vertical drags, so every page can be scrolled to', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _screenScope(
+        ProviderScope(
+          overrides: [
+            ensureMaterialDownloadedProvider('m1').overrideWith((ref) async => File('/tmp/m1.pdf')),
+          ],
+          child: _viewerApp(_material(id: 'm1', ingestStatus: 'ready')),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    final pdf = tester.widget<PDFView>(find.byType(PDFView));
+    expect(pdf.gestureRecognizers, same(materialPdfGestureRecognizers));
+    expect(materialPdfGestureRecognizers.single.constructor(), isA<EagerGestureRecognizer>());
   });
 
   testWidgets('shows a retry action when the download fails', (tester) async {

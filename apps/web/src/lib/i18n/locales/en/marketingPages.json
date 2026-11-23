@@ -301,6 +301,15 @@
     "sizeTitle": "What Studafy costs your school",
     "sizeLabel": "Students at your school",
     "perYear": "per year",
+    "currencyLabel": "Currency",
+    "currencyOption": "{{name}} ({{code}})",
+    "currencies": {
+      "USD": "US dollar",
+      "GBP": "British pound",
+      "EUR": "Euro",
+      "SAR": "Saudi riyal",
+      "JOD": "Jordanian dinar"
+    },
     "sizeNote": "Whatever the size of your school, the cost is the same. Students who add the AI assistant pay for it themselves.",
     "faqTitle": "Questions schools ask",
     "faq": {
