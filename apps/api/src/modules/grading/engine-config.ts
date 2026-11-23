@@ -10,6 +10,8 @@ import type {
   GradeBand,
   MarkInput,
   OverallPolicy,
+  RankBasis,
+  RankScope,
   ResultFormat,
   ResultFormatKind,
   RoundingMode,
@@ -130,8 +132,16 @@ export interface ProgramRow {
   result_format: ResultFormatKind;
   /** The out_of or gpa maximum; null for percentage. */
   result_scale_max: number | null;
+  /** Class rank (000257): off by default; read live, never part of a result snapshot. */
+  rank_enabled: boolean;
+  rank_basis: RankBasis;
+  rank_scope: RankScope;
+  rank_visibility: RankVisibility;
   updated_at: Date;
 }
+
+/** Who sees a grade's class rank: staff only, or also the student and their parents. */
+export type RankVisibility = "staff" | "students_and_parents";
 
 export interface DescriptorRow {
   id: string;
@@ -387,6 +397,7 @@ export async function requireProgram(
            program.max_failed_subjects_for_supplementary, program.mark_approval_required,
            program.average_rounding_decimals, program.average_rounding_mode,
            program.result_format, program.result_scale_max::float8 AS result_scale_max,
+           program.rank_enabled, program.rank_basis, program.rank_scope, program.rank_visibility,
            program.updated_at
     FROM app.grade_programs AS program
     JOIN app.grade_levels AS grade
@@ -412,7 +423,9 @@ const PROGRAM_COLUMNS = `
   grade.name AS grade_level_name, program.grade_scale_id,
   program.max_failed_subjects_for_supplementary, program.mark_approval_required,
   program.average_rounding_decimals, program.average_rounding_mode,
-  program.result_format, program.result_scale_max::float8 AS result_scale_max, program.updated_at`;
+  program.result_format, program.result_scale_max::float8 AS result_scale_max,
+  program.rank_enabled, program.rank_basis, program.rank_scope, program.rank_visibility,
+  program.updated_at`;
 
 /** A config with its categories, assessments, term weights, the year's terms and its scale. */
 export async function loadConfigDetail(

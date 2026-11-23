@@ -99,6 +99,61 @@ export const resultDisplaySchema = z
     description:
       "The final result in the grade's format. value is null when it can't be worked out (a GPA with a subject that has no GPA points).",
   });
+export const rankBasisSchema = z.enum(["average", "gpa", "weighted_gpa"]).openapi("RankBasis", {
+  description:
+    "What students are ranked by: average (the overall average percentage), gpa, or weighted_gpa (the plain GPA for a student without boosted subjects). gpa and weighted_gpa need a grade whose result is a GPA.",
+});
+export const rankScopeSchema = z.enum(["section", "grade_level"]).openapi("RankScope", {
+  description:
+    "Who a student is ranked against: their section, or every section of their grade level (pending until every section is finalized for the period).",
+});
+const rankVisibilitySchema = z.enum(["staff", "students_and_parents"]).openapi("RankVisibility", {
+  description:
+    "Who sees the rank: staff only, or also students and their parents (in the app and on the report cards, certificates and transcripts issued to them).",
+});
+export const classRankSchema = z
+  .object({
+    status: z.enum(["ranked", "not_ranked", "pending"]).openapi({
+      description:
+        "ranked: rank, cohort_size and percentile are set. not_ranked: this result is incomplete (or has no value on the basis), so it takes no place; cohort_size is still given. pending: a grade-level rank waits for every section of the grade to be finalized for the period.",
+    }),
+    basis: rankBasisSchema,
+    scope: rankScopeSchema,
+    rank: z.number().int().positive().nullable().openapi({
+      description:
+        "1 for the best; tied students share a rank and the next one skips (1, 2, 2, 4).",
+    }),
+    cohort_size: z.number().int().nonnegative().nullable().openapi({
+      description:
+        'How many students were ranked (complete results only): the 120 of "3rd of 120".',
+    }),
+    percentile: z.number().int().min(0).max(100).nullable().openapi({
+      description: "The whole-number share of ranked students with a lower value (rounded down).",
+    }),
+  })
+  .openapi("ClassRank", {
+    description:
+      "Where the result places the student among their section or grade level for the period, computed from current finalized results.",
+  });
+export const documentClassRankSchema = z
+  .object({
+    rank: z.number().int().positive(),
+    cohort_size: z.number().int().positive(),
+    percentile: z.number().int().min(0).max(100),
+    basis: rankBasisSchema,
+    scope: rankScopeSchema,
+  })
+  .openapi("DocumentClassRank", {
+    description:
+      "The class rank when the document was issued. Present only when the grade ranked, showed the rank to students and parents, and the student was ranked; absent on documents issued before class ranks existed.",
+  });
+const classRankField = {
+  class_rank: classRankSchema.nullable().openapi({
+    description:
+      "Null when the grade does not rank, the caller may not see it (a student or parent while the rank is for staff only), or these results were superseded by a correction.",
+  }),
+};
+
 /** A student's weighted GPA and credit totals, beside the result display. */
 const creditFields = {
   weighted_gpa: z.number().nullable().openapi({
@@ -335,6 +390,12 @@ export const programBodySchema = z
       description:
         "The maximum for out_of (e.g. 20) or gpa (4 or 5, up to 10); ignored for percentage.",
     }),
+    rank_enabled: z.boolean().optional().openapi({
+      description: "Give the grade's students a class rank and percentile. Off by default.",
+    }),
+    rank_basis: rankBasisSchema.optional(),
+    rank_scope: rankScopeSchema.optional(),
+    rank_visibility: rankVisibilitySchema.optional(),
     descriptors: z.array(descriptorBodySchema).max(20).optional().openapi({
       description:
         "Replaces the grade's descriptor scale (descriptive subjects), highest first. Descriptors left out are removed; one that marks use cannot be removed.",
@@ -355,6 +416,10 @@ export const programSchema = z
     average_rounding_mode: roundingModeSchema,
     result_format: resultFormatSchema,
     result_scale_max: z.number().nullable(),
+    rank_enabled: z.boolean(),
+    rank_basis: rankBasisSchema,
+    rank_scope: rankScopeSchema,
+    rank_visibility: rankVisibilitySchema,
     descriptors: z.array(descriptorSchema),
     updated_at: dateTimeSchema,
   })
@@ -1252,6 +1317,7 @@ export const storedStudentResultSchema = z
     academic_status: z.enum(["promoted", "supplementary", "retained", "incomplete"]),
     subjects: z.array(storedSubjectResultSchema),
     report: reportNotesSchema.nullable(),
+    ...classRankField,
   })
   .openapi("FinalizedStudentResult");
 
@@ -1280,6 +1346,68 @@ export const correctionBodySchema = z
     allow_incomplete: z.boolean().default(false),
   })
   .openapi("CorrectResultsBody");
+
+export const topStudentsQuerySchema = z
+  .object({
+    term_id: uuidSchema.optional().openapi({ description: "A term; the year when omitted." }),
+    limit: z.coerce.number().int().min(1).max(100).default(10).openapi({
+      description: "How many places: every student ranked at most this is listed (ties included).",
+    }),
+  })
+  .openapi("TopStudentsQuery");
+
+const pendingSectionSchema = z
+  .object({ section_id: uuidSchema, section_name: z.string() })
+  .openapi("TopStudentsPendingSection");
+
+export const topStudentsSchema = z
+  .object({
+    academic_year_id: uuidSchema,
+    grade_level_id: uuidSchema,
+    grade_level_name: z.string(),
+    term_id: uuidSchema.nullable(),
+    enabled: z.boolean().openapi({
+      description: "Whether the grade ranks its students; groups is empty when it does not.",
+    }),
+    basis: rankBasisSchema,
+    scope: rankScopeSchema,
+    visibility: rankVisibilitySchema,
+    groups: z.array(
+      z
+        .object({
+          section_id: uuidSchema.nullable().openapi({
+            description: "The section ranked (section scope); null for the whole grade level.",
+          }),
+          section_name: z.string().nullable(),
+          status: z.enum(["ranked", "pending"]).openapi({
+            description:
+              "pending: sections with students have no finalized results for the period yet (listed in pending_sections); no partial rank is given.",
+          }),
+          pending_sections: z.array(pendingSectionSchema),
+          cohort_size: z.number().int().nullable(),
+          students: z.array(
+            z
+              .object({
+                student_id: uuidSchema,
+                first_name: z.string(),
+                last_name: z.string(),
+                admission_number: z.string(),
+                section_id: uuidSchema,
+                section_name: z.string(),
+                rank: z.number().int(),
+                percentile: z.number().int(),
+                value: z.number().openapi({
+                  description:
+                    "The value ranked by, as compared after the grade's rounding: the average percentage, or the GPA.",
+                }),
+              })
+              .openapi("TopStudent"),
+          ),
+        })
+        .openapi("TopStudentsGroup"),
+    ),
+  })
+  .openapi("TopStudents");
 
 export const studentResultsSchema = z
   .object({
@@ -1573,6 +1701,7 @@ export const certificateContentSchema = z
         }),
         credits_attempted: z.number().nullable().optional(),
         credits_earned: z.number().nullable().optional(),
+        class_rank: documentClassRankSchema.nullable().optional(),
         subjects_failed: z.number().int(),
 
         academic_status: z.string(),

@@ -133,11 +133,15 @@ export async function copyYearConfiguration(
       average_rounding_mode: string;
       result_format: string;
       result_scale_max: string | null;
+      rank_enabled: boolean;
+      rank_basis: string;
+      rank_scope: string;
+      rank_visibility: string;
     }[]
   >`
     SELECT grade_level_id, grade_scale_id, max_failed_subjects_for_supplementary,
            mark_approval_required, average_rounding_decimals, average_rounding_mode,
-           result_format, result_scale_max
+           result_format, result_scale_max, rank_enabled, rank_basis, rank_scope, rank_visibility
     FROM app.grade_programs WHERE school_id = ${schoolId}::uuid AND academic_year_id = ${sourceYearId}::uuid
   `;
   for (const program of programs) {
@@ -145,13 +149,15 @@ export async function copyYearConfiguration(
       INSERT INTO app.grade_programs (
         school_id, academic_year_id, grade_level_id, grade_scale_id,
         max_failed_subjects_for_supplementary, mark_approval_required,
-        average_rounding_decimals, average_rounding_mode, result_format, result_scale_max
+        average_rounding_decimals, average_rounding_mode, result_format, result_scale_max,
+        rank_enabled, rank_basis, rank_scope, rank_visibility
       ) VALUES (
         ${schoolId}::uuid, ${targetYearId}::uuid, ${program.grade_level_id}::uuid,
         ${mapScale(program.grade_scale_id)}::uuid, ${program.max_failed_subjects_for_supplementary},
         ${program.mark_approval_required}, ${program.average_rounding_decimals},
         ${program.average_rounding_mode}, ${program.result_format},
-        ${program.result_scale_max}::numeric
+        ${program.result_scale_max}::numeric, ${program.rank_enabled}, ${program.rank_basis},
+        ${program.rank_scope}, ${program.rank_visibility}
       )
     `;
     // The grade's descriptor scale (descriptive subjects) comes along with it.

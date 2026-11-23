@@ -1,7 +1,7 @@
 import { z } from "@hono/zod-openapi";
 import { dateTimeSchema, uuidSchema } from "@studafy/shared-schemas";
 
-import { resultDisplaySchema } from "./schemas";
+import { documentClassRankSchema, resultDisplaySchema } from "./schemas";
 
 /**
  * Academic transcripts (000207): every year of a student's finalized annual results on one
@@ -85,6 +85,10 @@ const transcriptYearSchema = z
         }),
         credits_attempted: z.number().nullable().optional(),
         credits_earned: z.number().nullable().optional(),
+        class_rank: documentClassRankSchema.nullable().optional().openapi({
+          description:
+            "The year's class rank when issued; absent without one and on older transcripts.",
+        }),
       })
       .openapi("TranscriptYearOverall"),
   })
