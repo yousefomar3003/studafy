@@ -123,6 +123,8 @@ const GUARD_EXEMPT: Record<string, string> = {
     "self gate: aiStudentSelfGate (app.ts) admits only the student whose id is in the path; staff and parents get 403",
   "GET /api/ai/students/{studentId}/conversations":
     "self gate: aiStudentSelfGate (app.ts) admits only the student whose id is in the path; staff and parents get 403",
+  "DELETE /api/ai/students/{studentId}/conversations/{conversationId}":
+    "self gate: aiStudentSelfGate (app.ts) admits only the student whose id is in the path; staff and parents get 403",
   "GET /api/ai/students/{studentId}/conversations/{conversationId}":
     "self gate: aiStudentSelfGate (app.ts) admits only the student whose id is in the path; staff and parents get 403",
   "POST /api/ai/students/{studentId}/decks":

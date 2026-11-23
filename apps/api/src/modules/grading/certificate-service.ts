@@ -5,8 +5,10 @@ import { ERROR_CODES } from "@studafy/constants";
 import { CodedHttpException } from "../../coded-http-exception";
 import { emitAuditLog } from "../../middleware/auditEmitter";
 
+import { attachClassRanks, documentClassRank } from "./class-rank-service";
 import { readFinalizationResults, requireFinalization } from "./results-service";
 
+import type { DocumentClassRank } from "./class-rank-service";
 import type { ReportNotes } from "./report-card-service";
 import type { FinalizationRow, StoredStudentResult } from "./results-service";
 import type { ResultDisplay } from "@studafy/grading-engine";
@@ -44,6 +46,13 @@ export interface CertificateContent {
     grade_label: string | null;
     passed: boolean | null;
     exempt: boolean;
+    /**
+     * Credit hours, course level and boosted GPA points: present only when the subject has them
+     * (and absent on certificates issued before 000253). Readers treat absent as null.
+     */
+    credits?: number;
+    course_level?: string;
+    weighted_gpa_points?: number;
     terms: { term_id: string | null; term_name: string | null; percentage: number | null }[];
     /** The subject teacher's comment. Absent on certificates issued before report card notes. */
     comment?: string;
@@ -63,6 +72,16 @@ export interface CertificateContent {
     grade_label: string | null;
     /** The final result in the grade's format; absent on certificates issued before formats. */
     display?: ResultDisplay | null;
+    /** Weighted GPA and credit totals: present only when the result has them (from 000253). */
+    weighted_gpa?: number;
+    credits_attempted?: number;
+    credits_earned?: number;
+    /**
+     * Class rank, cohort size and percentile when issued (000257): present only when the grade
+     * ranks, shows its rank to students and parents, and the student was ranked. Absent on
+     * documents issued before; readers treat absent as no rank.
+     */
+    class_rank?: DocumentClassRank;
     subjects_failed: number;
     academic_status: string;
   };
@@ -199,6 +218,12 @@ async function loadRenderContext(
   return { ...context!, terms };
 }
 
+/** The class rank an issued document keeps, as an optional field (absent without one). */
+export function withDocumentRank(result: StoredStudentResult): { class_rank?: DocumentClassRank } {
+  const rank = documentClassRank(result.class_rank);
+  return rank ? { class_rank: rank } : {};
+}
+
 function renderContent(
   context: RenderContext,
   schoolId: string,
@@ -242,6 +267,11 @@ function renderContent(
         grade_label: subject.grade_label,
         passed: subject.passed,
         exempt: subject.status === "exempt",
+        ...(subject.credits !== null ? { credits: subject.credits } : {}),
+        ...(subject.course_level !== null ? { course_level: subject.course_level } : {}),
+        ...(subject.weighted_gpa_points !== null
+          ? { weighted_gpa_points: subject.weighted_gpa_points }
+          : {}),
         terms: subject.terms.map((term) => ({
           term_id: term.term_id,
           term_name: terms.find((t) => t.id === term.term_id)?.name ?? null,
@@ -266,6 +296,11 @@ function renderContent(
       total_max: result.total_max,
       grade_label: result.grade_label,
       display: result.result_display,
+      ...(result.weighted_gpa !== null ? { weighted_gpa: result.weighted_gpa } : {}),
+      ...(result.credits_attempted !== null
+        ? { credits_attempted: result.credits_attempted, credits_earned: result.credits_earned! }
+        : {}),
+      ...withDocumentRank(result),
       subjects_failed: result.subjects_failed,
       academic_status: result.academic_status,
     },
@@ -302,6 +337,12 @@ async function insertCertificates(
   const kind: CertificateKind =
     finalization.term_id === null ? "annual_certificate" : "term_report";
   const context = await loadRenderContext(tx, schoolId, userId, finalization);
+  await attachClassRanks(
+    tx,
+    schoolId,
+    [{ finalizationId: finalization.id, results: items.map((item) => item.result) }],
+    "document",
+  );
   const rows = items.map(({ result, reissueOf }) => {
     const serial = newSerial(context.year_code, kind);
     const content = renderContent(

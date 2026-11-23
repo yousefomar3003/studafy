@@ -256,8 +256,61 @@ function studentResult(id: string, first: string, status: "complete" | "incomple
     subjects_failed: 0,
     academic_status: status === "complete" ? "promoted" : "incomplete",
     subjects: [],
+    class_rank:
+      status === "complete"
+        ? {
+            status: "ranked",
+            basis: "average",
+            scope: "grade_level",
+            rank: 3,
+            cohort_size: 120,
+            percentile: 97,
+          }
+        : {
+            status: "not_ranked",
+            basis: "average",
+            scope: "grade_level",
+            rank: null,
+            cohort_size: 120,
+            percentile: null,
+          },
   };
 }
+
+const TOP_STUDENTS = {
+  academic_year_id: "year-1",
+  grade_level_id: "grade-10",
+  grade_level_name: "Grade 10",
+  term_id: null,
+  enabled: true,
+  basis: "average",
+  scope: "grade_level",
+  visibility: "students_and_parents",
+  groups: [
+    {
+      section_id: null,
+      section_name: null,
+      status: "ranked",
+      pending_sections: [],
+      cohort_size: 120,
+      students: [
+        ["s-1", "Lina", 1, 98.5, 99],
+        ["s-3", "Yara", 2, 97, 98],
+        ["s-4", "Adam", 2, 97, 98],
+      ].map(([id, first, rank, value, percentile]) => ({
+        student_id: id,
+        first_name: first,
+        last_name: "Haddad",
+        admission_number: `ADM-${id}`,
+        section_id: "sec-10c",
+        section_name: "C",
+        rank,
+        percentile,
+        value,
+      })),
+    },
+  ],
+};
 
 const RATINGS = [
   { code: "excellent", label: "Excellent", label_ar: "ممتاز" },
@@ -363,7 +416,130 @@ const CERTIFICATE = {
   },
 };
 
+const IELTS_EXAM = {
+  id: "exam-ielts",
+  code: "IELTS",
+  name: "IELTS Academic",
+  preset_key: "ielts",
+  total_mode: "average",
+  total_rounding_step: 0.5,
+  total_min: 0,
+  total_max: 9,
+  per_subject: false,
+  show_on_transcript: true,
+  archived_at: null,
+  result_count: 3,
+  components: ["Listening", "Reading"].map((name, index) => ({
+    id: `c-${index}`,
+    name,
+    score_type: "numeric",
+    min_score: 0,
+    max_score: 9,
+    step: 0.5,
+    allowed_labels: null,
+    sort_order: index,
+    has_scores: true,
+  })),
+  created_at: "2026-09-01T00:00:00.000Z",
+  updated_at: "2026-09-01T00:00:00.000Z",
+};
+
+const EXTERNAL_EXAM_PRESETS = [
+  {
+    key: "tawjihi",
+    code: "TAWJIHI",
+    name: "Tawjihi (General Secondary Education Certificate)",
+    total_mode: "average",
+    total_rounding_step: null,
+    total_min: 0,
+    total_max: 100,
+    per_subject: false,
+    show_on_transcript: true,
+    note: "Default subjects.",
+    components: [],
+  },
+];
+
+const DIPLOMA = {
+  id: "set-diploma",
+  name: "High school diploma",
+  grade_levels: [{ id: "grade-10", name: "Grade 10" }],
+  applies_from_academic_year: null,
+  is_active: true,
+  visible_to_students_and_parents: true,
+  rules: [
+    {
+      id: "rule-credits",
+      type: "total_credits",
+      min_value: 24,
+      group_name: null,
+      subjects: [],
+      external_exam: null,
+    },
+    {
+      id: "rule-english",
+      type: "group_credits",
+      min_value: 4,
+      group_name: "English",
+      subjects: [{ id: "eng", code: "ENG", name: "English" }],
+      external_exam: null,
+    },
+  ],
+  created_at: "2026-09-01T00:00:00.000Z",
+  updated_at: "2026-09-01T00:00:00.000Z",
+};
+
+const GRADUATION_REPORT = {
+  academic_year_id: "year-1",
+  grade_level_id: "grade-10",
+  students_checked: 2,
+  students: [
+    {
+      student_id: "stu-badr",
+      first_name: "Badr",
+      last_name: "Nasser",
+      admission_number: "A-2",
+      section_name: "C",
+      status: "not_met",
+      sets: [
+        {
+          set: {
+            id: "set-diploma",
+            name: "High school diploma",
+            visible_to_students_and_parents: true,
+          },
+          status: "not_met",
+          rules_met: 1,
+          rules_total: 2,
+          rules: [
+            {
+              ...DIPLOMA.rules[1],
+              status: "not_met",
+              current: 2,
+              required: 4,
+              missing_subjects: [],
+            },
+          ],
+        },
+      ],
+    },
+    {
+      student_id: "stu-lina",
+      first_name: "Lina",
+      last_name: "Haddad",
+      admission_number: "A-1",
+      section_name: "C",
+      status: "pending",
+      sets: [],
+    },
+  ],
+};
+
 const GET_RESPONSES: Record<string, unknown> = {
+  "/api/grading/graduation-requirement-sets": { sets: [DIPLOMA] },
+  "/api/grading/graduation-requirements/report": GRADUATION_REPORT,
+  "/api/grading/external-exams": { exams: [IELTS_EXAM] },
+  "/api/grading/external-exam-presets": { presets: EXTERNAL_EXAM_PRESETS },
   "/api/grading/report-card-settings": REPORT_SETTINGS,
   "/api/grading/sections/{sectionId}/report-notes": REPORT_NOTES,
   "/api/grading/certificates/{certificateId}": CERTIFICATE,
@@ -389,12 +565,17 @@ const GET_RESPONSES: Record<string, unknown> = {
         average_rounding_mode: "half_up",
         result_format: "percentage",
         result_scale_max: null,
+        rank_enabled: false,
+        rank_basis: "average",
+        rank_scope: "section",
+        rank_visibility: "staff",
         descriptors: [],
         updated_at: "2026-10-01T00:00:00.000Z",
       },
     ],
   },
   "/api/grading/years/{yearId}/programs/{gradeLevelId}/subjects": { configs: [MATH_CONFIG] },
+  "/api/grading/years/{yearId}/programs/{gradeLevelId}/top-students": TOP_STUDENTS,
   "/api/grading/subject-configs/{configId}": MATH_CONFIG,
   "/api/grading/subject-configs/{configId}/impact": IMPACT,
   "/api/grading/sections/{sectionId}/subjects": SECTION_SUBJECTS,
@@ -656,6 +837,82 @@ describe("AcademicSetupPage", () => {
     const [path, init] = putMock.mock.calls[0]! as [string, { body: Record<string, unknown> }];
     expect(path).toBe("/api/grading/years/{yearId}/programs/{gradeLevelId}");
     expect(init.body).toMatchObject({ result_format: "gpa", result_scale_max: 4 });
+  });
+
+  test("a grade can switch on predicted grades and show them to families", async () => {
+    await renderAt("/subjects");
+
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: "Teachers record predicted grades" }),
+    );
+    fireEvent.click(screen.getByRole("combobox", { name: "Predicted grades are seen by" }));
+    fireEvent.click(screen.getByRole("option", { name: "Staff, students and parents" }));
+    putMock.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "Save policies" }));
+
+    await waitFor(() => expect(putMock).toHaveBeenCalledTimes(1));
+    const [, init] = putMock.mock.calls[0]! as [string, { body: Record<string, unknown> }];
+    expect(init.body).toMatchObject({
+      predicted_grades_enabled: true,
+      predicted_grades_visibility: "students_and_parents",
+    });
+  });
+
+  test("a grade can rank its students across the grade, shown to students and parents", async () => {
+    await renderAt("/subjects");
+
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Rank students in this grade" }));
+    // A percentage grade ranks by its average only.
+    fireEvent.click(screen.getByRole("combobox", { name: "Rank by" }));
+    expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual(["Average"]);
+    fireEvent.click(screen.getByRole("option", { name: "Average" }));
+    fireEvent.click(screen.getByRole("combobox", { name: "Rank among" }));
+    fireEvent.click(screen.getByRole("option", { name: "The whole grade" }));
+    fireEvent.click(screen.getByRole("combobox", { name: "Who sees the rank" }));
+    fireEvent.click(screen.getByRole("option", { name: "Staff, students and parents" }));
+    putMock.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "Save policies" }));
+
+    await waitFor(() => expect(putMock).toHaveBeenCalledTimes(1));
+    const [, init] = putMock.mock.calls[0]! as [string, { body: Record<string, unknown> }];
+    expect(init.body).toMatchObject({
+      rank_enabled: true,
+      rank_basis: "average",
+      rank_scope: "grade_level",
+      rank_visibility: "students_and_parents",
+    });
+  });
+
+  test("shows each result's class rank and percentile", async () => {
+    await renderAt("/results");
+
+    expect(await screen.findByText("3rd of 120")).toBeTruthy();
+    expect(within(rowOf("3rd of 120")).getByText("97th percentile")).toBeTruthy();
+    expect(within(rowOf("Not ranked")).getByText(/Sami/)).toBeTruthy();
+  });
+
+  test("lists a grade's top students, ties sharing a place", async () => {
+    await renderAt("/top-students");
+
+    expect(await screen.findByRole("heading", { name: "Top students" })).toBeTruthy();
+    expect(await screen.findByText("Ranked by Average")).toBeTruthy();
+    expect(screen.getByText("120 students ranked")).toBeTruthy();
+    expect(within(rowOf("Lina Haddad")).getByText("1st")).toBeTruthy();
+    expect(within(rowOf("Yara Haddad")).getByText("2nd")).toBeTruthy();
+    expect(within(rowOf("Adam Haddad")).getByText("2nd")).toBeTruthy();
+    expect(within(rowOf("Lina Haddad")).getByText("99th")).toBeTruthy();
+    await waitFor(() =>
+      expect(getMock).toHaveBeenCalledWith(
+        "/api/grading/years/{yearId}/programs/{gradeLevelId}/top-students",
+        { params: { path: { yearId: "year-1", gradeLevelId: "grade-10" }, query: { limit: 10 } } },
+      ),
+    );
+  });
+
+  test("has no accessibility violations on the top students screen", async () => {
+    const { container } = await renderAt("/top-students");
+    await screen.findByText("120 students ranked");
+    await expectNoA11yViolations(container);
   });
 
   test("a descriptive subject drops marks and weights for skills and descriptors", async () => {
@@ -936,6 +1193,103 @@ describe("AcademicSetupPage", () => {
     expect(screen.getByText("Excellent")).toBeTruthy();
     const facts = screen.getByText("Days absent").closest("div")!;
     expect(within(facts).getByText("4")).toBeTruthy();
+  });
+
+  test("lists graduation requirement sets and adds one checked by the grading engine", async () => {
+    const { container } = await renderAt("/graduation-requirements");
+    const edit = await screen.findByRole("button", { name: "Edit High school diploma" });
+    const row = edit.closest("tr")!;
+    expect(within(row).getByText("Total credits · Credits in English")).toBeTruthy();
+    expect(within(row).getByText("Shown to students and parents")).toBeTruthy();
+    await expectNoA11yViolations(container);
+
+    fireEvent.click(screen.getByRole("button", { name: "Add requirement set" }));
+    const save = await screen.findByRole("button", { name: "Save requirements" });
+    // Nothing named, no grade, no minimum: the engine's checks hold the save back.
+    expect((save as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText("Requirement 1: Enter the minimum value.")).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText(/^Name/), { target: { value: "Honors diploma" } });
+    fireEvent.click(screen.getByLabelText("Grade 10"));
+    fireEvent.change(screen.getByLabelText(/Credits earned, at least/), {
+      target: { value: "26" },
+    });
+    await waitFor(() => expect((save as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(save);
+    await waitFor(() => expect(postMock).toHaveBeenCalledTimes(1));
+    const [path, init] = postMock.mock.calls[0] as [string, { body: unknown }];
+    expect(path).toBe("/api/grading/graduation-requirement-sets");
+    expect(init.body).toEqual({
+      name: "Honors diploma",
+      grade_level_ids: ["grade-10"],
+      applies_from_academic_year_id: null,
+      is_active: true,
+      visible_to_students_and_parents: false,
+      rules: [
+        {
+          type: "total_credits",
+          min_value: 26,
+          group_name: null,
+          subject_ids: [],
+          external_exam_id: null,
+        },
+      ],
+    });
+  });
+
+  test("reports the students of a grade not on track, in progress ones on request", async () => {
+    await renderAt("/graduation-requirements");
+    await screen.findByRole("button", { name: "Edit High school diploma" });
+    // The grade select stays disabled until the grade levels load; opening it earlier shows no
+    // options (seen on slower CI runners).
+    const gradeSelect = () => screen.getByRole("combobox", { name: "Grade level" });
+    await waitFor(() => {
+      const select = gradeSelect();
+      expect(
+        select.hasAttribute("disabled") || select.getAttribute("aria-disabled") === "true",
+      ).toBe(false);
+    });
+    fireEvent.click(gradeSelect());
+    fireEvent.click(await screen.findByRole("option", { name: "Grade 10" }));
+    const badr = await screen.findByText("Badr Nasser");
+    const row = badr.closest("tr")!;
+    expect(within(row).getByText("Not met")).toBeTruthy();
+    expect(within(row).getByText("High school diploma: Credits in English")).toBeTruthy();
+    expect(screen.queryByText("Lina Haddad")).toBeNull();
+    fireEvent.click(screen.getByLabelText("Also show students whose year is still in progress"));
+    expect(await screen.findByText("Lina Haddad")).toBeTruthy();
+  });
+
+  test("lists external exams, adds a preset under its translated name, and locks scored parts", async () => {
+    const { container } = await renderAt("/external-exams");
+    expect(await screen.findByText("IELTS Academic")).toBeTruthy();
+    expect(screen.getByText("Average, 0–9")).toBeTruthy();
+    await expectNoA11yViolations(container);
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Built-in exam" }));
+    fireEvent.click(
+      await screen.findByRole("option", {
+        name: "Tawjihi (General Secondary Education Certificate)",
+      }),
+    );
+    // The preset's note says which defaults to check.
+    expect(screen.getByRole("note").textContent).toContain("Default subjects, each marked 0-100");
+    fireEvent.click(screen.getByRole("button", { name: "Add exam" }));
+    await waitFor(() => expect(postMock).toHaveBeenCalledTimes(1));
+    const [path, init] = postMock.mock.calls[0] as [string, { body: unknown }];
+    expect(path).toBe("/api/grading/external-exams/from-preset");
+    expect(init.body).toEqual({
+      preset_key: "tawjihi",
+      name: "Tawjihi (General Secondary Education Certificate)",
+    });
+
+    // Results are recorded: how each part is scored is read-only.
+    fireEvent.click(screen.getByRole("button", { name: "Edit IELTS Academic" }));
+    const listening = await screen.findByRole("group", { name: "Part 1" });
+    expect((within(listening).getByLabelText("Highest") as HTMLInputElement).disabled).toBe(true);
+    expect((within(listening).getByLabelText(/Part name/) as HTMLInputElement).disabled).toBe(
+      false,
+    );
   });
 
   test("has no accessibility violations on the report cards screen", async () => {

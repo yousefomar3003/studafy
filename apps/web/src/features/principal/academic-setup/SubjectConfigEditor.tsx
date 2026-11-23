@@ -361,6 +361,33 @@ function EditorForm({
                 disabled={readOnly}
               />
               <Input
+                label={t("academicGrading.editor.credits")}
+                helperText={t("academicGrading.editor.creditsHelp")}
+                type="number"
+                min={0}
+                max={100}
+                step={0.5}
+                value={draft.credits}
+                onChange={(event) => patch({ credits: event.target.value })}
+              />
+              <Input
+                label={t("academicGrading.editor.courseLevel")}
+                helperText={t("academicGrading.editor.courseLevelHelp")}
+                maxLength={40}
+                value={draft.courseLevel}
+                onChange={(event) => patch({ courseLevel: event.target.value })}
+              />
+              <Input
+                label={t("academicGrading.editor.gpaBoost")}
+                helperText={t("academicGrading.editor.gpaBoostHelp")}
+                type="number"
+                min={0}
+                max={5}
+                step={0.5}
+                value={draft.gpaBoost}
+                onChange={(event) => patch({ gpaBoost: event.target.value })}
+              />
+              <Input
                 label={t("academicGrading.editor.roundingDecimals")}
                 type="number"
                 min={0}

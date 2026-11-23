@@ -10,11 +10,14 @@ import type {
   GradeBand,
   MarkInput,
   OverallPolicy,
+  RankBasis,
+  RankScope,
   ResultFormat,
   ResultFormatKind,
   RoundingMode,
   SubjectGradingConfig,
   SubjectRequirement,
+  SubjectWeighting,
 } from "@studafy/grading-engine";
 import type { TransactionSql } from "postgres";
 
@@ -47,6 +50,11 @@ export interface SubjectConfigRow {
   include_in_average: boolean;
   include_on_certificate: boolean;
   average_weight: string;
+  /** Credit hours (numeric text); null when the school does not use credits. */
+  credits: string | null;
+  course_level: string | null;
+  /** Added to a passed subject's GPA points for the weighted GPA (numeric text, "0" for none). */
+  gpa_boost: string;
   grading_method: "weighted" | "total_points" | "descriptive";
   max_marks: string;
   pass_percentage: string;
@@ -124,8 +132,21 @@ export interface ProgramRow {
   result_format: ResultFormatKind;
   /** The out_of or gpa maximum; null for percentage. */
   result_scale_max: number | null;
+  /** Predicted grades (000254): never part of a result or its snapshot. */
+  predicted_grades_enabled: boolean;
+  predicted_grades_visibility: PredictedGradesVisibility;
+  /** Class rank (000257): off by default; read live, never part of a result snapshot. */
+  rank_enabled: boolean;
+  rank_basis: RankBasis;
+  rank_scope: RankScope;
+  rank_visibility: RankVisibility;
   updated_at: Date;
 }
+
+export type PredictedGradesVisibility = "staff" | "students_and_parents";
+
+/** Who sees a grade's class rank: staff only, or also the student and their parents. */
+export type RankVisibility = "staff" | "students_and_parents";
 
 export interface DescriptorRow {
   id: string;
@@ -186,6 +207,10 @@ export interface ConfigSnapshot {
   include_in_average: boolean;
   include_on_certificate: boolean;
   average_weight: number;
+  /** Absent on snapshots taken before credits existed (000253): no credits. */
+  credits?: number | null;
+  /** Absent on snapshots taken before course levels existed (000253): none. */
+  course_level?: string | null;
   scale_name: string | null;
   engine: SubjectGradingConfig;
   program: {
@@ -205,8 +230,8 @@ const CONFIG_COLUMNS = `
   config.id, config.school_id, config.academic_year_id, config.grade_level_id, config.section_id,
   config.subject_id, subject.code AS subject_code, subject.name AS subject_name, config.requirement,
   config.include_in_average, config.include_on_certificate, config.average_weight,
-  config.grading_method, config.max_marks, config.pass_percentage,
-  config.final_exam_pass_percentage, config.grade_scale_id, config.rounding_decimals,
+  config.credits, config.course_level, config.gpa_boost, config.grading_method, config.max_marks,
+  config.pass_percentage, config.final_exam_pass_percentage, config.grade_scale_id, config.rounding_decimals,
   config.rounding_mode, config.missing_mark_policy, config.absent_policy, config.retake_policy,
   config.retake_cap_percentage, config.teachers_can_add_assessments,
   config.teacher_assessments_require_approval, config.instructions, config.is_excluded,
@@ -377,6 +402,8 @@ export async function requireProgram(
            program.max_failed_subjects_for_supplementary, program.mark_approval_required,
            program.average_rounding_decimals, program.average_rounding_mode,
            program.result_format, program.result_scale_max::float8 AS result_scale_max,
+           program.predicted_grades_enabled, program.predicted_grades_visibility,
+           program.rank_enabled, program.rank_basis, program.rank_scope, program.rank_visibility,
            program.updated_at
     FROM app.grade_programs AS program
     JOIN app.grade_levels AS grade
@@ -402,7 +429,10 @@ const PROGRAM_COLUMNS = `
   grade.name AS grade_level_name, program.grade_scale_id,
   program.max_failed_subjects_for_supplementary, program.mark_approval_required,
   program.average_rounding_decimals, program.average_rounding_mode,
-  program.result_format, program.result_scale_max::float8 AS result_scale_max, program.updated_at`;
+  program.result_format, program.result_scale_max::float8 AS result_scale_max,
+  program.predicted_grades_enabled, program.predicted_grades_visibility,
+  program.rank_enabled, program.rank_basis, program.rank_scope, program.rank_visibility,
+  program.updated_at`;
 
 /** A config with its categories, assessments, term weights, the year's terms and its scale. */
 export async function loadConfigDetail(
@@ -704,7 +734,15 @@ export function toEngineConfig(
         mandatory: assessment.is_mandatory,
       })),
     ...(config.grading_method === "descriptive" ? { descriptors: loaded.descriptors } : {}),
+    gpaBoost: Number(config.gpa_boost),
   };
+}
+
+/** How a config counts towards the overall result, for the engine's credits check. */
+export function configWeighting(
+  config: Pick<SubjectConfigRow, "average_weight" | "credits">,
+): SubjectWeighting {
+  return { averageWeight: Number(config.average_weight), credits: num(config.credits) };
 }
 
 export function programPolicy(program: ProgramRow, scale: GradeBand[]): OverallPolicy {
@@ -746,6 +784,8 @@ export function buildSnapshot(
     include_in_average: config.include_in_average,
     include_on_certificate: config.include_on_certificate,
     average_weight: Number(config.average_weight),
+    credits: num(config.credits),
+    course_level: config.course_level,
     scale_name: loaded.scaleName,
     engine,
     program: {

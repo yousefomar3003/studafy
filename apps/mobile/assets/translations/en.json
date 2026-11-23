@@ -680,7 +680,13 @@
       "emptyBody": "Your conversations with the study assistant appear here for 90 days.",
       "error": "Couldn't load your chat history.",
       "retry": "Try again",
-      "openError": "Couldn't open that chat. It may have expired."
+      "openError": "Couldn't open that chat. It may have expired.",
+      "delete": "Delete chat",
+      "deleteTitle": "Delete this chat?",
+      "deleteBody": "This chat will be removed for good. You can't undo this.",
+      "deleteCancel": "Cancel",
+      "deleteConfirm": "Delete",
+      "deleteError": "Couldn't delete that chat. Try again."
     },
     "title": "Ask AI",
     "attach": {
@@ -1816,6 +1822,23 @@
         "scoreRequired": "Enter a score before publishing.",
         "failed": "The mark couldn't be saved. Check your connection and try again."
       }
+    },
+    "predicted": {
+      "entry": "Predicted grades",
+      "entrySubtitle": "The grade you predict for each student",
+      "title": "Predicted grades",
+      "help": "Your forecast of the grade each student will reach in this subject, for the year or a term.",
+      "period": "Period",
+      "wholeYear": "Whole year",
+      "none": "No prediction",
+      "save": "Save",
+      "saved": "Predicted grades saved",
+      "error": "Couldn't load the predicted grades.",
+      "noSection": "This class isn't linked to a grade section, so it has no predicted grades.",
+      "disabled": "Your school hasn't switched predicted grades on for this grade.",
+      "readOnly": "This year is closed, so predicted grades can no longer change.",
+      "invalid": "A grade isn't on this subject's grading scale.",
+      "noStudents": "No students take this subject in this section."
     }
   },
   "parent": {
@@ -2515,6 +2538,17 @@
     "valueOutOf": "{value} / {max}",
     "gpaValue": "GPA {value} / {max}",
     "gpaUnavailable": "GPA not available",
+    "weightedGpa": "Weighted GPA",
+    "creditsEarned": "Credits earned",
+    "subjectCredits": "Credits: {value}",
+    "weightedPoints": "Weighted {value}",
+    "rank": {
+      "label": "Class rank",
+      "place": "{place} of {cohort}",
+      "percentile": "{place} percentile",
+      "notRanked": "Not ranked",
+      "pending": "Rank pending"
+    },
     "total": "Total",
     "grade": "Grade",
     "failed": "Subjects failed",
@@ -2537,6 +2571,11 @@
     "certificates": "Certificates and report cards",
     "certificatesEmpty": "No certificates or report cards issued yet.",
     "certificatesError": "Couldn't load certificates.",
+    "predicted": {
+      "title": "Predicted grades",
+      "help": "What your teachers expect you to reach. These are not results.",
+      "wholeYear": "Whole year"
+    },
     "transcripts": "Transcripts",
     "transcriptsEmpty": "No transcript issued yet. The school issues it when it's needed, for example for university applications.",
     "transcriptsError": "Couldn't load transcripts.",
@@ -2546,6 +2585,8 @@
       "cumulative": "Cumulative result",
       "cumulativeAverage": "Cumulative average",
       "cumulativeGpa": "Cumulative GPA",
+      "cumulativeWeightedGpa": "Cumulative weighted GPA",
+      "cumulativeCredits": "Credits earned (all years)",
       "yearsCovered": "Years covered",
       "gpaScale": "{year}: out of {max}",
       "gpaReason": {
@@ -2553,7 +2594,9 @@
         "incomplete": "No cumulative figures: some results are incomplete.",
         "noSubjects": "No cumulative figures: no subject counts toward the average.",
         "mixedGpaScales": "No cumulative GPA: the years use different GPA scales ({scales}), so their points can't be averaged."
-      }
+      },
+      "graduation": "Graduation requirements: {name}",
+      "graduationValue": "{status} ({met} of {total})"
     },
     "kind": {
       "annualCertificate": "Certificate",
@@ -2585,6 +2628,39 @@
       "issueDate": "Issue date",
       "serialLabel": "Serial number",
       "finalization": "Results version {version}, finalized {date}"
+    },
+    "testScores": {
+      "title": "Test scores",
+      "empty": "No external exam results recorded yet.",
+      "error": "Test scores couldn't be loaded.",
+      "examSubject": "{exam} — {subject}",
+      "satOn": "Sat on {date}",
+      "scoreLine": "{component}: {score}"
+    },
+    "graduation": {
+      "title": "Graduation requirements",
+      "setProgress": "{met} of {total} requirements met",
+      "status": {
+        "met": "Met",
+        "notMet": "Not met",
+        "pending": "In progress",
+        "unknown": "Not available"
+      },
+      "rule": {
+        "totalCredits": "Total credits",
+        "groupCredits": "Credits in {group}",
+        "subjectsPassed": "Pass {group}",
+        "cumulativeGpa": "Cumulative GPA",
+        "cumulativeAverage": "Cumulative average",
+        "unknown": "Requirement"
+      },
+      "progress": {
+        "of": "{current} of {required}",
+        "minimum": "{current} (minimum {required})",
+        "recorded": "Recorded",
+        "notRecorded": "Not recorded yet"
+      },
+      "missing": "Still to pass: {subjects}"
     }
   },
   "features": {

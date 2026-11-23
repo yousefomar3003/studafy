@@ -6,6 +6,7 @@ import { useFormatters, useTranslation } from "../../../lib/i18n";
 
 import { Badge, ConfirmModal, QueryState, SeverityBadge, YearStatusBadge } from "./components";
 import { setupHref } from "./context";
+import { CurriculumTemplateDialog } from "./CurriculumTemplateDialog";
 import { problemMessage } from "./errors";
 import { useCopyGradingYear, useSetGradingStatus } from "./mutations";
 import { useGradeScales, usePublishCheck } from "./queries";
@@ -54,7 +55,9 @@ export function OverviewTab({ ctx }: { ctx: SetupContext }) {
   const { formatNumber } = useFormatters();
   const { overview, status } = ctx;
   const scales = useGradeScales(ctx.year.id);
-  const [dialog, setDialog] = useState<"publish" | "forward" | "unpublish" | "copy" | null>(null);
+  const [dialog, setDialog] = useState<
+    "publish" | "forward" | "unpublish" | "copy" | "template" | null
+  >(null);
 
   if (!overview || !status) {
     return <QueryState isPending error={null} />;
@@ -116,6 +119,11 @@ export function OverviewTab({ ctx }: { ctx: SetupContext }) {
                     </Button>
                   ) : null}
                 </>
+              ) : null}
+              {ctx.configEditable ? (
+                <Button type="button" variant="secondary" onClick={() => setDialog("template")}>
+                  {t("academicGrading.templates.action")}
+                </Button>
               ) : null}
               {status === "active" ? (
                 <Button type="button" variant="secondary" onClick={() => setDialog("unpublish")}>
@@ -188,9 +196,14 @@ export function OverviewTab({ ctx }: { ctx: SetupContext }) {
                   {t(`academicGrading.overview.checklist.${step.key}.help`)}
                 </p>
                 {step.key === "start" && isEmpty && ctx.can.manage && status === "draft" ? (
-                  <Button type="button" variant="secondary" onClick={() => setDialog("copy")}>
-                    {t("academicGrading.overview.copy.action")}
-                  </Button>
+                  <div className="ag-actions">
+                    <Button type="button" variant="secondary" onClick={() => setDialog("template")}>
+                      {t("academicGrading.templates.action")}
+                    </Button>
+                    <Button type="button" variant="secondary" onClick={() => setDialog("copy")}>
+                      {t("academicGrading.overview.copy.action")}
+                    </Button>
+                  </div>
                 ) : step.path ? (
                   <Link to={setupHref(ctx, step.path)}>
                     {t(`academicGrading.overview.checklist.${step.key}.link`)}
@@ -269,6 +282,9 @@ export function OverviewTab({ ctx }: { ctx: SetupContext }) {
         <StatusDialog ctx={ctx} target="draft" onClose={() => setDialog(null)} />
       ) : null}
       {dialog === "copy" ? <CopyYearDialog ctx={ctx} onClose={() => setDialog(null)} /> : null}
+      {dialog === "template" ? (
+        <CurriculumTemplateDialog ctx={ctx} onClose={() => setDialog(null)} />
+      ) : null}
     </>
   );
 }

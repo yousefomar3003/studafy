@@ -69,9 +69,11 @@ not hiding relationships. The exact reviewed payload exceptions are:
 - `outbox_events.payload`;
 - `student_subject_results.config_snapshot`, `student_subject_results.breakdown` and
   `certificates.content` (000160, write-once snapshots of finalized results and issued
-  certificates); and
+  certificates);
 - `license_quotes.breakdown` (000165, the pricing calculator's result as sent to the school; the
-  invoice lines it becomes are relational).
+  invoice lines it becomes are relational); and
+- `external_exam_components.allowed_labels` (000255, an exam component's closed, ordered list of
+  allowed grade labels, read whole with the component).
 
 These hold polymorphic audit state, internal event envelopes, external/flexible provider
 payloads, or immutable point-in-time snapshots. Tenant identity and relational routing remain normal constrained columns. Adding another

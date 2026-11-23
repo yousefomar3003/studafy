@@ -320,6 +320,16 @@
       "where": "Principal › Academic setup › Scales",
       "keywords": "grading scale, grade scale, letter grades, grade boundaries, gpa, mark bands, grade bands"
     },
+    "academic-external-exams": {
+      "title": "External exams",
+      "where": "Principal › Academic setup › External exams",
+      "keywords": "external exams, test scores, sat, act, ap, ielts, toefl, igcse, a level, ib diploma, tawjihi, thanaweya amma, state test, national exams"
+    },
+    "academic-graduation": {
+      "title": "Graduation requirements",
+      "where": "Principal › Academic setup › Graduation requirements",
+      "keywords": "graduation requirements, diploma, credits, credit hours, gpa, on track, not on track, required subjects, graduation checklist"
+    },
     "academic-approvals": {
       "title": "Mark sheet approvals",
       "where": "Principal › Academic setup › Approvals",
@@ -329,6 +339,11 @@
       "title": "Results & certificates",
       "where": "Principal › Academic setup › Results",
       "keywords": "results, finalize results, report cards, certificates, term results, annual results, transcripts, print certificate"
+    },
+    "academic-top-students": {
+      "title": "Top students",
+      "where": "Principal › Academic setup › Top students",
+      "keywords": "top students, class rank, rank, percentile, honor roll, best students, valedictorian, top of the class"
     },
     "academic-report-cards": {
       "title": "Report card comments",

@@ -164,7 +164,23 @@ const EXPECTED_MUTATING_ROUTES = [
   "PUT /api/grading/report-card-settings",
   "PUT /api/grading/sections/{sectionId}/report-notes",
   "PUT /api/grading/sections/{sectionId}/subjects/{subjectId}/report-comments",
+  "PUT /api/grading/sections/{sectionId}/subjects/{subjectId}/predicted-grades",
   "POST /api/grading/finalizations/{finalizationId}/certificates",
+  // External exams and test scores (000255): leadership behind academicConfig:manage; each write
+  // records its old and new values in the service.
+  "POST /api/grading/external-exams",
+  "POST /api/grading/external-exams/from-preset",
+  "PUT /api/grading/external-exams/{examId}",
+  "POST /api/grading/external-exams/{examId}/archive",
+  "POST /api/grading/external-exams/{examId}/restore",
+  "POST /api/grading/students/{studentId}/external-exam-results",
+  "PUT /api/grading/external-exam-results/{resultId}",
+  "DELETE /api/grading/external-exam-results/{resultId}",
+  // Graduation requirements (000258): leadership behind academicConfig:manage; each write records
+  // its old and new values in the service.
+  "POST /api/grading/graduation-requirement-sets",
+  "PUT /api/grading/graduation-requirement-sets/{setId}",
+  "DELETE /api/grading/graduation-requirement-sets/{setId}",
   // Transcripts (000207): issue, reissue and revoke behind academicCertificate:issue.
   "POST /api/grading/students/{studentId}/transcripts",
   "POST /api/grading/transcripts/{transcriptId}/reissue",
@@ -179,6 +195,8 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/grading/subject-configs/{configId}/reset",
   "POST /api/grading/teacher-assignments",
   "POST /api/grading/years/{yearId}/copy",
+  "POST /api/grading/years/{yearId}/curriculum-template/apply",
+  "POST /api/grading/years/{yearId}/curriculum-template/preview",
   "POST /api/grading/years/{yearId}/programs/{gradeLevelId}/subjects",
   "POST /api/grading/years/{yearId}/scales",
   "POST /api/grading/years/{yearId}/status",
@@ -417,6 +435,8 @@ const EXPECTED_MUTATING_ROUTES = [
   // Ask AI streaming (ST-165). Same gate and same rationale as the gateway route above; the ask
   // route's writes are the grounded answer's messages, citations, and the student's usage ledger.
   "POST /api/ai/students/{studentId}/ask",
+  // Ask AI chat delete. Same gate; it deletes only the path student's own conversation.
+  "DELETE /api/ai/students/{studentId}/conversations/{conversationId}",
   // Ask AI photo text. Gated by the caller's own Ask AI feature, not the permission matrix; it reads
   // a photo in memory and writes nothing.
   "POST /api/ai/photo-text",
@@ -720,6 +740,9 @@ const GUARD_EXEMPT_ROUTES = new Set([
   // Ask AI streaming (ST-165) — same gate, same RLS; its writes are the answer's messages,
   // citations, and the student's ai_usage_meters row.
   "POST /api/ai/students/{studentId}/ask",
+  // Ask AI chat delete — same gate, same RLS; it deletes only the path student's own conversation
+  // (moderation decisions keep their record with the message link cleared).
+  "DELETE /api/ai/students/{studentId}/conversations/{conversationId}",
   // Ask AI photo text — the caller's own Ask AI feature is the gate (the subject is the caller, so
   // there is no other person's data to authorize against); it reads the photo in memory, touches no
   // table, and writes nothing.

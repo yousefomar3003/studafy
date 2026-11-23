@@ -1,0 +1,1 @@
+export { externalExamRoutes } from "./routes";

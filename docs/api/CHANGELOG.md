@@ -13,6 +13,59 @@ when it required the `version-bump` label.
 
 ### Added
 
+- Class rank and percentile (migration 000257; docs/database/academic-grading.md "Class rank and
+  percentile"). New `listTopStudents`
+  (`GET /api/grading/years/{yearId}/programs/{gradeLevelId}/top-students`, `result:finalize`;
+  query `term_id`, `limit` 1–100, default 10) returning `TopStudents`. `GradeProgramBody` takes
+  optional `rank_enabled`, `rank_basis` (`RankBasis`: `average`, `gpa`, `weighted_gpa`),
+  `rank_scope` (`RankScope`: `section`, `grade_level`) and `rank_visibility` (`RankVisibility`:
+  `staff`, `students_and_parents`); `GradeProgram` returns them; a GPA basis on a grade that is not
+  a GPA is a 400. `FinalizedStudentResult` adds `class_rank` (`ClassRank`, nullable: `status`
+  `ranked` / `not_ranked` / `pending`, `basis`, `scope`, `rank`, `cohort_size`, `percentile`),
+  shown to students and parents only when the grade allows. `CertificateContentOverall` and
+  `TranscriptYearOverall` add optional `class_rank` (`DocumentClassRank`), absent on documents
+  issued before or without a visible rank.
+- Graduation requirements (migration 000258; docs/modules/graduation-requirements.md), tag
+  "Graduation requirements". Sets: `listGraduationRequirementSets`
+  (`GET /api/grading/graduation-requirement-sets`, `academicConfig:read`),
+  `createGraduationRequirementSet` (`POST`), `updateGraduationRequirementSet`
+  (`PUT .../{setId}`) and `deleteGraduationRequirementSet` (`DELETE .../{setId}`), all
+  `academicConfig:manage`, with `GraduationRequirementSet` / `GraduationRequirementSetInput` and
+  rule types `GraduationRuleType` (`total_credits`, `group_credits`, `subjects_passed`,
+  `cumulative_gpa`, `cumulative_average`, `external_exam`). Checks: `getStudentGraduationRequirements`
+  (`GET /api/grading/students/{studentId}/graduation-requirements`, `grade:read` + row scope;
+  students and parents get only the sets shown to them, `GraduationChecklist`),
+  `previewGraduationRequirementSet` (`GET .../{setId}/preview?student_id=`, `GraduationPreview`) and
+  `getGraduationRequirementsReport` (`GET /api/grading/graduation-requirements/report`,
+  `GraduationReport`), both `academicConfig:manage`. Each rule is `met`, `not_met` or `pending`
+  (`GraduationStatus`). `TranscriptContent` adds an optional `graduation_requirements`
+  (`TranscriptGraduationRequirement`: name, status, rules met and total), absent when no set applied
+  and on transcripts issued before.
+
+- Credits, course levels and the weighted GPA (migration 000253; docs/database/academic-grading.md
+  "Credits, course levels and the weighted GPA"). No new paths. `CreateSubjectConfigBody` /
+  `UpdateSubjectConfigBody` take optional `credits` (0–100, nullable), `course_level` (≤ 40,
+  nullable) and `gpa_boost` (0–5, default 0); `SubjectConfig` returns them. `FinalizedSubjectResult`
+  adds `weighted_gpa_points`, `credits` and `course_level`; `FinalizedStudentResult` and
+  `ResultPreviewStudent` add `weighted_gpa`, `credits_attempted` and `credits_earned`;
+  `ResultPreviewSubject` adds `credits` and `course_level`. Certificate and transcript content gain
+  the same optional subject (`credits`, `course_level`, `weighted_gpa_points`) and overall
+  (`weighted_gpa`, `credits_attempted`, `credits_earned`) fields, absent when not set and on
+  documents issued before; `TranscriptCumulative` / `TranscriptReadinessCumulative` add optional
+  `weighted_gpa`, `credits_attempted` and `credits_earned`. New validation warning code
+  `CREDITS_DIFFER_FROM_COEFFICIENT`.
+- Predicted grades (migration 000254; docs/modules/predicted-grades.md). `GradeProgram` and
+  `GradeProgramBody` gain `predicted_grades_enabled` and `predicted_grades_visibility`
+  (`PredictedGradesVisibility`: `staff` or `students_and_parents`; defaults `false` / `staff`).
+  New: `getSectionPredictedGrades` (`GET /api/grading/sections/{sectionId}/subjects/{subjectId}/predicted-grades`,
+  `SectionPredictedGrades`, `grade:read`, the subject's teachers in the section and leadership),
+  `savePredictedGrades` (`PUT` the same path, `SavePredictedGradesBody`, `grade:update` or
+  `result:finalize`; labels must be on the subject's scale; refused with the new
+  `PREDICTED_GRADES_DISABLED` problem code unless the grade's program has them switched on) and
+  `getStudentPredictedGrades` (`GET /api/grading/students/{studentId}/predicted-grades`,
+  `StudentPredictedGrades`, `grade:read`; the student and linked parents only when the program shows
+  them, and never the teacher's note).
+
 - The Student AI programme's dashboards (phase 6; docs/billing/ai-programme.md "Dashboards").
   School (`aiRevenueShare:read`: the school admin, the principal and finance):
   `schoolGetAiProgrammeDashboard` (`GET /api/school/ai-revenue-share/summary`,
@@ -209,6 +262,12 @@ when it required the `version-bump` label.
   anything not refunded, and the last error.
 
 ### Changed
+
+- Credits attempted and earned (results, previews, certificates, transcripts) now count every
+  complete, non-exempt subject that has credits, including subjects left out of the average and
+  descriptive (pass/fail) subjects, not only the subjects counted in the average. No schema change.
+  Results finalized earlier keep their stored totals; the cumulative credits of transcripts issued
+  from now on use the new rule.
 
 - `getAiStoreConfig` (`GET /api/subscriptions/ai/store/config`, `AiStoreConfig`): new
   `unavailableReason` value `covered_by_school` and a nullable `schoolName`. A student holding a

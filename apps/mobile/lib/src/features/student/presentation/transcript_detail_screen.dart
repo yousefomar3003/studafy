@@ -8,6 +8,7 @@ import '../application/transcript_providers.dart';
 import '../domain/academic_results.dart';
 import '../domain/transcript.dart';
 import 'widgets/academic_result_widgets.dart';
+import 'widgets/graduation_requirements_section.dart';
 import 'widgets/status_pill.dart';
 import '../../../design/widgets/protected_screen.dart';
 
@@ -187,6 +188,22 @@ class _Document extends StatelessWidget {
                         ? '—'
                         : formatResultNumber(cumulative.gpa!),
                   ),
+                  if (cumulative.gpa != null && cumulative.weightedGpa != null)
+                    _Field(
+                      label: 'academicResults.transcript.cumulativeWeightedGpa'
+                          .tr(),
+                      value: formatResultNumber(cumulative.weightedGpa!),
+                    ),
+                  if (formatCreditsEarned(
+                        cumulative.creditsAttempted,
+                        cumulative.creditsEarned,
+                      )
+                      case final credits?)
+                    _Field(
+                      label: 'academicResults.transcript.cumulativeCredits'
+                          .tr(),
+                      value: credits,
+                    ),
                   _Field(
                     label: 'academicResults.transcript.yearsCovered'.tr(),
                     value: '${cumulative.yearsCovered}',
@@ -219,6 +236,19 @@ class _Document extends StatelessWidget {
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
+                      ),
+                    ),
+                  for (final requirement in content.graduationRequirements)
+                    _Field(
+                      label: 'academicResults.transcript.graduation'.tr(
+                        namedArgs: {'name': requirement.name},
+                      ),
+                      value: 'academicResults.transcript.graduationValue'.tr(
+                        namedArgs: {
+                          'status': graduationStatusLabel(requirement.status),
+                          'met': '${requirement.rulesMet}',
+                          'total': '${requirement.rulesTotal}',
+                        },
                       ),
                     ),
                   const Divider(height: AppSpacing.space32),

@@ -308,6 +308,8 @@ export const SEARCH_DESTINATIONS: readonly SearchDestination[] = [
   entry("academic-subjects", "page", `${SETUP}/subjects`, ACADEMIC),
   entry("academic-sections", "page", `${SETUP}/sections`, ACADEMIC),
   entry("academic-scales", "page", `${SETUP}/scales`, ACADEMIC),
+  entry("academic-external-exams", "page", `${SETUP}/external-exams`, ACADEMIC),
+  entry("academic-graduation", "page", `${SETUP}/graduation-requirements`, ACADEMIC),
   entry("academic-approvals", "page", `${SETUP}/approvals`, {
     ...ACADEMIC,
     alsoRequires: [P.APPROVAL_REVIEW],
@@ -315,6 +317,10 @@ export const SEARCH_DESTINATIONS: readonly SearchDestination[] = [
   entry("academic-results", "page", `${SETUP}/results`, {
     ...ACADEMIC,
     alsoRequiresAny: [P.RESULT_FINALIZE, P.ACADEMIC_CERTIFICATE_ISSUE],
+  }),
+  entry("academic-top-students", "page", `${SETUP}/top-students`, {
+    ...ACADEMIC,
+    alsoRequires: [P.RESULT_FINALIZE],
   }),
   entry("academic-report-cards", "page", `${SETUP}/report-cards`, {
     ...ACADEMIC,

@@ -5,11 +5,17 @@ import { calculateCumulativeResult } from "@studafy/grading-engine";
 
 import { CodedHttpException } from "../../coded-http-exception";
 import { emitAuditLog } from "../../middleware/auditEmitter";
+import { transcriptExternalExams } from "../external-exams/service";
+import { transcriptGraduationRequirements } from "../graduation-requirements/service";
 
-import { blockingReasons } from "./certificate-service";
+import { blockingReasons, withDocumentRank } from "./certificate-service";
+import { attachClassRanks } from "./class-rank-service";
 import { readFinalizationResults } from "./results-service";
 
+import type { DocumentClassRank } from "./class-rank-service";
 import type { StoredStudentResult } from "./results-service";
+import type { TranscriptExternalExam } from "../external-exams/service";
+import type { TranscriptGraduationRequirement } from "../graduation-requirements/service";
 import type { CumulativeResult, ResultDisplay, RoundingRule } from "@studafy/grading-engine";
 import type { TransactionSql } from "postgres";
 
@@ -43,6 +49,13 @@ export interface TranscriptSubject {
   exempt: boolean;
   include_in_average: boolean;
   average_weight: number;
+  /**
+   * Credit hours, course level and boosted GPA points: present only when the subject has them
+   * (absent on transcripts issued before 000253). Readers treat absent as null.
+   */
+  credits?: number;
+  course_level?: string;
+  weighted_gpa_points?: number;
   /** Graded with descriptors (no marks): `grade_label` is the subject's descriptor, if any. */
   descriptive?: boolean;
   /** A descriptive subject's skills and the descriptor each was given. */
@@ -64,6 +77,12 @@ export interface TranscriptYear {
     academic_status: string;
     /** The year's result in its grade's format (out of 20, GPA...); null on a percentage-only row. */
     display: ResultDisplay | null;
+    /** Weighted GPA and credit totals: present only when the year has them (from 000253). */
+    weighted_gpa?: number;
+    credits_attempted?: number;
+    credits_earned?: number;
+    /** The year's class rank when issued (000257); absent without one and on older transcripts. */
+    class_rank?: DocumentClassRank;
   };
 }
 
@@ -76,6 +95,14 @@ export interface TranscriptCumulative {
   gpa_scale_max?: number | null;
   /** Each GPA year and its maximum, when they differ (the cumulative GPA is then null). */
   mixed_gpa_scales?: { academic_year_name: string; max: number }[];
+  /**
+   * The cumulative GPA with boosted subjects' weighted points; null when the GPA is, or no subject
+   * is boosted. Absent on transcripts issued before 000253.
+   */
+  weighted_gpa?: number | null;
+  /** Credits over every covered year; null without credits, absent before 000253. */
+  credits_attempted?: number | null;
+  credits_earned?: number | null;
   years_covered: number;
   subjects_counted: number;
 }
@@ -91,6 +118,17 @@ export interface TranscriptContent {
   cumulative: TranscriptCumulative;
   issued_by: { user_id: string; name: string | null };
   reissue: { supersedes_serial: string; reason: string } | null;
+  /**
+   * External examinations (SAT, IELTS, IGCSE finals...) of exams shown on transcripts, as they
+   * stood at issue (000255). Absent when the student had none, and on transcripts issued before.
+   */
+  external_exams?: TranscriptExternalExam[];
+  /**
+   * Whether the student met each graduation requirement set applying to them, as it stood at issue
+   * (000258): met, not met, or pending while the current year is not finalized. Absent when no set
+   * applied, and on transcripts issued before.
+   */
+  graduation_requirements?: TranscriptGraduationRequirement[];
 }
 
 export interface TranscriptView {
@@ -238,6 +276,9 @@ function cumulativeOf(years: readonly CoveredYear[]): TranscriptCumulative {
         averageWeight: year.weights.get(subject.subject_id) ?? 1,
         percentage: subject.percentage,
         gpaPoints: subject.gpa_points,
+        weightedGpaPoints: subject.weighted_gpa_points,
+        credits: subject.credits,
+        passed: subject.passed,
         descriptive: subject.is_descriptive,
       })),
     })),
@@ -253,6 +294,9 @@ function cumulativeOf(years: readonly CoveredYear[]): TranscriptCumulative {
       academic_year_name: scale.label,
       max: scale.max,
     })),
+    weighted_gpa: result.weightedGpa,
+    credits_attempted: result.creditsAttempted,
+    credits_earned: result.creditsEarned,
     years_covered: years.length,
     subjects_counted: result.subjectsCounted,
   };
@@ -300,6 +344,11 @@ function renderYear(year: CoveredYear): TranscriptYear {
         exempt: subject.status === "exempt",
         include_in_average: subject.include_in_average,
         average_weight: year.weights.get(subject.subject_id) ?? 1,
+        ...(subject.credits !== null ? { credits: subject.credits } : {}),
+        ...(subject.course_level !== null ? { course_level: subject.course_level } : {}),
+        ...(subject.weighted_gpa_points !== null
+          ? { weighted_gpa_points: subject.weighted_gpa_points }
+          : {}),
         ...(subject.is_descriptive
           ? {
               descriptive: true,
@@ -319,6 +368,11 @@ function renderYear(year: CoveredYear): TranscriptYear {
       subjects_failed: result.subjects_failed,
       academic_status: result.academic_status,
       display: result.result_display,
+      ...(result.weighted_gpa !== null ? { weighted_gpa: result.weighted_gpa } : {}),
+      ...(result.credits_attempted !== null
+        ? { credits_attempted: result.credits_attempted, credits_earned: result.credits_earned! }
+        : {}),
+      ...withDocumentRank(result),
     },
   };
 }
@@ -338,6 +392,15 @@ async function renderContent(
     FROM app.schools AS school WHERE school.id = ${schoolId}::uuid
   `;
   const student = years[0]!.result;
+  const externalExams = await transcriptExternalExams(tx, schoolId, student.student_id);
+  // Each year's rank among its section or grade level, as the documents issued to students show it.
+  await attachClassRanks(
+    tx,
+    schoolId,
+    years.map((year) => ({ finalizationId: year.finalization.id, results: [year.result] })),
+    "document",
+  );
+  const graduation = await transcriptGraduationRequirements(tx, schoolId, student.student_id);
   return {
     version: 1,
     kind: "transcript",
@@ -354,6 +417,8 @@ async function renderContent(
     cumulative: cumulativeOf(years),
     issued_by: { user_id: userId, name: names?.issuer_name ?? null },
     reissue,
+    ...(externalExams.length > 0 ? { external_exams: externalExams } : {}),
+    ...(graduation.length > 0 ? { graduation_requirements: graduation } : {}),
   };
 }
 
