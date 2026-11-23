@@ -5,11 +5,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:studafy_mobile/src/core/localization/app_locales.dart';
 import 'package:studafy_mobile/src/design/theme/app_theme.dart';
 import 'package:studafy_mobile/src/features/student/application/academic_results_providers.dart';
+import 'package:studafy_mobile/src/features/student/application/predicted_grades_providers.dart';
 import 'package:studafy_mobile/src/features/student/application/student_context_providers.dart';
 import 'package:studafy_mobile/src/features/student/application/transcript_providers.dart';
 import 'package:studafy_mobile/src/features/student/data/academic_results_client.dart';
+import 'package:studafy_mobile/src/features/student/data/predicted_grades_client.dart';
 import 'package:studafy_mobile/src/features/student/data/transcript_client.dart';
 import 'package:studafy_mobile/src/features/student/domain/academic_results.dart';
+import 'package:studafy_mobile/src/features/student/domain/predicted_grades.dart';
 import 'package:studafy_mobile/src/features/student/domain/transcript.dart';
 import 'package:studafy_mobile/src/features/student/presentation/academic_results_screen.dart';
 import 'package:studafy_mobile/src/features/student/presentation/certificate_detail_screen.dart';
@@ -206,12 +209,24 @@ class _NoTranscriptsClient implements TranscriptClient {
       throw UnimplementedError();
 }
 
+/// Predicted grades as the API hands them to a student or parent (no notes).
+class _FakePredictedClient implements StudentPredictedGradesClient {
+  _FakePredictedClient([this.json]);
+
+  final Map<String, Object?>? json;
+
+  @override
+  Future<List<PredictedGradesYear>> fetch(String studentId) async =>
+      parsePredictedGradeYears(json);
+}
+
 Future<void> _pump(
   WidgetTester tester,
   _FakeResultsClient client, {
   Widget home = const AcademicResultsScreen(),
   String? currentStudentId = 'st-1',
   Locale locale = AppLocales.fallback,
+  _FakePredictedClient? predicted,
 }) async {
   tester.view.physicalSize = const Size(1080, 4000);
   tester.view.devicePixelRatio = 1;
@@ -223,6 +238,9 @@ Future<void> _pump(
         overrides: [
           academicResultsClientProvider.overrideWithValue(client),
           transcriptClientProvider.overrideWithValue(_NoTranscriptsClient()),
+          studentPredictedGradesClientProvider.overrideWithValue(
+            predicted ?? _FakePredictedClient(),
+          ),
           currentStudentIdProvider.overrideWithValue(currentStudentId),
         ],
         child: Builder(
@@ -309,6 +327,61 @@ void main() {
       expect(find.text('81.25%'), findsNWidgets(2));
     },
   );
+
+  testWidgets('predicted grades show by year when the school shares them', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      _FakeResultsClient(),
+      predicted: _FakePredictedClient({
+        'student_id': 'st-1',
+        'years': [
+          {
+            'academic_year_id': 'year-2',
+            'academic_year_name': '2026–2027',
+            'section_name': 'A',
+            'grade_level_name': 'Year 13',
+            'grades': [
+              {
+                'term_id': null,
+                'term_name': null,
+                'subject_name': 'Physics',
+                'grade_label': 'A*',
+                'note': null,
+              },
+              {
+                'term_id': 't1',
+                'term_name': 'Term 1',
+                'subject_name': 'Physics',
+                'grade_label': 'A',
+              },
+              // Unknown shapes are skipped, not fatal.
+              {'subject_name': 'Broken'},
+            ],
+          },
+          // A year with nothing visible takes no space.
+          {'academic_year_name': '2025–2026', 'grades': <Object?>[]},
+        ],
+      }),
+    );
+
+    expect(find.text('Predicted grades'), findsOneWidget);
+    expect(find.text('2026–2027 · Year 13 A'), findsOneWidget);
+    expect(find.text('Physics · Whole year'), findsOneWidget);
+    expect(find.text('Physics · Term 1'), findsOneWidget);
+    expect(find.text('A*'), findsOneWidget);
+    expect(find.text('2025–2026'), findsNothing);
+    expect(find.textContaining('Broken'), findsNothing);
+  });
+
+  testWidgets('no predicted grades section when none are shared', (
+    tester,
+  ) async {
+    await _pump(tester, _FakeResultsClient());
+
+    expect(find.text('Predicted grades'), findsNothing);
+  });
 
   testWidgets('a certificate shows its GPA; an older one its percentage', (
     tester,
