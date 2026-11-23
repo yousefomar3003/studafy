@@ -8,8 +8,9 @@ import { MemoryRouter, useLocation } from "react-router-dom";
 import type { ComponentType } from "react";
 
 /**
- * Principal & finance accounts: the admin invites by email and role (Principal or Finance), the
- * list merges both roles' invitations, and pending/expired invitations can be resent.
+ * Admin, principal & finance accounts: the admin invites by email and role (Principal, Finance or
+ * another school admin), the list merges every role's invitations, and pending/expired invitations
+ * can be resent.
  */
 
 const PENDING_ID = "11111111-1111-4111-8111-111111111111";
@@ -31,26 +32,29 @@ function invitation(id: string, email: string, role: string, status: string, cre
 
 const getMock = mock((path: string, init: { params: { query: { role: string } } }) => {
   if (path !== "/api/invitations") throw new Error(`Unhandled GET ${path}`);
+  const { role } = init.params.query;
   const rows =
-    init.params.query.role === "PRINCIPAL"
-      ? [
-          invitation(
-            ACCEPTED_ID,
-            "head@alpha.test",
-            "PRINCIPAL",
-            "consumed",
-            "2026-09-01T00:00:00.000Z",
-          ),
-        ]
-      : [
-          invitation(
-            PENDING_ID,
-            "money@alpha.test",
-            "FINANCE",
-            "pending",
-            "2026-10-01T00:00:00.000Z",
-          ),
-        ];
+    role === "ORG_ADMIN"
+      ? []
+      : role === "PRINCIPAL"
+        ? [
+            invitation(
+              ACCEPTED_ID,
+              "head@alpha.test",
+              "PRINCIPAL",
+              "consumed",
+              "2026-09-01T00:00:00.000Z",
+            ),
+          ]
+        : [
+            invitation(
+              PENDING_ID,
+              "money@alpha.test",
+              "FINANCE",
+              "pending",
+              "2026-10-01T00:00:00.000Z",
+            ),
+          ];
   return Promise.resolve({ data: { invitations: rows, next_cursor: null } });
 });
 const postMock = mock((path: string, _init?: unknown) => {
@@ -92,7 +96,9 @@ afterEach(() => {
 describe("StaffAccountsPage", () => {
   test("lists principal and finance invitations newest first", async () => {
     await renderPage();
-    const table = await screen.findByRole("table", { name: "Principal and finance invitations" });
+    const table = await screen.findByRole("table", {
+      name: "Admin, principal and finance invitations",
+    });
     await within(table).findByText("money@alpha.test");
     const rows = within(table).getAllByRole("row").slice(1);
     expect(rows[0]!.textContent).toContain("money@alpha.test");
@@ -104,7 +110,7 @@ describe("StaffAccountsPage", () => {
   test("invites a finance staff member by email", async () => {
     await renderPage();
     const form = await screen.findByRole("form", {
-      name: "Invite a principal or finance staff member",
+      name: "Invite an admin, principal or finance staff member",
     });
     fireEvent.change(within(form).getByLabelText(/Email/), {
       target: { value: " new@alpha.test " },
@@ -120,10 +126,29 @@ describe("StaffAccountsPage", () => {
     ]);
   });
 
+  test("invites another school admin by email", async () => {
+    await renderPage();
+    const form = await screen.findByRole("form", {
+      name: "Invite an admin, principal or finance staff member",
+    });
+    fireEvent.change(within(form).getByLabelText(/Email/), {
+      target: { value: "deputy@alpha.test" },
+    });
+    fireEvent.click(within(form).getByRole("combobox", { name: /Role/ }));
+    fireEvent.click(await screen.findByRole("option", { name: "Org admin" }));
+    fireEvent.click(within(form).getByRole("button", { name: "Send invitation" }));
+
+    await waitFor(() => expect(postMock).toHaveBeenCalledTimes(1));
+    expect(postMock.mock.calls[0]).toEqual([
+      "/api/invitations",
+      { body: { email: "deputy@alpha.test", role: "ORG_ADMIN" } },
+    ]);
+  });
+
   test("rejects an invalid email without calling the API", async () => {
     await renderPage();
     const form = await screen.findByRole("form", {
-      name: "Invite a principal or finance staff member",
+      name: "Invite an admin, principal or finance staff member",
     });
     fireEvent.change(within(form).getByLabelText(/Email/), { target: { value: "not-an-email" } });
     fireEvent.click(within(form).getByRole("button", { name: "Send invitation" }));
@@ -133,7 +158,9 @@ describe("StaffAccountsPage", () => {
 
   test("resends a pending invitation", async () => {
     await renderPage();
-    const table = await screen.findByRole("table", { name: "Principal and finance invitations" });
+    const table = await screen.findByRole("table", {
+      name: "Admin, principal and finance invitations",
+    });
     fireEvent.click(await within(table).findByRole("button", { name: "Resend" }));
     await waitFor(() =>
       expect(postMock).toHaveBeenCalledWith("/api/invitations/{id}/regenerate", {
