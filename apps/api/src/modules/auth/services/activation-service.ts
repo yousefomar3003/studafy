@@ -153,7 +153,7 @@ async function resolveInvitationTenant(
  *
  * @throws CodedHttpException(400 INVITATION_INVALID) — malformed or unknown token.
  * @throws CodedHttpException(409 EXPIRED|REVOKED|CONSUMED|SCHOOL_SUSPENDED) — invitation unusable.
- * @throws CodedHttpException(409 CONFLICT_DUPLICATE_ENTRY) — the identity is already linked elsewhere.
+ * @throws CodedHttpException(409 OAUTH_IDENTITY_EXISTS) — the identity is already linked elsewhere.
  */
 export async function activateAccount(
   db: Database,
@@ -305,9 +305,12 @@ export async function activateAccount(
       identityId = linked!.id;
     } catch (error) {
       if (isUniqueViolation(error)) {
+        // The Google/Microsoft account already signs in to another Studafy account (one provider
+        // account belongs to one Studafy account, in one school). The web's error page tells the
+        // user to accept with a different account, such as their email at this school.
         throw new CodedHttpException(
           409,
-          ERROR_CODES.CONFLICT_DUPLICATE_ENTRY,
+          ERROR_CODES.OAUTH_IDENTITY_EXISTS,
           "This account is already linked to another user.",
         );
       }

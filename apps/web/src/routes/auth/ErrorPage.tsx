@@ -66,6 +66,10 @@ const STATE_COPY = new Map<string, StateCopy>([
   ["WEB_ACCESS_MOBILE_ONLY", copy("mobileOnly", BACK_TO_SIGN_IN)],
   ["TENANT_SUSPENDED", copy("suspended")],
   ["OAUTH_CANCELLED", copy("cancelled", RETRY)],
+  // Accepting an invitation with a Google/Microsoft account that already signs in to another
+  // Studafy account (often another school's). One provider account belongs to one Studafy
+  // account, so the copy asks for a different one; the invitation link itself is still valid.
+  ["OAUTH_IDENTITY_EXISTS", copy("accountInUse")],
 ]);
 
 const GENERIC_FAILURE = copy("generic", RETRY);
