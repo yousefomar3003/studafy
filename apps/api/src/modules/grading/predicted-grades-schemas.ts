@@ -14,6 +14,10 @@ export const predictedGradesQuerySchema = z
   })
   .openapi("PredictedGradesQuery");
 
+const termOptionSchema = z
+  .object({ term_id: uuidSchema, term_name: z.string() })
+  .openapi("PredictedGradeTermOption");
+
 export const sectionPredictedGradesSchema = z
   .object({
     section_id: uuidSchema,
@@ -33,6 +37,9 @@ export const sectionPredictedGradesSchema = z
     labels: z.array(z.string()).openapi({
       description:
         "The bands of the subject's grade scale, highest first. Empty when the subject has no scale (any label up to 40 characters).",
+    }),
+    terms: z.array(termOptionSchema).openapi({
+      description: "The year's terms; a null term_id is the whole year.",
     }),
     students: z.array(
       z
@@ -104,11 +111,7 @@ export const studentPredictedGradesSchema = z
               description: "Subjects the student takes that year; empty unless can_edit.",
             }),
           terms: z
-            .array(
-              z
-                .object({ term_id: uuidSchema, term_name: z.string() })
-                .openapi("PredictedGradeTermOption"),
-            )
+            .array(termOptionSchema)
             .openapi({ description: "The year's terms; empty unless can_edit." }),
           grades: z.array(
             z

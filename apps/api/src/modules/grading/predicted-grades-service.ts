@@ -144,6 +144,8 @@ export interface SectionPredictedGradesView {
   visibility: PredictedGradesVisibility;
   editable: boolean;
   labels: string[];
+  /** The year's terms, to choose a period from (term_id null is the whole year). */
+  terms: { term_id: string; term_name: string }[];
   students: {
     student_id: string;
     first_name: string;
@@ -179,6 +181,7 @@ export async function getSectionPredictedGrades(
       `
     : [];
   const byStudent = new Map(rows.map((row) => [row.student_id, row]));
+  const terms = await loadYearTerms(tx, schoolId, period.section.academic_year_id);
   return {
     section_id: period.section.id,
     section_name: period.section.name,
@@ -191,6 +194,7 @@ export async function getSectionPredictedGrades(
     visibility: period.program.predicted_grades_visibility,
     editable: period.program.predicted_grades_enabled && isYearOpen(period.year),
     labels: period.labels,
+    terms: terms.map((term) => ({ term_id: term.id, term_name: term.name })),
     students: period.roster.map((student) => {
       const row = byStudent.get(student.student_id);
       return {

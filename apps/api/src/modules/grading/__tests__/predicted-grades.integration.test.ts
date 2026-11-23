@@ -238,6 +238,7 @@ describeDb("predicted grades", () => {
     expect(view.enabled).toBe(false);
     expect(view.editable).toBe(false);
     expect(view.labels).toEqual(["A*", "A", "B", "C", "U"]);
+    expect(view.terms.map((term) => term.term_id)).toContain(tenant.term.id);
     expect(view.students.map((s) => s.student_id).sort()).toEqual([ids.s1!, ids.s2!].sort());
     expect(
       await codeOf(
