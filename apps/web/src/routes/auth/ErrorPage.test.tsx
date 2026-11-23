@@ -46,6 +46,9 @@ const RENDERED_STATES: readonly {
   { code: "SCHOOL_SUSPENDED", heading: /account is suspended/i },
   { code: "TENANT_SUSPENDED", heading: /account is suspended/i },
   { code: "OAUTH_CANCELLED", heading: /sign-in cancelled/i, actionLabel: /try again/i },
+  // An invitation accepted with a provider account already used by another school's account: no
+  // retry link (signing in would reach the other school), the copy says to reopen the invitation.
+  { code: "OAUTH_IDENTITY_EXISTS", heading: /already used for another school/i },
 ];
 
 describe("ErrorPage", () => {
