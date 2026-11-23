@@ -13,6 +13,18 @@ when it required the `version-bump` label.
 
 ### Added
 
+- Predicted grades (migration 000254; docs/modules/predicted-grades.md). `GradeProgram` and
+  `GradeProgramBody` gain `predicted_grades_enabled` and `predicted_grades_visibility`
+  (`PredictedGradesVisibility`: `staff` or `students_and_parents`; defaults `false` / `staff`).
+  New: `getSectionPredictedGrades` (`GET /api/grading/sections/{sectionId}/subjects/{subjectId}/predicted-grades`,
+  `SectionPredictedGrades`, `grade:read`, the subject's teachers in the section and leadership),
+  `savePredictedGrades` (`PUT` the same path, `SavePredictedGradesBody`, `grade:update` or
+  `result:finalize`; labels must be on the subject's scale; refused with the new
+  `PREDICTED_GRADES_DISABLED` problem code unless the grade's program has them switched on) and
+  `getStudentPredictedGrades` (`GET /api/grading/students/{studentId}/predicted-grades`,
+  `StudentPredictedGrades`, `grade:read`; the student and linked parents only when the program shows
+  them, and never the teacher's note).
+
 - The Student AI programme's dashboards (phase 6; docs/billing/ai-programme.md "Dashboards").
   School (`aiRevenueShare:read`: the school admin, the principal and finance):
   `schoolGetAiProgrammeDashboard` (`GET /api/school/ai-revenue-share/summary`,
