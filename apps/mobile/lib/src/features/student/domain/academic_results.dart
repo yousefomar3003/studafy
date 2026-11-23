@@ -39,6 +39,9 @@ class SubjectResult {
     this.comment,
     this.isDescriptive = false,
     this.skills = const [],
+    this.credits,
+    this.courseLevel,
+    this.weightedGpaPoints,
   });
 
   factory SubjectResult.fromJson(Map<String, Object?> json) => SubjectResult(
@@ -75,6 +78,10 @@ class SubjectResult {
           descriptor: skill['descriptor_label'] as String?,
         ),
     ],
+    // Absent on results, certificates and transcripts from servers or documents before credits.
+    credits: _num(json['credits']),
+    courseLevel: _text(json['course_level']),
+    weightedGpaPoints: _num(json['weighted_gpa_points']),
   );
 
   final String subjectId;
@@ -95,6 +102,7 @@ class SubjectResult {
   /// The subject teacher's report card comment; null when there is none (and on results and
   /// certificates from before report card notes).
   final String? comment;
+
   /// Graded with descriptors (kindergarten, early primary): no marks or percentage; [gradeLabel]
   /// is the subject's descriptor when its scale has points, and [skills] carry the detail.
   final bool isDescriptive;
@@ -111,6 +119,15 @@ class SubjectResult {
     })
   >
   skills;
+
+  /// Credit hours (American and IB schools); null when the subject has none.
+  final double? credits;
+
+  /// Course level shown beside the subject ("Honors", "AP", "HL"); null for none.
+  final String? courseLevel;
+
+  /// GPA points with the course level's boost; null when the subject has no boost.
+  final double? weightedGpaPoints;
 
   bool get isExempt => status == 'exempt';
   bool get isIncomplete => status == 'incomplete';
@@ -164,6 +181,9 @@ class OverallResult {
     required this.subjectsFailed,
     required this.academicStatus,
     this.display,
+    this.weightedGpa,
+    this.creditsAttempted,
+    this.creditsEarned,
   });
 
   /// Reads a finalized result (`result_display`) or a certificate's overall block (`display`).
@@ -176,6 +196,10 @@ class OverallResult {
     subjectsFailed: (json['subjects_failed'] as num?)?.toInt() ?? 0,
     academicStatus: AcademicStatus.fromWire(json['academic_status']),
     display: ResultDisplay.fromJson(json['result_display'] ?? json['display']),
+    // Absent from older servers and documents: no weighted GPA, no credits.
+    weightedGpa: _num(json['weighted_gpa']),
+    creditsAttempted: _num(json['credits_attempted']),
+    creditsEarned: _num(json['credits_earned']),
   );
 
   final double? averagePercentage;
@@ -185,6 +209,13 @@ class OverallResult {
   final int subjectsFailed;
   final AcademicStatus academicStatus;
   final ResultDisplay? display;
+
+  /// The GPA with Honors/AP/HL boosts, beside a GPA [display]; null when there is none.
+  final double? weightedGpa;
+
+  /// Credits of the counted subjects, and of those passed; null when none carries credits.
+  final double? creditsAttempted;
+  final double? creditsEarned;
 }
 
 /// Days of recorded attendance in the report's period. Late days are counted within present days;

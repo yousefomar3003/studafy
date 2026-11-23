@@ -310,6 +310,50 @@ void main() {
     },
   );
 
+  testWidgets(
+    'shows course levels, credits and the weighted GPA; older results none',
+    (tester) async {
+      final boosted = _result(
+        id: 'fin-annual',
+        display: {'format': 'gpa', 'value': 3.25, 'max': 4},
+      );
+      final result = boosted['result']! as Map<String, Object?>;
+      result['weighted_gpa'] = 3.63;
+      result['credits_attempted'] = 3;
+      result['credits_earned'] = 2;
+      final math =
+          (result['subjects']! as List<Object?>).first! as Map<String, Object?>;
+      math['course_level'] = 'AP';
+      math['credits'] = 1;
+      math['weighted_gpa_points'] = 5;
+
+      await _pump(
+        tester,
+        _FakeResultsClient(
+          results: [
+            boosted,
+            // From a server before credits: no such fields at all.
+            _result(
+              id: 'fin-t1',
+              termId: 't1',
+              termName: 'Term 1',
+              finalizedAt: '2026-01-20T09:00:00.000Z',
+            ),
+          ],
+        ),
+      );
+
+      expect(find.text('GPA 3.25 / 4'), findsOneWidget);
+      expect(find.text('Weighted GPA'), findsOneWidget);
+      expect(find.text('3.63'), findsOneWidget);
+      expect(find.text('Credits earned'), findsOneWidget);
+      expect(find.text('2 / 3'), findsOneWidget);
+      expect(find.text('AP'), findsOneWidget);
+      expect(find.text('Credits: 1'), findsOneWidget);
+      expect(find.text('Weighted 5'), findsOneWidget);
+    },
+  );
+
   testWidgets('a certificate shows its GPA; an older one its percentage', (
     tester,
   ) async {

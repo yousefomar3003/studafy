@@ -212,6 +212,8 @@ export function normalizeDescriptiveInput(input: SubjectConfigInput): SubjectCon
   return {
     ...input,
     include_in_average: false,
+    // No GPA points, so no weighted GPA either.
+    gpa_boost: 0,
     final_exam_pass_percentage: null,
     retake_policy: "none",
     retake_cap_percentage: null,

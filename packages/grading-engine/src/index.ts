@@ -17,6 +17,7 @@ export {
   validateGradeScale,
 } from "./rounding";
 export { hasErrors, summarizeWeights, validateSubjectConfig } from "./validation";
+export type { SubjectWeighting } from "./validation";
 export {
   calculateCategory,
   calculateOverallResult,

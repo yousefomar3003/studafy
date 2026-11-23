@@ -138,6 +138,11 @@ export interface SubjectGradingConfig {
   assessments: EngineAssessment[];
   /** The grade's descriptor scale, highest first. Present only for `descriptive` subjects. */
   descriptors?: EngineDescriptor[];
+  /**
+   * Added to a passed subject's GPA points for the weighted GPA (Honors +0.5, AP +1, 0-5). Absent
+   * on snapshots taken before course levels existed, which means no boost.
+   */
+  gpaBoost?: number;
 }
 
 export interface MarkInput {
@@ -213,6 +218,12 @@ export interface SubjectResult {
   maxMarks: number;
   gradeLabel: string | null;
   gpaPoints: number | null;
+  /**
+   * Only for a subject with a GPA boost: its GPA points plus the boost when passed, its plain GPA
+   * points when not. Null (or absent, on results computed before boosts existed) when the subject
+   * has no boost, the result is incomplete or the grade band carries no GPA points.
+   */
+  weightedGpaPoints?: number | null;
   /** Null when incomplete: pass/fail is only decided on a complete result. */
   passed: boolean | null;
   failReasons: FailReason[];
@@ -249,6 +260,8 @@ export interface SubjectOutcomeForOverall {
   includeInAverage: boolean;
   /** Coefficient in the overall average (1 for a plain mean). */
   averageWeight: number;
+  /** Credit hours the subject is worth; null or absent when the school does not use credits. */
+  credits?: number | null;
   exempt: boolean;
   result: SubjectResult | null;
 }
@@ -296,6 +309,16 @@ export interface OverallResult {
   gradeLabel: string | null;
   /** The final result in the grade's chosen format; null while the result is incomplete. */
   display: ResultDisplay | null;
+  /**
+   * The GPA with each boosted subject's weighted points, on the same scale and weighting as the
+   * GPA in `display`. Only for a GPA result where a counted subject has a boost; null otherwise,
+   * and null whenever the GPA itself is.
+   */
+  weightedGpa: number | null;
+  /** Credits of the counted, complete subjects that have credits; null when none has credits. */
+  creditsAttempted: number | null;
+  /** The same over the passed subjects; null when no counted subject has credits. */
+  creditsEarned: number | null;
   subjectsFailed: number;
   failedSubjectIds: string[];
   incompleteSubjectIds: string[];

@@ -32,6 +32,15 @@ const transcriptSubjectSchema = z
     exempt: z.boolean(),
     include_in_average: z.boolean(),
     average_weight: z.number(),
+    credits: z.number().nullable().optional().openapi({
+      description: "Credit hours. Absent when the subject has none, and on older transcripts.",
+    }),
+    course_level: z.string().nullable().optional().openapi({
+      description: "Course level (Honors, AP, HL). Absent when the subject has none.",
+    }),
+    weighted_gpa_points: z.number().nullable().optional().openapi({
+      description: "GPA points with the course level's boost. Absent without a boost.",
+    }),
     descriptive: z.boolean().optional().openapi({
       description:
         "Graded with descriptors, not marks: grade_label is the subject's descriptor (if its scale has points). Never counted in the cumulative figures.",
@@ -70,6 +79,12 @@ const transcriptYearSchema = z
         subjects_failed: z.number().int(),
         academic_status: z.string(),
         display: resultDisplaySchema.nullable(),
+        weighted_gpa: z.number().nullable().optional().openapi({
+          description:
+            "The year's GPA with boosted subjects' weighted points. Absent when there is none.",
+        }),
+        credits_attempted: z.number().nullable().optional(),
+        credits_earned: z.number().nullable().optional(),
       })
       .openapi("TranscriptYearOverall"),
   })
@@ -100,6 +115,17 @@ const transcriptCumulativeShape = z.object({
       description:
         "mixed_gpa_scales: each GPA year and its maximum. The cumulative GPA is null because they differ.",
     }),
+  weighted_gpa: z.number().nullable().optional().openapi({
+    description:
+      "The cumulative GPA with each boosted subject's (Honors, AP, HL) weighted points; null when the GPA is null or no subject is boosted. Absent on transcripts issued before credits existed.",
+  }),
+  credits_attempted: z.number().nullable().optional().openapi({
+    description:
+      "Credits of every counted, complete subject across the covered years; null when none carries credits.",
+  }),
+  credits_earned: z.number().nullable().optional().openapi({
+    description: "Credits of those subjects that were passed; null when none carries credits.",
+  }),
   years_covered: z.number().int(),
   subjects_counted: z.number().int(),
 });

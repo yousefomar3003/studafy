@@ -326,6 +326,7 @@ export function calculateSubjectResult(
       maxMarks: config.maxMarks,
       gradeLabel: null,
       gpaPoints: null,
+      weightedGpaPoints: null,
       passed: null,
       failReasons: [],
       missingAssessments,
@@ -362,6 +363,8 @@ export function calculateSubjectResult(
     }
   }
 
+  const gpaPoints = band?.gpaPoints ?? null;
+  const passed = failReasons.length === 0;
   return {
     status: "complete",
     termId,
@@ -370,12 +373,56 @@ export function calculateSubjectResult(
     marksObtained,
     maxMarks: config.maxMarks,
     gradeLabel: band?.label ?? null,
-    gpaPoints: band?.gpaPoints ?? null,
-    passed: failReasons.length === 0,
+    gpaPoints,
+    weightedGpaPoints: weightedGpaPoints(gpaPoints, passed, config.gpaBoost),
+    passed,
     failReasons,
     missingAssessments,
     terms,
     annualCategories,
+  };
+}
+
+/** Credits and boosted GPA points carry two decimals (numeric(5,2) / numeric(4,2)). */
+const CREDIT_ROUNDING = { decimals: 2, mode: "half_up" } as const;
+
+/**
+ * A subject's points in the weighted GPA: its GPA points plus its boost (Honors, AP, HL...), but
+ * only when it is passed; a failed subject keeps its points. Null when the subject has no boost or
+ * its grade band carries no GPA points, so a weighted figure only exists where one means something.
+ */
+function weightedGpaPoints(
+  gpaPoints: number | null,
+  passed: boolean,
+  boost: number | undefined,
+): number | null {
+  if (gpaPoints === null || boost === undefined || !(boost > 0)) return null;
+  // Points and boosts have at most two decimals; keep the sum free of binary noise (3.3 + 0.5).
+  return passed ? roundTo(gpaPoints + boost, CREDIT_ROUNDING) : gpaPoints;
+}
+
+/**
+ * Credits attempted and earned: the credits of the counted subjects (in the average, not exempt,
+ * not descriptive) that are complete, and of those that are passed. Null when no counted subject
+ * carries credits, so a school that does not use credits never sees a 0.
+ */
+function creditTotals(counted: readonly SubjectOutcomeForOverall[]): {
+  creditsAttempted: number | null;
+  creditsEarned: number | null;
+} {
+  const withCredits = counted.filter(
+    (subject) => subject.credits !== null && subject.credits !== undefined,
+  );
+  if (withCredits.length === 0) return { creditsAttempted: null, creditsEarned: null };
+  const total = (subjects: readonly SubjectOutcomeForOverall[]) =>
+    roundTo(
+      subjects.reduce((sum, subject) => sum + subject.credits!, 0),
+      CREDIT_ROUNDING,
+    );
+  const complete = withCredits.filter((subject) => subject.result?.status === "complete");
+  return {
+    creditsAttempted: total(complete),
+    creditsEarned: total(complete.filter((subject) => subject.result!.passed === true)),
   };
 }
 
@@ -391,6 +438,10 @@ export function calculateSubjectResult(
  *  - status: promoted with no failures, supplementary with up to the policy's allowance,
  *    retained beyond it.
  *  - display: the average in the grade's chosen format (see {@link resultDisplay}).
+ *  - weighted GPA: for a GPA result where a counted subject has a boost, the same GPA with each
+ *    boosted subject's weighted points (see {@link weightedGpa}).
+ *  - credits: attempted and earned over the counted subjects that carry credits. The coefficient
+ *    (`averageWeight`) still weights the average and GPA; credits are reported, not used to weight.
  */
 export function calculateOverallResult(
   subjects: readonly SubjectOutcomeForOverall[],
@@ -419,6 +470,8 @@ export function calculateOverallResult(
       totalMax: null,
       gradeLabel: null,
       display: null,
+      weightedGpa: null,
+      ...creditTotals(counted),
       subjectsFailed: failedSubjectIds.length,
       failedSubjectIds,
       incompleteSubjectIds,
@@ -451,13 +504,16 @@ export function calculateOverallResult(
   const band = average !== null && policy.scale ? matchBand(average, policy.scale) : null;
 
   const failed = failedSubjectIds.length;
+  const display = resultDisplay(counted, average, policy);
   return {
     status: "complete",
     averagePercentage: average,
     totalObtained,
     totalMax,
     gradeLabel: band?.label ?? null,
-    display: resultDisplay(counted, average, policy),
+    display,
+    weightedGpa: weightedGpa(counted, display, policy),
+    ...creditTotals(counted),
     subjectsFailed: failed,
     failedSubjectIds,
     incompleteSubjectIds,
@@ -511,4 +567,33 @@ export function resultDisplay(
           policy.rounding,
         );
   return { format: "gpa", value, max: format.max };
+}
+
+/**
+ * The weighted GPA beside a GPA result: the same weighted mean as {@link resultDisplay}'s GPA, over
+ * the same subjects and coefficients, with each boosted subject's weighted points in place of its
+ * points. Null unless the result is a GPA, the GPA itself could be worked out and at least one
+ * counted subject has a boost.
+ */
+function weightedGpa(
+  counted: readonly SubjectOutcomeForOverall[],
+  display: ResultDisplay,
+  policy: OverallPolicy,
+): number | null {
+  if (display.format !== "gpa" || display.value === null) return null;
+  const boosted = counted.some(
+    (subject) =>
+      subject.result?.weightedGpaPoints !== null && subject.result?.weightedGpaPoints !== undefined,
+  );
+  if (!boosted) return null;
+  const coefficients = counted.reduce((total, subject) => total + subject.averageWeight, 0);
+  return roundTo(
+    counted.reduce(
+      (total, subject) =>
+        total +
+        (subject.result!.weightedGpaPoints ?? subject.result!.gpaPoints!) * subject.averageWeight,
+      0,
+    ) / coefficients,
+    policy.rounding,
+  );
 }

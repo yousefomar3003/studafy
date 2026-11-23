@@ -213,7 +213,7 @@ export async function copyYearConfiguration(
         pass_percentage, final_exam_pass_percentage, grade_scale_id, rounding_decimals,
         rounding_mode, missing_mark_policy, absent_policy, retake_policy, retake_cap_percentage,
         teachers_can_add_assessments, teacher_assessments_require_approval, instructions,
-        is_excluded, based_on_revision
+        is_excluded, based_on_revision, credits, course_level, gpa_boost
       )
       SELECT school_id, ${targetYearId}::uuid, grade_level_id,
              ${config.section_id ? sectionMap.get(config.section_id)! : null}::uuid, subject_id,
@@ -222,7 +222,8 @@ export async function copyYearConfiguration(
              ${mapScale(config.grade_scale_id)}::uuid, rounding_decimals, rounding_mode,
              missing_mark_policy, absent_policy, retake_policy, retake_cap_percentage,
              teachers_can_add_assessments, teacher_assessments_require_approval, instructions,
-             is_excluded, CASE WHEN section_id IS NULL THEN NULL ELSE 1 END
+             is_excluded, CASE WHEN section_id IS NULL THEN NULL ELSE 1 END, credits,
+             course_level, gpa_boost
       FROM app.subject_configs WHERE id = ${config.id}::uuid AND school_id = ${schoolId}::uuid
       RETURNING id
     `;

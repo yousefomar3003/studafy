@@ -227,6 +227,27 @@ void main() {
     );
   });
 
+  testWidgets(
+    'shows the cumulative weighted GPA and credits when issued with them',
+    (tester) async {
+      final row = _transcript();
+      final content = row['content']! as Map<String, Object?>;
+      final cumulative = content['cumulative']! as Map<String, Object?>;
+      cumulative['weighted_gpa'] = 3.5;
+      cumulative['credits_attempted'] = 8;
+      cumulative['credits_earned'] = 7.5;
+      await _pump(
+        tester,
+        _FakeTranscriptClient([row]),
+        const TranscriptDetailScreen(transcriptId: 'tr-1'),
+      );
+      expect(find.text('Cumulative weighted GPA'), findsOneWidget);
+      expect(find.text('3.5'), findsOneWidget);
+      expect(find.text('Credits earned (all years)'), findsOneWidget);
+      expect(find.text('7.5 / 8'), findsOneWidget);
+    },
+  );
+
   testWidgets('years on different GPA scales explain the missing GPA', (
     tester,
   ) async {

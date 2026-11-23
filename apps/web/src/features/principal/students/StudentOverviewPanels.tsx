@@ -6,7 +6,7 @@ import { Link } from "react-router-dom";
 import { api } from "../../../lib/api";
 import { usePermissions } from "../../../lib/auth";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
-import { ResultValue } from "../academic-setup/components";
+import { CreditsEarned, ResultValue } from "../academic-setup/components";
 import {
   DISCIPLINE_SEVERITY_LABEL_KEYS,
   DISCIPLINE_STATUS_LABEL_KEYS,
@@ -140,7 +140,18 @@ export function StudentOverviewPanels({ studentId }: { studentId: string }) {
                     <ResultValue
                       display={row.result.result_display}
                       percentage={row.result.average_percentage}
+                      weightedGpa={row.result.weighted_gpa}
                     />
+                    {row.result.credits_attempted == null ? null : (
+                      <div>
+                        <small>
+                          <CreditsEarned
+                            attempted={row.result.credits_attempted}
+                            earned={row.result.credits_earned}
+                          />
+                        </small>
+                      </div>
+                    )}
                   </Table.Cell>
                   <Table.Cell>{row.result.grade_label ?? "—"}</Table.Cell>
                   <Table.Cell>
