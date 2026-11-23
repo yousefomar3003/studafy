@@ -149,6 +149,7 @@ export interface ExternalExamPresetView {
   total_max: number | null;
   per_subject: boolean;
   show_on_transcript: boolean;
+  note: string | null;
   components: {
     name: string;
     score_type: ExternalExamScoreType;
@@ -224,6 +225,7 @@ function presetView(preset: ExternalExamPreset): ExternalExamPresetView {
     total_max: preset.totalMax,
     per_subject: preset.perSubject,
     show_on_transcript: preset.showOnTranscript,
+    note: preset.note,
     components: preset.components.map((component) => ({
       name: component.name,
       score_type: component.scoreType,

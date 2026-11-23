@@ -58,7 +58,9 @@ const listPresetsRoute = createRoute({
   tags: TAGS,
   operationId: "listExternalExamPresets",
   summary: "Built-in external exams a school can add",
-  description: "SAT, PSAT, ACT, AP, IELTS, TOEFL iBT, IGCSE, A Level and IB DP final results.",
+  description:
+    "SAT, PSAT, ACT, AP, IELTS, TOEFL iBT, IGCSE, A Level and IB DP final results, Jordan's " +
+    "Tawjihi, Egypt's Thanaweya Amma and a US state assessment. `note` says which defaults to check.",
   security,
   responses: standardResponses(
     { 200: { description: "Presets.", schema: externalExamPresetListSchema } },

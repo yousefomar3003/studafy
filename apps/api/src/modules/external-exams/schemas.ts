@@ -121,6 +121,9 @@ export const externalExamPresetListSchema = z
           total_max: z.number().nullable(),
           per_subject: z.boolean(),
           show_on_transcript: z.boolean(),
+          note: z.string().nullable().openapi({
+            description: "What to check after adding it: defaults that are the school's to set.",
+          }),
           components: z.array(presetComponentSchema),
         })
         .openapi("ExternalExamPreset"),

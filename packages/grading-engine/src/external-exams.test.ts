@@ -120,6 +120,41 @@ describe("presets", () => {
     expect(externalExamPreset("igcse_numeric")!.components[0]!.allowedLabels?.at(0)).toBe("9");
   });
 
+  test("Tawjihi averages its subject marks into a percentage", () => {
+    const tawjihi = externalExamPreset("tawjihi")!;
+    expect(tawjihi.perSubject).toBe(false);
+    expect(tawjihi.totalMax).toBe(100);
+    // (95 + 88 + 90 + 85 + 92.5 + 80) / 6 = 530.5 / 6 = 88.4166... -> 88.42
+    expect(computeExternalExamTotal(tawjihi, [95, 88, 90, 85, 92.5, 80])).toBe(88.42);
+    expect(tawjihi.note).toContain("Edit the subjects");
+  });
+
+  test("Thanaweya Amma totals its subject marks", () => {
+    const thanaweya = externalExamPreset("thanaweya_amma")!;
+    expect(thanaweya.totalMode).toBe("sum");
+    expect(thanaweya.totalMax).toBe(600);
+    expect(computeExternalExamTotal(thanaweya, [78.5, 90, 85, 100, 99.5, 97])).toBe(550);
+  });
+
+  test("a state assessment is per subject: a performance level and an optional scale score", () => {
+    const state = externalExamPreset("state_assessment")!;
+    expect(state.perSubject).toBe(true);
+    expect(state.totalMode).toBe("none");
+    expect(state.components.map((c) => [c.name, c.scoreType])).toEqual([
+      ["Performance level", "label"],
+      ["Scale score", "numeric"],
+    ]);
+    expect(validateExternalExamScore(state.components[0]!, "Level 3")).toBeNull();
+    expect(validateExternalExamScore(state.components[0]!, "Level 5")?.code).toBe(
+      "SCORE_LABEL_UNKNOWN",
+    );
+  });
+
+  test("only presets with editable official defaults carry a note", () => {
+    expect(externalExamPreset("sat")!.note).toBeNull();
+    expect(externalExamPreset("toefl_ibt")!.note).not.toBeNull();
+  });
+
   test("an unknown preset key is null", () => {
     expect(externalExamPreset("gcse")).toBeNull();
   });

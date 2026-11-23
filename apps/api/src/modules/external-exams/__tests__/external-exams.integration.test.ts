@@ -342,6 +342,49 @@ describeDb("external exams and test scores", () => {
     ids.igcseResult = result.id;
   });
 
+  test("national exams and state tests: Tawjihi averages, a state test's scale score is optional", async () => {
+    // Added under its Arabic name, as the web does in Arabic.
+    const added = await call("POST", "/api/grading/external-exams/from-preset", adminAuth(), {
+      preset_key: "tawjihi",
+      name: "التوجيهي",
+    });
+    expect(added.status).toBe(201);
+    const tawjihi = added.body as unknown as ExternalExamView;
+    expect([tawjihi.code, tawjihi.name, tawjihi.preset_key]).toEqual([
+      "TAWJIHI",
+      "التوجيهي",
+      "tawjihi",
+    ]);
+    const tawjihiResult = await call("POST", resultsPath(ids.student!), adminAuth(), {
+      exam_id: tawjihi.id,
+      sat_on: "2026-07-20",
+      scores: scoresFor(tawjihi, [95, 88, 90, 85, 92.5, 80]),
+    });
+    expect(tawjihiResult.status).toBe(201);
+    expect((tawjihiResult.body as unknown as ExternalExamResultView).total_score).toBe(88.42);
+
+    const presets = await call("GET", "/api/grading/external-exam-presets", adminAuth());
+    const state = (presets.body.presets as { key: string; note: string | null }[]).find(
+      (preset) => preset.key === "state_assessment",
+    );
+    expect(state?.note).toContain("optional");
+    const stateExam = (
+      await call("POST", "/api/grading/external-exams/from-preset", adminAuth(), {
+        preset_key: "state_assessment",
+      })
+    ).body as unknown as ExternalExamView;
+    const levelOnly = await call("POST", resultsPath(ids.student!), adminAuth(), {
+      exam_id: stateExam.id,
+      subject_id: ids.mathematics,
+      sat_on: "2026-05-10",
+      scores: [{ component_id: stateExam.components[0]!.id, label_score: "Level 3" }],
+    });
+    expect(levelOnly.status).toBe(201);
+    expect(
+      (levelOnly.body as unknown as ExternalExamResultView).scores.map((s) => s.label_score),
+    ).toEqual(["Level 3"]);
+  });
+
   test("editing a result replaces its scores and works the total out again", async () => {
     const sat = exams.sat!;
     const edited = await call(
@@ -622,7 +665,7 @@ describeDb("external exams and test scores", () => {
     expect(issued.status).toBe(201);
     const transcript = issued.body as unknown as TranscriptView;
     const section = transcript.content.external_exams ?? [];
-    expect(section.map((exam) => exam.code)).toEqual(["IELTS", "IGCSE", "SAT"]);
+    expect(section.map((exam) => exam.code)).toEqual(["IELTS", "IGCSE", "SAT", "TAWJIHI"]);
     const sat = section.find((exam) => exam.code === "SAT")!;
     expect(sat.name).toBe("SAT (digital)");
     expect(sat.total_max).toBe(1600);

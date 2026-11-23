@@ -1,5 +1,6 @@
 /**
- * External exams and test scores: SAT, ACT, AP, IELTS, TOEFL and Cambridge / IB final results.
+ * External exams and test scores: SAT, ACT, AP, IELTS, TOEFL, Cambridge / IB final results, the
+ * national exams of Jordan (Tawjihi) and Egypt (Thanaweya Amma) and US state assessments.
  *
  * A school keeps a catalogue of the external exams its students sit (db/migrations/000255). Each
  * exam is scored on one or more components, either as a number (a range and a step: IELTS bands
@@ -26,7 +27,7 @@ export interface ExternalExamComponentDefinition {
   minScore: number | null;
   maxScore: number | null;
   step: number | null;
-  /** Label components only: the allowed labels, best first. */
+  /** Label components only: the allowed labels, in display order (IGCSE lists the best first). */
   allowedLabels: string[] | null;
 }
 
@@ -56,12 +57,17 @@ export const EXTERNAL_EXAM_PRESET_KEYS = [
   "igcse_numeric",
   "a_level",
   "ib_dp",
+  "tawjihi",
+  "thanaweya_amma",
+  "state_assessment",
 ] as const;
 
 export type ExternalExamPresetKey = (typeof EXTERNAL_EXAM_PRESET_KEYS)[number];
 
 export interface ExternalExamPreset extends ExternalExamDefinition {
   key: ExternalExamPresetKey;
+  /** What to check after adding it: defaults that are the school's to set, not an official scale. */
+  note: string | null;
 }
 
 /** Limits shared with the database CHECKs (000255). */
@@ -113,6 +119,7 @@ export const EXTERNAL_EXAM_PRESETS: readonly ExternalExamPreset[] = [
     totalMax: 1600,
     perSubject: false,
     showOnTranscript: true,
+    note: null,
     components: [numeric("Reading and Writing", 200, 800, 10), numeric("Math", 200, 800, 10)],
   },
   {
@@ -125,6 +132,7 @@ export const EXTERNAL_EXAM_PRESETS: readonly ExternalExamPreset[] = [
     totalMax: 1520,
     perSubject: false,
     showOnTranscript: false,
+    note: null,
     components: [numeric("Reading and Writing", 160, 760, 10), numeric("Math", 160, 760, 10)],
   },
   {
@@ -137,6 +145,7 @@ export const EXTERNAL_EXAM_PRESETS: readonly ExternalExamPreset[] = [
     totalMax: 36,
     perSubject: false,
     showOnTranscript: true,
+    note: null,
     components: [
       numeric("English", 1, 36, 1),
       numeric("Mathematics", 1, 36, 1),
@@ -151,6 +160,7 @@ export const EXTERNAL_EXAM_PRESETS: readonly ExternalExamPreset[] = [
     ...noTotal,
     perSubject: true,
     showOnTranscript: true,
+    note: null,
     components: [numeric("Score", 1, 5, 1)],
   },
   {
@@ -163,6 +173,7 @@ export const EXTERNAL_EXAM_PRESETS: readonly ExternalExamPreset[] = [
     totalMax: 9,
     perSubject: false,
     showOnTranscript: true,
+    note: null,
     components: [
       numeric("Listening", 0, 9, 0.5),
       numeric("Reading", 0, 9, 0.5),
@@ -180,6 +191,7 @@ export const EXTERNAL_EXAM_PRESETS: readonly ExternalExamPreset[] = [
     totalMax: 120,
     perSubject: false,
     showOnTranscript: true,
+    note: "TOEFL iBT is moving to a 1-6 band scale; edit the sections' ranges for new score reports.",
     components: [
       numeric("Reading", 0, 30, 1),
       numeric("Listening", 0, 30, 1),
@@ -194,6 +206,7 @@ export const EXTERNAL_EXAM_PRESETS: readonly ExternalExamPreset[] = [
     ...noTotal,
     perSubject: true,
     showOnTranscript: true,
+    note: null,
     components: [label("Grade", ["A*", "A", "B", "C", "D", "E", "F", "G", "U"])],
   },
   {
@@ -203,6 +216,7 @@ export const EXTERNAL_EXAM_PRESETS: readonly ExternalExamPreset[] = [
     ...noTotal,
     perSubject: true,
     showOnTranscript: true,
+    note: null,
     components: [label("Grade", ["9", "8", "7", "6", "5", "4", "3", "2", "1", "U"])],
   },
   {
@@ -212,6 +226,7 @@ export const EXTERNAL_EXAM_PRESETS: readonly ExternalExamPreset[] = [
     ...noTotal,
     perSubject: true,
     showOnTranscript: true,
+    note: null,
     components: [label("Grade", ["A*", "A", "B", "C", "D", "E", "U"])],
   },
   {
@@ -221,7 +236,77 @@ export const EXTERNAL_EXAM_PRESETS: readonly ExternalExamPreset[] = [
     ...noTotal,
     perSubject: true,
     showOnTranscript: true,
+    note: null,
     components: [numeric("Grade", 1, 7, 1)],
+  },
+  {
+    // Jordan's General Secondary Education Certificate (التوجيهي): one result per student, a mark
+    // per subject and the average of them as a percentage.
+    key: "tawjihi",
+    code: "TAWJIHI",
+    name: "Tawjihi (General Secondary Education Certificate)",
+    totalMode: "average",
+    totalRoundingStep: null,
+    totalMin: 0,
+    totalMax: 100,
+    perSubject: false,
+    showOnTranscript: true,
+    note:
+      "Default subjects, each marked 0-100, averaged into a percentage. Edit the subjects and their " +
+      "maximums to match the student's stream and the ministry's current rules; the ministry's " +
+      "weighting of subjects is not applied.",
+    components: [
+      numeric("Arabic Language", 0, 100, 0.5),
+      numeric("English Language", 0, 100, 0.5),
+      numeric("Islamic Education", 0, 100, 0.5),
+      numeric("History of Jordan", 0, 100, 0.5),
+      numeric("Mathematics", 0, 100, 0.5),
+      numeric("Stream subject", 0, 100, 0.5),
+    ],
+  },
+  {
+    // Egypt's General Secondary Certificate (الثانوية العامة): a mark per subject and their total;
+    // the percentage is the total over the total's maximum.
+    key: "thanaweya_amma",
+    code: "THANAWEYA",
+    name: "Thanaweya Amma (General Secondary Certificate)",
+    totalMode: "sum",
+    totalRoundingStep: null,
+    totalMin: 0,
+    totalMax: 600,
+    perSubject: false,
+    showOnTranscript: true,
+    note:
+      "Default subjects, each marked out of 100, totalled. The ministry changes subjects and " +
+      "maximums: edit them, and the total's maximum, to match the student's track and year.",
+    components: [
+      numeric("Arabic Language", 0, 100, 0.5),
+      numeric("First Foreign Language", 0, 100, 0.5),
+      numeric("Second Foreign Language", 0, 100, 0.5),
+      numeric("Track subject 1", 0, 100, 0.5),
+      numeric("Track subject 2", 0, 100, 0.5),
+      numeric("Track subject 3", 0, 100, 0.5),
+    ],
+  },
+  {
+    // A US state's annual assessment, per subject: a performance level and, when reported, a
+    // scale score.
+    key: "state_assessment",
+    code: "STATE",
+    name: "State assessment",
+    totalMode: "none",
+    totalRoundingStep: null,
+    totalMin: null,
+    totalMax: null,
+    perSubject: true,
+    showOnTranscript: false,
+    note:
+      "Rename it after your state's test. The levels and the scale score's range differ by state " +
+      "and subject: edit them. The scale score is optional when recording a result.",
+    components: [
+      label("Performance level", ["Level 1", "Level 2", "Level 3", "Level 4"]),
+      numeric("Scale score", 0, 1000, 1),
+    ],
   },
 ];
 
