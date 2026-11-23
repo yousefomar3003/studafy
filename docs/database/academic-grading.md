@@ -198,6 +198,54 @@ read back with all of them null. Transcripts add the cumulative weighted GPA (sa
 reasons as the cumulative GPA) and cumulative credits; certificates and transcripts gain the subject
 and overall fields only when they are set, so documents issued earlier still render unchanged.
 
+## Curriculum templates
+
+Built-in starting points for a whole curriculum, defined in code
+(`packages/grading-engine/src/templates.ts`, no table): each template carries a grading scale (or,
+for descriptive templates, a descriptor scale), the result format and its maximum, the overall and
+subject rounding, the subject pass mark and maximum marks, the default categories and weights, and
+optional subject credits (and the course levels a subject can be given afterwards). Names, band
+labels and category names exist in English and Arabic.
+
+| Template                   | Scale                                                                                     | Result     | Subjects                                                                                                                        |
+| -------------------------- | ----------------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| National percentage        | Excellent 90 … Pass 50, Fail                                                              | percentage | pass 50; the school's exam system (School Settings)                                                                             |
+| IGCSE 9–1 / A\*–G, A-Level | 9…1 / A\*…G / A\*…E in steps of 10%, U                                                    | percentage | pass 40; homework 10, classwork 15, tests 25, end-of-term exam 50                                                               |
+| BTEC                       | Distinction\* 90, Distinction 75, Merit 60, Pass 40, Unclassified                         | percentage | pass 40; assignments 70, practical 30                                                                                           |
+| British Key Stages, IB PYP | descriptors (Greater depth / Expected / Working towards; Exceeding … Beginning)           | percentage | descriptive, one "Attainment" skill per term                                                                                    |
+| IB MYP                     | 1–7 at totals 0, 6, 10, 15, 19, 24, 28 of 32 (as % of 32), GPA points 1–7                 | GPA of 7   | total points; criteria A–D out of 8 per term; max marks 32; pass at grade 3; 3-decimal rounding                                 |
+| IB DP subjects             | 7 80, 6 70, 5 60, 4 50, 3 40, 2 25, 1                                                     | GPA of 7   | pass 40; internal assessment 25, tests 25, end-of-term exam 50; HL/SL as course levels                                          |
+| American                   | A+ 97 (4.0) … D 65 (1.0), F (0.0)                                                         | GPA of 4   | pass 65; tests 40, quizzes 20, homework 15, classwork 15, projects 10; 1 credit = coefficient 1; Standard / Honors +0.5 / AP +1 |
+| French                     | Très bien 80, Bien 70, Assez bien 60, Passable 50, Insuffisant                            | out of 20  | max marks 20, pass 50; the school's exam system                                                                                 |
+| Irish Junior Cycle         | Distinction 90, Higher Merit 75, Merit 55, Achieved 40, Partially Achieved 20, Not Graded | percentage | pass 40; the school's exam system                                                                                               |
+| Irish Leaving Certificate  | H1 90 … H7 30, H8                                                                         | percentage | pass 40; the school's exam system                                                                                               |
+
+Boundaries are defaults, not awarding-body boundaries; the school edits them like any other scale.
+
+`POST /api/grading/years/{yearId}/curriculum-template/preview` and `.../apply` take a template and a
+list of grade levels (`academicConfig:manage`; `GET /api/grading/curriculum-templates` lists them).
+Applying:
+
+1. creates the template's scale in the year (named after the template), reuses one with that name
+   and the same bands, or replaces the bands of one with that name;
+2. creates or updates each grade program: scale, result format and maximum, overall rounding, and
+   the descriptor scale for descriptive templates;
+3. rebuilds each grade default subject on the template (method, maximum marks, pass mark, rounding,
+   categories with one assessment per term, equal term weights, credits where the template sets
+   them; the subject then inherits the grade's scale). Requirement, average and certificate flags,
+   policies and instructions are kept.
+
+Every write goes through the ordinary services (`createScale`, `upsertProgram`,
+`updateSubjectConfig`), so validation, revisions, the impact check and their audit entries apply, and
+one `curriculum_template_applied` audit entry summarises the apply. The preview reports each step as
+create / update / unchanged; when anything that already exists would change, `requires_confirmation`
+is true and the apply is refused with `ACADEMIC_CONFIG_IMPACT_UNCONFIRMED` unless it is resent with
+`confirm: true`. Never touched: subjects with recorded marks (`has_marks`), grade defaults with
+section-only assessments, section overrides, and every subject when the year has no terms yet. A
+grade or subject the rules refuse is reported (`error` / `invalid`) and the rest still applies.
+Which template a grade came from is not recorded: subjects added later start from the school's exam
+system, and applying the template again brings them in line (it is idempotent).
+
 ## Certificates and report cards
 
 Issued from a **current** finalization: annual → `annual_certificate`, term → `term_report`. Only a
