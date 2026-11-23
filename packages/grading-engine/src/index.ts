@@ -38,3 +38,27 @@ export {
   nearestDescriptor,
   validateDescriptiveConfig,
 } from "./descriptive";
+export {
+  CURRICULUM_TEMPLATE_IDS,
+  CURRICULUM_TEMPLATES,
+  MYP_TOTAL_BOUNDARIES,
+  buildTemplateTermStructure,
+  equalTermWeights,
+  getCurriculumTemplate,
+  localize,
+  templateScaleBands,
+} from "./templates";
+export type {
+  CurriculumFamily,
+  CurriculumTemplate,
+  CurriculumTemplateId,
+  LocalizedText,
+  TemplateBand,
+  TemplateCategory,
+  TemplateCourseLevel,
+  TemplateDescriptor,
+  TemplateLocale,
+  TemplateStructure,
+  TemplateSubjectDefaults,
+  TemplateTermStructure,
+} from "./templates";
