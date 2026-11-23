@@ -680,7 +680,13 @@
       "emptyBody": "Your conversations with the study assistant appear here for 90 days.",
       "error": "Couldn't load your chat history.",
       "retry": "Try again",
-      "openError": "Couldn't open that chat. It may have expired."
+      "openError": "Couldn't open that chat. It may have expired.",
+      "delete": "Delete chat",
+      "deleteTitle": "Delete this chat?",
+      "deleteBody": "This chat will be removed for good. You can't undo this.",
+      "deleteCancel": "Cancel",
+      "deleteConfirm": "Delete",
+      "deleteError": "Couldn't delete that chat. Try again."
     },
     "title": "Ask AI",
     "attach": {

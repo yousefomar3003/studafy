@@ -983,6 +983,7 @@ describe("security", () => {
         "GET /api/ai/consent",
         "PUT /api/ai/consent",
         "DELETE /api/ai/consent",
+        "DELETE /api/ai/students/{studentId}/conversations/{conversationId}",
         "DELETE /api/ai/students/{studentId}/sources/{sourceId}",
         // AI moderation queue (ST-306). Authenticated *and* gated on aiContent:moderate by
         // middleware/authz.ts, which bearerAuth cannot express. See routes/moderation-routes.ts.

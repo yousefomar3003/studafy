@@ -2,11 +2,13 @@ import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { z } from "zod";
 
 import { withTenantTx } from "../../../db/tenant-tx";
+import { auditAction } from "../../../middleware/auditEmitter";
 import { requireAuth } from "../../../middleware/authContext";
+import { onlyMethods } from "../../../middleware/only-methods";
 import { openApiValidationHook } from "../../../openapi/hook";
-import { standardResponses } from "../../../openapi/responses";
+import { requestIdHeaders, standardResponses } from "../../../openapi/responses";
 import { requireFeature } from "../../features/middleware";
-import { listConversations, loadConversation } from "../ask/history";
+import { deleteConversation, listConversations, loadConversation } from "../ask/history";
 import { AI_FEATURE_ROUTE } from "../gate/token-budget";
 
 import type { Database } from "../../../db/client";
@@ -147,6 +149,33 @@ const getConversationRoute = createRoute({
   ),
 });
 
+const deleteConversationRoute = createRoute({
+  method: "delete",
+  path: "/api/ai/students/{studentId}/conversations/{conversationId}",
+  tags: ["AI"],
+  operationId: "deleteAskAiConversation",
+  summary: "Delete one of the student's Ask AI conversations",
+  description:
+    "Deletes the conversation and all its questions and answers for good. A moderation decision " +
+    "about a message keeps its record without the link, and a report keeps its own copy of the " +
+    "reported text. Answers 404 AI_CONVERSATION_NOT_FOUND for a conversation that is not this " +
+    "student's.",
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({
+      studentId: studentParamSchema,
+      conversationId: z
+        .string()
+        .uuid()
+        .openapi({ param: { name: "conversationId", in: "path" } }),
+    }),
+  },
+  responses: {
+    204: { description: "Conversation deleted.", headers: requestIdHeaders },
+    ...standardResponses({}, [400, 401, 402, 403, 404, 422, 429, 500]),
+  },
+});
+
 function tenantFrom(c: Context<AppEnv>): {
   schoolId: string;
   userId: string;
@@ -166,6 +195,11 @@ export function aiAskHistoryRoutes(deps: { database: Database }): OpenAPIHono<Ap
   routes.use(
     "/api/ai/students/:studentId/conversations/:conversationId",
     requireFeature("ai_tutor", AI_FEATURE_ROUTE),
+  );
+  // Audit intent for the one mutating route (tests/audit-coverage.test.ts).
+  routes.use(
+    "/api/ai/students/:studentId/conversations/:conversationId",
+    onlyMethods(["DELETE"], auditAction("delete", "ai_conversations")),
   );
 
   routes.openapi(listConversationsRoute, async (c) => {
@@ -226,6 +260,15 @@ export function aiAskHistoryRoutes(deps: { database: Database }): OpenAPIHono<Ap
       },
       200,
     );
+  });
+
+  routes.openapi(deleteConversationRoute, async (c) => {
+    const { studentId, conversationId } = c.req.valid("param");
+    const locale = (c.get("locale") ?? "en") as SupportedLocale;
+    await withTenantTx(database, tenantFrom(c), (tx) =>
+      deleteConversation(tx, { studentId, conversationId, locale }),
+    );
+    return c.body(null, 204);
   });
 
   return routes;

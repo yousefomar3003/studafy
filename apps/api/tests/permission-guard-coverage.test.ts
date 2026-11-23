@@ -435,6 +435,8 @@ const EXPECTED_MUTATING_ROUTES = [
   // Ask AI streaming (ST-165). Same gate and same rationale as the gateway route above; the ask
   // route's writes are the grounded answer's messages, citations, and the student's usage ledger.
   "POST /api/ai/students/{studentId}/ask",
+  // Ask AI chat delete. Same gate; it deletes only the path student's own conversation.
+  "DELETE /api/ai/students/{studentId}/conversations/{conversationId}",
   // Ask AI photo text. Gated by the caller's own Ask AI feature, not the permission matrix; it reads
   // a photo in memory and writes nothing.
   "POST /api/ai/photo-text",
@@ -738,6 +740,9 @@ const GUARD_EXEMPT_ROUTES = new Set([
   // Ask AI streaming (ST-165) — same gate, same RLS; its writes are the answer's messages,
   // citations, and the student's ai_usage_meters row.
   "POST /api/ai/students/{studentId}/ask",
+  // Ask AI chat delete — same gate, same RLS; it deletes only the path student's own conversation
+  // (moderation decisions keep their record with the message link cleared).
+  "DELETE /api/ai/students/{studentId}/conversations/{conversationId}",
   // Ask AI photo text — the caller's own Ask AI feature is the gate (the subject is the caller, so
   // there is no other person's data to authorize against); it reads the photo in memory, touches no
   // table, and writes nothing.

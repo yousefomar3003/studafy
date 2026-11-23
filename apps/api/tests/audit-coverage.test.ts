@@ -514,6 +514,8 @@ const EXPECTED_MUTATING_ROUTES = [
   // message, and citation rows, recorded with the storage-upload precedent (the interaction's own
   // rows are its audit record), plus the durable usage meter.
   "POST /api/ai/students/{studentId}/ask",
+  // A student deletes one of their own Ask AI conversations (with its messages and citations).
+  "DELETE /api/ai/students/{studentId}/conversations/{conversationId}",
   // Study-material summarizer. POST carries the material id; the route's one write is the durable
   // per-student usage meter, recorded with the same declaration as the retrieval route above.
   "POST /api/ai/students/{studentId}/summarize",
