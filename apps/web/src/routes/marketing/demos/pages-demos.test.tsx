@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
 import { expectNoA11yViolations } from "../../../lib/test/axe";
 
@@ -126,19 +126,104 @@ describe("features: one working example per area", () => {
 });
 
 describe("pricing: the school size", () => {
-  test("any number of students costs the school nothing", async () => {
-    const { container } = render(
+  /** Pretends the browser reports these locale tags, for the card's first currency. */
+  function browserLanguages(tags: string[]) {
+    Object.defineProperty(navigator, "languages", { value: tags, configurable: true });
+  }
+
+  function renderSchoolSize() {
+    return render(
       <main>
         <SchoolSize />
       </main>,
     );
+  }
+
+  // Intl puts a non-breaking space between a currency code and the amount.
+  const amount = (container: HTMLElement) =>
+    container.querySelector("output")?.textContent?.replace(/\s/g, " ");
+
+  const checkedCurrency = () =>
+    (
+      screen
+        .getByRole("radiogroup", { name: "Currency" })
+        .querySelector("input:checked") as HTMLInputElement | null
+    )?.value;
+
+  beforeEach(() => browserLanguages(["en-US"]));
+
+  afterEach(() => {
+    // Drops the stub, so the browser's own `languages` shows through again.
+    delete (navigator as { languages?: unknown }).languages;
+    window.localStorage.clear();
+  });
+
+  test("any number of students costs the school nothing", async () => {
+    const { container } = renderSchoolSize();
     const slider = screen.getByLabelText("Students at your school");
     fireEvent.change(slider, { target: { value: "2400" } });
     expect(screen.getByText("2,400 students")).toBeTruthy();
     expect(slider.getAttribute("aria-valuetext")).toBe("2,400 students");
-    // Intl puts a non-breaking space between the currency and the amount.
-    expect(container.querySelector("output")?.textContent?.replace(/\s/g, " ")).toBe("JOD 0");
+    expect(checkedCurrency()).toBe("USD");
+    expect(amount(container)).toBe("$0");
     await expectNoA11yViolations(container);
+  });
+
+  test("the visitor can show the cost in any of five currencies, and it is remembered", () => {
+    const { container, unmount } = renderSchoolSize();
+    const group = screen.getByRole("radiogroup", { name: "Currency" });
+    expect(
+      within(group)
+        .getAllByRole("radio")
+        .map((radio) => radio.getAttribute("value")),
+    ).toEqual(["USD", "GBP", "EUR", "SAR", "JOD"]);
+
+    fireEvent.click(screen.getByRole("radio", { name: "British pound (GBP)" }));
+    expect(amount(container)).toBe("£0");
+    fireEvent.click(screen.getByRole("radio", { name: "Euro (EUR)" }));
+    expect(amount(container)).toBe("€0");
+    fireEvent.click(screen.getByRole("radio", { name: "Saudi riyal (SAR)" }));
+    expect(amount(container)).toBe("SAR 0");
+    fireEvent.click(screen.getByRole("radio", { name: "Jordanian dinar (JOD)" }));
+    expect(amount(container)).toBe("JOD 0");
+    expect(checkedCurrency()).toBe("JOD");
+
+    unmount();
+    const again = renderSchoolSize();
+    expect(checkedCurrency()).toBe("JOD");
+    expect(amount(again.container)).toBe("JOD 0");
+  });
+
+  test("starts in the currency of the visitor's region", () => {
+    browserLanguages(["ar-SA"]);
+    const { container } = renderSchoolSize();
+    expect(checkedCurrency()).toBe("SAR");
+    expect(amount(container)).toBe("SAR 0");
+  });
+
+  test("still works when the browser blocks storage", () => {
+    // As with blocked site data: merely reading `window.localStorage` throws.
+    const original = Object.getOwnPropertyDescriptor(window, "localStorage");
+    let reads = 0;
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      get() {
+        reads += 1;
+        throw new DOMException("The operation is insecure.", "SecurityError");
+      },
+    });
+    try {
+      const { container } = renderSchoolSize();
+      expect(checkedCurrency()).toBe("USD");
+      fireEvent.click(screen.getByRole("radio", { name: "Euro (EUR)" }));
+      expect(amount(container)).toBe("€0");
+      expect(checkedCurrency()).toBe("EUR");
+      // Read on first render, written on the pick.
+      expect(reads).toBe(2);
+    } finally {
+      if (original) Object.defineProperty(window, "localStorage", original);
+      else delete (window as { localStorage?: Storage }).localStorage;
+    }
   });
 });
 
