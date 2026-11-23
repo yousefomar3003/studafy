@@ -265,4 +265,31 @@ CREATE POLICY role_scope_visibility ON app.student_external_exam_scores
   AS RESTRICTIVE FOR SELECT TO studafy_app
   USING (app.can_read_student(student_id));
 
+-- The subjects of a student's per-subject results, for whoever may read the student. app.subjects
+-- is role-scoped (000037): a student or parent sees a subject only through a class, a released mark
+-- sheet or mark release, so an IGCSE or AP subject the student takes no class in would come back
+-- without its name. Like the role-scope helpers, this reads as its owner -- still under tenant
+-- isolation (FORCE, current school only) -- and checks the caller itself, so it reveals a subject's
+-- code and name only beside a result the caller can already read. It deliberately does not widen
+-- app.subjects' policy, which other features replace whole.
+CREATE FUNCTION app.external_exam_result_subjects(target_student_id uuid)
+RETURNS TABLE (subject_id uuid, code text, name text)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = pg_catalog
+AS $function$
+  SELECT DISTINCT subject.id, subject.code, subject.name
+  FROM app.student_external_exam_results AS result
+  JOIN app.subjects AS subject
+    ON subject.id = result.subject_id AND subject.school_id = result.school_id
+  WHERE result.school_id = current_setting('app.school_id')::uuid
+    AND result.student_id = target_student_id
+    AND app.can_read_student(target_student_id)
+$function$;
+
+ALTER FUNCTION app.external_exam_result_subjects(uuid) OWNER TO studafy_admin;
+REVOKE ALL ON FUNCTION app.external_exam_result_subjects(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION app.external_exam_result_subjects(uuid) TO studafy_app;
+
 RESET ROLE;
