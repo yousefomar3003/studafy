@@ -14,7 +14,8 @@
     "scales": "Grading scales",
     "approvals": "Approvals",
     "results": "Results & certificates",
-    "reportCards": "Report cards"
+    "reportCards": "Report cards",
+    "externalExams": "External exams"
   },
   "common": {
     "loading": "Loading…",
@@ -850,7 +851,17 @@
     "method": "The cumulative average and GPA weight every counted subject of every year by its weight in the year's average.",
     "reissueNote": "Replaces transcript {{serial}}. Reason: {{reason}}",
     "gpaScale": "{{year}}: out of {{max}}",
-    "skillLine": "{{skill}}: {{descriptor}}"
+    "skillLine": "{{skill}}: {{descriptor}}",
+    "externalExams": {
+      "heading": "External examinations",
+      "exam": "Examination",
+      "date": "Date",
+      "scores": "Scores",
+      "total": "Total",
+      "examSubject": "{{exam}} — {{subject}}",
+      "scoreLine": "{{component}}: {{score}}",
+      "outOf": "{{score}} / {{max}}"
+    }
   },
   "reportCards": {
     "settingsHeading": "What report cards show",
@@ -931,5 +942,159 @@
     "useDefaults": "Use the default scale",
     "addDescriptor": "Add descriptor",
     "saveScale": "Save scale"
+  },
+  "externalExams": {
+    "heading": "External exams",
+    "help": "The external exams your students sit — SAT, IELTS, IGCSE finals, national exams and others. Add a built-in exam and adjust it, or define your own. Exams belong to the school, not to one academic year.",
+    "addCustom": "Add custom exam",
+    "preset": "Built-in exam",
+    "presetPlaceholder": "Choose an exam",
+    "addPreset": "Add exam",
+    "added": "{{name}} added.",
+    "addFailed": "The exam couldn't be added.",
+    "showArchived": "Show archived exams",
+    "caption": "The school's external exams",
+    "empty": "No external exams yet. Add a built-in exam to start.",
+    "columns": {
+      "name": "Exam",
+      "components": "Scored on",
+      "total": "Total",
+      "results": "Results recorded",
+      "actions": "Actions"
+    },
+    "perSubject": "Per subject",
+    "onTranscript": "On transcripts",
+    "archived": "Archived",
+    "numericSummary": "{{name}} ({{min}}–{{max}})",
+    "labelSummary": "{{name}} ({{labels}})",
+    "totalMode": {
+      "sum": "Sum",
+      "average": "Average",
+      "none": "No total"
+    },
+    "totalRange": "{{mode}}, {{min}}–{{max}}",
+    "editLabel": "Edit {{name}}",
+    "archive": "Archive",
+    "archiveLabel": "Archive {{name}}",
+    "archiveTitle": "Archive {{name}}?",
+    "archiveDescription": "No new results can be recorded for an archived exam. Results already recorded stay, and you can restore it later.",
+    "archivedToast": "Exam archived.",
+    "archiveFailed": "The exam couldn't be changed.",
+    "restore": "Restore",
+    "restoreLabel": "Restore {{name}}",
+    "restored": "Exam restored.",
+    "editTitle": "Edit {{name}}",
+    "lockedNote": "Results are recorded for this exam, so its total, the per-subject setting and how each scored part is scored can no longer change. Names, the total's range and transcript visibility still can.",
+    "details": "Exam",
+    "name": "Name",
+    "code": "Code",
+    "total": "Total",
+    "roundingStep": "Round the average to",
+    "roundingStepHelp": "For example 0.5 for an IELTS overall band. Leave empty for two decimals.",
+    "totalMin": "Lowest total",
+    "totalMax": "Highest total",
+    "perSubjectLabel": "One result per subject (for example IGCSE or AP)",
+    "onTranscriptLabel": "Show on transcripts",
+    "components": "Scored parts",
+    "componentsHelp": "Each part is scored as a number in a range, or as one grade from a list. A sum or an average needs every part scored as a number.",
+    "componentN": "Part {{n}}",
+    "componentName": "Part name",
+    "scoreType": "Scored as",
+    "scoreTypes": {
+      "numeric": "A number",
+      "label": "A grade"
+    },
+    "min": "Lowest",
+    "max": "Highest",
+    "step": "Step",
+    "labels": "Grades",
+    "labelsHelp": "Separated by commas, in the order to list them (for example A*, A, B, C).",
+    "removeComponent": "Remove part {{n}}",
+    "addComponent": "Add part",
+    "valid": "This exam is ready to save.",
+    "save": "Save exam",
+    "saved": "Exam saved.",
+    "presets": {
+      "sat": {
+        "name": "SAT"
+      },
+      "psat": {
+        "name": "PSAT/NMSQT"
+      },
+      "act": {
+        "name": "ACT"
+      },
+      "ap": {
+        "name": "AP Exam"
+      },
+      "ielts": {
+        "name": "IELTS Academic"
+      },
+      "toefl_ibt": {
+        "name": "TOEFL iBT",
+        "note": "TOEFL iBT is moving to a 1-6 band scale; edit the sections' ranges for new score reports."
+      },
+      "igcse_letter": {
+        "name": "IGCSE (A*-G)"
+      },
+      "igcse_numeric": {
+        "name": "IGCSE (9-1)"
+      },
+      "a_level": {
+        "name": "A Level"
+      },
+      "ib_dp": {
+        "name": "IB Diploma subject"
+      },
+      "tawjihi": {
+        "name": "Tawjihi (General Secondary Education Certificate)",
+        "note": "Default subjects, each marked 0-100, averaged into a percentage. Edit the subjects and their maximums to match the student's stream and the ministry's current rules; the ministry's weighting of subjects is not applied."
+      },
+      "thanaweya_amma": {
+        "name": "Thanaweya Amma (General Secondary Certificate)",
+        "note": "Default subjects, each marked out of 100, totalled. The ministry changes subjects and maximums: edit them, and the total's maximum, to match the student's track and year."
+      },
+      "state_assessment": {
+        "name": "State assessment",
+        "note": "Rename it after your state's test. The levels and the scale score's range differ by state and subject: edit them. The scale score is optional when recording a result."
+      }
+    }
+  },
+  "testScores": {
+    "heading": "Test scores",
+    "add": "Record a result",
+    "caption": "External exam results and test scores",
+    "empty": "No external exam results recorded.",
+    "error": "Test scores couldn't be loaded.",
+    "columns": {
+      "date": "Date",
+      "exam": "Exam",
+      "scores": "Scores",
+      "total": "Total",
+      "actions": "Actions"
+    },
+    "examSubject": "{{exam}} — {{subject}}",
+    "scoreLine": "{{component}}: {{score}}",
+    "outOf": "{{score}} / {{max}}",
+    "editLabel": "Edit the {{exam}} result",
+    "deleteLabel": "Delete the {{exam}} result",
+    "deleteTitle": "Delete this {{exam}} result?",
+    "deleteDescription": "The result and its scores are removed. Transcripts already issued keep it.",
+    "deleted": "Result deleted.",
+    "deleteFailed": "The result couldn't be deleted.",
+    "editTitle": "Edit {{exam}} result",
+    "noExams": "There are no external exams yet. Add them in Academic setup › External exams.",
+    "exam": "Exam",
+    "examPlaceholder": "Choose an exam",
+    "subject": "Subject",
+    "subjectPlaceholder": "Choose a subject",
+    "date": "Date sat",
+    "scores": "Scores",
+    "scoresHelp": "Leave a part empty if it wasn't scored; the total is worked out only when every part has a number.",
+    "range": "{{min}}–{{max}}",
+    "notScored": "Not scored",
+    "note": "Note",
+    "save": "Save result",
+    "saved": "Result saved."
   }
 }

@@ -308,6 +308,7 @@ export const SEARCH_DESTINATIONS: readonly SearchDestination[] = [
   entry("academic-subjects", "page", `${SETUP}/subjects`, ACADEMIC),
   entry("academic-sections", "page", `${SETUP}/sections`, ACADEMIC),
   entry("academic-scales", "page", `${SETUP}/scales`, ACADEMIC),
+  entry("academic-external-exams", "page", `${SETUP}/external-exams`, ACADEMIC),
   entry("academic-approvals", "page", `${SETUP}/approvals`, {
     ...ACADEMIC,
     alsoRequires: [P.APPROVAL_REVIEW],

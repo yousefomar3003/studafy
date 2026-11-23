@@ -6,6 +6,7 @@ import { useFormatters, useTranslation } from "../../../../lib/i18n";
 import { Num, Percent, QueryState, ResultValue } from "../../academic-setup/components";
 
 import { useTranscript } from "./queries";
+import { TranscriptExternalExams } from "./TranscriptExternalExams";
 
 import type { TranscriptContent } from "./queries";
 
@@ -240,6 +241,8 @@ export function TranscriptDocument({
         </p>
       ) : null}
       <p className="ag-muted">{t("academicGrading.transcript.method")}</p>
+
+      <TranscriptExternalExams exams={content.external_exams} />
 
       <footer className="ag-certificate__footer">
         <p>
