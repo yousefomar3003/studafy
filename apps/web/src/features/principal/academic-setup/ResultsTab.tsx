@@ -9,6 +9,7 @@ import { sectionDisplayName, useSections } from "../sections/queries";
 
 import {
   Badge,
+  ClassRankLabel,
   ConfirmModal,
   DateTime,
   Num,
@@ -355,6 +356,8 @@ function StudentResultsTable({
   students: readonly (PreviewStudent | StoredStudent)[];
 }) {
   const { t } = useTranslation();
+  // Stored results carry a class rank when the grade ranks; a preview never does.
+  const showRank = students.some((student) => "class_rank" in student && student.class_rank);
   return (
     <Table caption={t("academicGrading.results.studentsCaption")} hideCaption>
       <Table.Header>
@@ -362,13 +365,16 @@ function StudentResultsTable({
           <Table.HeaderCell>{t("academicGrading.results.columns.student")}</Table.HeaderCell>
           <Table.HeaderCell>{t("academicGrading.results.columns.completeness")}</Table.HeaderCell>
           <Table.HeaderCell>{t("academicGrading.results.columns.average")}</Table.HeaderCell>
+          {showRank ? (
+            <Table.HeaderCell>{t("academicGrading.rank.column")}</Table.HeaderCell>
+          ) : null}
           <Table.HeaderCell>{t("academicGrading.results.columns.total")}</Table.HeaderCell>
           <Table.HeaderCell>{t("academicGrading.results.columns.grade")}</Table.HeaderCell>
           <Table.HeaderCell>{t("academicGrading.results.columns.failed")}</Table.HeaderCell>
           <Table.HeaderCell>{t("academicGrading.results.columns.outcome")}</Table.HeaderCell>
         </Table.Row>
       </Table.Header>
-      <Table.Body columnCount={7} empty={t("academicGrading.results.noStudents")}>
+      <Table.Body columnCount={showRank ? 8 : 7} empty={t("academicGrading.results.noStudents")}>
         {students.map((student) => {
           const missing = student.subjects.filter((subject) => subject.status === "incomplete");
           return (
@@ -411,6 +417,11 @@ function StudentResultsTable({
                   </div>
                 )}
               </Table.Cell>
+              {showRank ? (
+                <Table.Cell>
+                  <ClassRankLabel rank={"class_rank" in student ? student.class_rank : null} />
+                </Table.Cell>
+              ) : null}
               <Table.Cell>
                 {student.total_obtained === null ? (
                   "—"

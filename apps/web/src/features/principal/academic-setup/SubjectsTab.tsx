@@ -93,6 +93,14 @@ export function SubjectsTab({ ctx }: { ctx: SetupContext }) {
 
 type ResultFormat = GradeProgram["result_format"];
 const RESULT_FORMATS: readonly ResultFormat[] = ["percentage", "out_of", "gpa"];
+type RankBasis = GradeProgram["rank_basis"];
+type RankScope = GradeProgram["rank_scope"];
+type RankVisibility = GradeProgram["rank_visibility"];
+const RANK_SCOPES: readonly RankScope[] = ["section", "grade_level"];
+const RANK_VISIBILITIES: readonly RankVisibility[] = ["staff", "students_and_parents"];
+/** A GPA basis needs the grade's result shown as a GPA (the API refuses it otherwise). */
+const rankBases = (format: ResultFormat): readonly RankBasis[] =>
+  format === "gpa" ? ["average", "gpa", "weighted_gpa"] : ["average"];
 
 function ProgramForm({
   ctx,
@@ -123,7 +131,15 @@ function ProgramForm({
   const [scaleMax, setScaleMax] = useState(
     program?.result_scale_max == null ? "" : String(program.result_scale_max),
   );
+  const [rankEnabled, setRankEnabled] = useState(program?.rank_enabled ?? false);
+  const [rankBasis, setRankBasis] = useState<RankBasis>(program?.rank_basis ?? "average");
+  const [rankScope, setRankScope] = useState<RankScope>(program?.rank_scope ?? "section");
+  const [rankVisibility, setRankVisibility] = useState<RankVisibility>(
+    program?.rank_visibility ?? "staff",
+  );
   const disabled = !ctx.can.manage || !ctx.configEditable;
+  const bases = rankBases(resultFormat);
+  const basis = bases.includes(rankBasis) ? rankBasis : "average";
 
   function chooseResultFormat(next: ResultFormat) {
     setResultFormat(next);
@@ -145,6 +161,10 @@ function ProgramForm({
           average_rounding_mode: mode,
           result_format: resultFormat,
           result_scale_max: resultFormat === "percentage" ? null : Number(scaleMax),
+          rank_enabled: rankEnabled,
+          rank_basis: basis,
+          rank_scope: rankScope,
+          rank_visibility: rankVisibility,
         },
       },
       {
@@ -248,6 +268,54 @@ function ProgramForm({
           checked={approval}
           onChange={(event) => setApproval(event.target.checked)}
         />
+        <h3 className="ag-subheading">{t("academicGrading.subjects.program.rank.heading")}</h3>
+        <Checkbox
+          label={t("academicGrading.subjects.program.rank.enabled")}
+          checked={rankEnabled}
+          onChange={(event) => setRankEnabled(event.target.checked)}
+        />
+        <p className="ag-muted">{t("academicGrading.subjects.program.rank.enabledHelp")}</p>
+        {rankEnabled ? (
+          <div className="ag-grid">
+            <Select
+              label={t("academicGrading.subjects.program.rank.basis")}
+              helperText={
+                resultFormat === "gpa"
+                  ? undefined
+                  : t("academicGrading.subjects.program.rank.basisHelp")
+              }
+              options={bases.map((value) => ({
+                value,
+                label: t(`academicGrading.rank.basis.${value}`),
+              }))}
+              value={basis}
+              onChange={setRankBasis}
+              disabled={disabled}
+            />
+            <Select
+              label={t("academicGrading.subjects.program.rank.scope")}
+              helperText={t("academicGrading.subjects.program.rank.scopeHelp")}
+              options={RANK_SCOPES.map((value) => ({
+                value,
+                label: t(`academicGrading.rank.scope.${value}`),
+              }))}
+              value={rankScope}
+              onChange={setRankScope}
+              disabled={disabled}
+            />
+            <Select
+              label={t("academicGrading.subjects.program.rank.visibility")}
+              helperText={t("academicGrading.subjects.program.rank.visibilityHelp")}
+              options={RANK_VISIBILITIES.map((value) => ({
+                value,
+                label: t(`academicGrading.rank.visibility.${value}`),
+              }))}
+              value={rankVisibility}
+              onChange={setRankVisibility}
+              disabled={disabled}
+            />
+          </div>
+        ) : null}
       </fieldset>
       {disabled ? null : (
         <div className="ag-actions">

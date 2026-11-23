@@ -14,6 +14,7 @@
     "scales": "Grading scales",
     "approvals": "Approvals",
     "results": "Results & certificates",
+    "topStudents": "Top students",
     "reportCards": "Report cards"
   },
   "common": {
@@ -361,7 +362,18 @@
       "outOfMax": "Out of",
       "outOfMaxHelp": "For example 20: an average of 82.5% shows as 16.5 / 20.",
       "gpaMax": "GPA out of",
-      "gpaMaxHelp": "Usually 4 or 5. Each subject's GPA points come from its grading scale and are weighted like the average."
+      "gpaMaxHelp": "Usually 4 or 5. Each subject's GPA points come from its grading scale and are weighted like the average.",
+      "rank": {
+        "heading": "Class rank",
+        "enabled": "Rank students in this grade",
+        "enabledHelp": "Gives each student a rank and percentile on their finalized results, and lists the grade's top students. Only complete results are ranked; tied students share a place.",
+        "basis": "Rank by",
+        "basisHelp": "Ranking by GPA needs the final result shown as a GPA.",
+        "scope": "Rank among",
+        "scopeHelp": "A grade-wide rank appears once every section of the grade is finalized for the period.",
+        "visibility": "Who sees the rank",
+        "visibilityHelp": "When students and parents see it, it also appears in their app and on the report cards, certificates and transcripts issued to them."
+      }
     }
   },
   "editor": {
@@ -838,6 +850,57 @@
     "cumulative": "Credits (all years)",
     "earnedOf": "{{earned}} of {{attempted}} credits earned",
     "weighted": "(weighted {{value}})"
+  },
+  "rank": {
+    "column": "Rank",
+    "place": "{{place}} of {{cohort}}",
+    "percentile": "{{place}} percentile",
+    "notRanked": "Not ranked",
+    "notRankedHelp": "Only complete results are ranked.",
+    "pending": "Rank pending",
+    "pendingHelp": "Shown once every section of the grade is finalized for this period.",
+    "ordinal": {
+      "one": "{{n}}st",
+      "two": "{{n}}nd",
+      "few": "{{n}}rd",
+      "other": "{{n}}th"
+    },
+    "basis": {
+      "average": "Average",
+      "gpa": "GPA",
+      "weighted_gpa": "Weighted GPA"
+    },
+    "scope": {
+      "section": "Their section",
+      "grade_level": "The whole grade"
+    },
+    "visibility": {
+      "staff": "Staff only",
+      "students_and_parents": "Staff, students and parents"
+    }
+  },
+  "topStudents": {
+    "heading": "Top students",
+    "help": "The best places in a grade for a term or the whole year, from finalized results. Tied students share a place.",
+    "grade": "Grade",
+    "limit": "Places",
+    "disabled": "{{grade}} doesn't rank its students. Turn on class rank in Grades & subjects.",
+    "setUp": "Open {{grade}} policies",
+    "notSetUp": "{{grade}} isn't set up for this year.",
+    "gradeWide": "Whole grade",
+    "pending": "Waiting for finalized results from: {{sections}}",
+    "cohort_one": "{{count}} student ranked",
+    "cohort_other": "{{count}} students ranked",
+    "empty": "No students are ranked yet.",
+    "caption": "Top students of {{group}}",
+    "rankedBy": "Ranked by {{basis}}",
+    "columns": {
+      "rank": "Rank",
+      "student": "Student",
+      "section": "Section",
+      "value": "Result",
+      "percentile": "Percentile"
+    }
   },
   "transcript": {
     "title": "Academic Transcript",

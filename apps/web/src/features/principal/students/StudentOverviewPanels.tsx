@@ -6,7 +6,7 @@ import { Link } from "react-router-dom";
 import { api } from "../../../lib/api";
 import { usePermissions } from "../../../lib/auth";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
-import { CreditsEarned, ResultValue } from "../academic-setup/components";
+import { ClassRankLabel, CreditsEarned, ResultValue } from "../academic-setup/components";
 import {
   DISCIPLINE_SEVERITY_LABEL_KEYS,
   DISCIPLINE_STATUS_LABEL_KEYS,
@@ -152,6 +152,13 @@ export function StudentOverviewPanels({ studentId }: { studentId: string }) {
                         </small>
                       </div>
                     )}
+                    {row.result.class_rank ? (
+                      <div>
+                        <small>
+                          <ClassRankLabel rank={row.result.class_rank} />
+                        </small>
+                      </div>
+                    ) : null}
                   </Table.Cell>
                   <Table.Cell>{row.result.grade_label ?? "—"}</Table.Cell>
                   <Table.Cell>

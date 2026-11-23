@@ -37,6 +37,10 @@ export type CertificateReadinessStudent = CertificateReadiness["students"][numbe
 export type AcademicCertificate = Schemas["AcademicCertificate"];
 export type CertificateContent = Schemas["CertificateContent"];
 export type CopyGradingYearSummary = Schemas["CopyGradingYearSummary"];
+export type ClassRank = Schemas["ClassRank"];
+export type DocumentClassRank = Schemas["DocumentClassRank"];
+export type TopStudents = Schemas["TopStudents"];
+export type RankBasis = Schemas["RankBasis"];
 
 /**
  * Reads behind the academic setup area (`/portal/principal/academic-setup`). Every key sits under
@@ -73,6 +77,8 @@ export const gradingKeys = {
   certificates: (finalizationId: string) =>
     [...GRADING_KEY, "certificates", finalizationId] as const,
   certificate: (certificateId: string) => [...GRADING_KEY, "certificate", certificateId] as const,
+  topStudents: (yearId: string, gradeLevelId: string, termId: string | null, limit: number) =>
+    [...GRADING_KEY, "top-students", yearId, gradeLevelId, termId ?? "annual", limit] as const,
 };
 
 /**
@@ -326,6 +332,31 @@ export function useFinalizationDetail(finalizationId: string | undefined) {
         params: { path: { finalizationId: finalizationId! } },
       });
       return required<ResultFinalizationDetail>(data, "Finalization");
+    },
+  });
+}
+
+/** A grade's top students for a term (or the year, `termId` null), by class rank. */
+export function useTopStudents(
+  yearId: string,
+  gradeLevelId: string | undefined,
+  termId: string | null,
+  limit: number,
+) {
+  return useQuery({
+    queryKey: gradingKeys.topStudents(yearId, gradeLevelId ?? "", termId, limit),
+    enabled: gradeLevelId !== undefined,
+    queryFn: async () => {
+      const { data } = await api.GET(
+        "/api/grading/years/{yearId}/programs/{gradeLevelId}/top-students",
+        {
+          params: {
+            path: { yearId, gradeLevelId: gradeLevelId! },
+            query: { limit, ...(termId ? { term_id: termId } : {}) },
+          },
+        },
+      );
+      return required<TopStudents>(data, "Top students");
     },
   });
 }
