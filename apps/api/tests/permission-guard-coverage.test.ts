@@ -179,6 +179,8 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/grading/subject-configs/{configId}/reset",
   "POST /api/grading/teacher-assignments",
   "POST /api/grading/years/{yearId}/copy",
+  "POST /api/grading/years/{yearId}/curriculum-template/apply",
+  "POST /api/grading/years/{yearId}/curriculum-template/preview",
   "POST /api/grading/years/{yearId}/programs/{gradeLevelId}/subjects",
   "POST /api/grading/years/{yearId}/scales",
   "POST /api/grading/years/{yearId}/status",

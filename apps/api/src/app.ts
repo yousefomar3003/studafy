@@ -140,6 +140,7 @@ import {
 } from "./modules/grades";
 import {
   gradingConfigRoutes,
+  gradingCurriculumTemplateRoutes,
   gradingMarksRoutes,
   gradingReportCardRoutes,
   gradingResultsRoutes,
@@ -1206,6 +1207,8 @@ export function createApp({
     app.route("/", gradingTranscriptRoutes(database));
     // Report card comments, attendance and conduct (000209).
     app.route("/", gradingReportCardRoutes(database));
+    // Curriculum templates (IGCSE, IB, American...) applied to a year's grades.
+    app.route("/", gradingCurriculumTemplateRoutes(database));
   }
 
   // Gradebook configuration (ST-112). Weighted assessment categories per gradebook and

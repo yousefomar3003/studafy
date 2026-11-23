@@ -69,7 +69,7 @@ export const gradingConfigStatusSchema = z
   .openapi({ description: "Lifecycle of a year's grading configuration." });
 const roundingModeSchema = z.enum(["half_up", "half_even", "floor", "ceil"]);
 const requirementSchema = z.enum(["mandatory", "optional", "elective"]);
-const categoryKindSchema = z.enum([
+export const categoryKindSchema = z.enum([
   "homework",
   "quiz",
   "classwork",
@@ -85,7 +85,7 @@ const categoryKindSchema = z.enum([
   "other",
 ]);
 const categoryScopeSchema = z.enum(["term", "annual"]);
-const resultFormatSchema = z.enum(["percentage", "out_of", "gpa"]).openapi("ResultFormat", {
+export const resultFormatSchema = z.enum(["percentage", "out_of", "gpa"]).openapi("ResultFormat", {
   description:
     "How a grade shows its final result: percentage (out of 100), out_of (rescaled to result_scale_max) or gpa (weighted GPA points out of result_scale_max).",
 });
@@ -113,9 +113,9 @@ const creditFields = {
     description: "Credits of those subjects that were passed; null when none carries credits.",
   }),
 };
-const aggregationSchema = z.enum(["weighted_average", "total_points"]);
+export const aggregationSchema = z.enum(["weighted_average", "total_points"]);
 const markStatusSchema = z.enum(["graded", "absent", "excused", "not_applicable"]);
-const gradingMethodSchema = z.enum(["weighted", "total_points", "descriptive"]).openapi({
+export const gradingMethodSchema = z.enum(["weighted", "total_points", "descriptive"]).openapi({
   description:
     "weighted / total_points: marked out of numbers. descriptive: no marks; each skill gets a descriptor from the grade's descriptor scale, and the subject never counts in the numeric average.",
 });
