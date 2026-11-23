@@ -44,6 +44,13 @@ export interface CertificateContent {
     grade_label: string | null;
     passed: boolean | null;
     exempt: boolean;
+    /**
+     * Credit hours, course level and boosted GPA points: present only when the subject has them
+     * (and absent on certificates issued before 000253). Readers treat absent as null.
+     */
+    credits?: number;
+    course_level?: string;
+    weighted_gpa_points?: number;
     terms: { term_id: string | null; term_name: string | null; percentage: number | null }[];
     /** The subject teacher's comment. Absent on certificates issued before report card notes. */
     comment?: string;
@@ -63,6 +70,10 @@ export interface CertificateContent {
     grade_label: string | null;
     /** The final result in the grade's format; absent on certificates issued before formats. */
     display?: ResultDisplay | null;
+    /** Weighted GPA and credit totals: present only when the result has them (from 000253). */
+    weighted_gpa?: number;
+    credits_attempted?: number;
+    credits_earned?: number;
     subjects_failed: number;
     academic_status: string;
   };
@@ -242,6 +253,11 @@ function renderContent(
         grade_label: subject.grade_label,
         passed: subject.passed,
         exempt: subject.status === "exempt",
+        ...(subject.credits !== null ? { credits: subject.credits } : {}),
+        ...(subject.course_level !== null ? { course_level: subject.course_level } : {}),
+        ...(subject.weighted_gpa_points !== null
+          ? { weighted_gpa_points: subject.weighted_gpa_points }
+          : {}),
         terms: subject.terms.map((term) => ({
           term_id: term.term_id,
           term_name: terms.find((t) => t.id === term.term_id)?.name ?? null,
@@ -266,6 +282,10 @@ function renderContent(
       total_max: result.total_max,
       grade_label: result.grade_label,
       display: result.result_display,
+      ...(result.weighted_gpa !== null ? { weighted_gpa: result.weighted_gpa } : {}),
+      ...(result.credits_attempted !== null
+        ? { credits_attempted: result.credits_attempted, credits_earned: result.credits_earned! }
+        : {}),
       subjects_failed: result.subjects_failed,
       academic_status: result.academic_status,
     },

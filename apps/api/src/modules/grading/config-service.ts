@@ -16,6 +16,7 @@ import {
   replaceDescriptors,
 } from "./descriptor-service";
 import {
+  configWeighting,
   effectiveSubjects,
   loadConfigDetail,
   loadConfigDetails,
@@ -112,6 +113,12 @@ export interface SubjectConfigInput {
   include_in_average: boolean;
   include_on_certificate: boolean;
   average_weight: number;
+  /** Credit hours; null (or omitted) when the school does not use credits. */
+  credits?: number | null;
+  /** A short course level label (Honors, AP, HL); null or omitted for none. */
+  course_level?: string | null;
+  /** Weighted GPA boost (0-5); 0 or omitted for none. */
+  gpa_boost?: number;
   grading_method: "weighted" | "total_points" | "descriptive";
   max_marks: number;
   pass_percentage: number;
@@ -153,6 +160,9 @@ export interface ConfigView {
   include_in_average: boolean;
   include_on_certificate: boolean;
   average_weight: number;
+  credits: number | null;
+  course_level: string | null;
+  gpa_boost: number;
   grading_method: "weighted" | "total_points" | "descriptive";
   max_marks: number;
   pass_percentage: number;
@@ -271,6 +281,7 @@ function inputToEngine(
       mandatory: assessment.is_mandatory,
     })),
     ...(input.grading_method === "descriptive" ? { descriptors } : {}),
+    gpaBoost: input.gpa_boost ?? 0,
   };
 }
 
@@ -349,6 +360,8 @@ function signatureFlags(source: {
   include_in_average: boolean;
   include_on_certificate: boolean;
   average_weight: number | string;
+  credits?: number | string | null;
+  gpa_boost?: number | string;
   grade_scale_id: string | null;
 }): Record<string, unknown> {
   return {
@@ -356,6 +369,10 @@ function signatureFlags(source: {
     include_in_average: source.include_in_average,
     include_on_certificate: source.include_on_certificate,
     average_weight: Number(source.average_weight),
+    // Credits and the boost change credit totals and the weighted GPA; the course level is a label.
+    credits:
+      source.credits === null || source.credits === undefined ? null : Number(source.credits),
+    gpa_boost: Number(source.gpa_boost ?? 0),
     grade_scale_id: source.grade_scale_id,
   };
 }
@@ -727,7 +744,7 @@ export async function toConfigView(
 function configViewOf(loaded: LoadedConfig, allCounts: ReadonlyMap<string, number>): ConfigView {
   const { config } = loaded;
   const engine = toEngineConfig(loaded);
-  const issues = config.is_excluded ? [] : validateSubjectConfig(engine);
+  const issues = config.is_excluded ? [] : validateSubjectConfig(engine, configWeighting(config));
   // Only this config's assessments, in the order a per-config count query would have listed them.
   const counts = new Map(
     loaded.assessments
@@ -745,6 +762,9 @@ function configViewOf(loaded: LoadedConfig, allCounts: ReadonlyMap<string, numbe
     include_in_average: config.include_in_average,
     include_on_certificate: config.include_on_certificate,
     average_weight: Number(config.average_weight),
+    credits: config.credits === null ? null : Number(config.credits),
+    course_level: config.course_level,
+    gpa_boost: Number(config.gpa_boost),
     grading_method: config.grading_method,
     max_marks: Number(config.max_marks),
     pass_percentage: Number(config.pass_percentage),
@@ -880,7 +900,7 @@ export async function listConfigSummaries(
     if (row.is_excluded) continue;
     const loaded = details.get(row.id);
     const engine = toEngineConfig(loaded);
-    const issues = validateSubjectConfig(engine);
+    const issues = validateSubjectConfig(engine, configWeighting(loaded.config));
     const weights = summarizeWeights(engine);
     summaries.push({
       config_id: row.id,
@@ -1081,7 +1101,13 @@ async function validateInputForYear(
         )
       : [];
   const engine = inputToEngine(input, terms, scale.bands, descriptors);
-  const issues = [...checkInputReferences(input, terms), ...validateSubjectConfig(engine)];
+  const issues = [
+    ...checkInputReferences(input, terms),
+    ...validateSubjectConfig(engine, {
+      averageWeight: input.average_weight,
+      credits: input.credits ?? null,
+    }),
+  ];
   // A live (active) year never runs on a broken configuration; a draft may be saved half-done.
   if (year.grading_config_status === "active" && hasErrors(issues)) invalid(issues);
   if (
@@ -1105,7 +1131,7 @@ const CONFIG_INSERT_COLUMNS = `
   pass_percentage, final_exam_pass_percentage, grade_scale_id, rounding_decimals, rounding_mode,
   missing_mark_policy, absent_policy, retake_policy, retake_cap_percentage,
   teachers_can_add_assessments, teacher_assessments_require_approval, instructions,
-  is_excluded, based_on_revision`;
+  is_excluded, based_on_revision, credits, course_level, gpa_boost`;
 
 /**
  * Create a subject's grade default (`sectionId` null) or a section-only subject (a subject the
@@ -1168,7 +1194,8 @@ export async function createSubjectConfig(
           ${input.rounding_decimals}, ${input.rounding_mode}, ${input.missing_mark_policy},
           ${input.absent_policy}, ${input.retake_policy}, ${input.retake_cap_percentage},
           ${input.teachers_can_add_assessments}, ${input.teacher_assessments_require_approval},
-          ${input.instructions}, false, NULL
+          ${input.instructions}, false, NULL, ${input.credits ?? null},
+          ${input.course_level ?? null}, ${input.gpa_boost ?? 0}
         )
         RETURNING id
       `,
@@ -1429,6 +1456,9 @@ export async function updateSubjectConfig(
       include_in_average = ${input.include_in_average},
       include_on_certificate = ${input.include_on_certificate},
       average_weight = ${input.average_weight},
+      credits = ${input.credits ?? null},
+      course_level = ${input.course_level ?? null},
+      gpa_boost = ${input.gpa_boost ?? 0},
       grading_method = ${input.grading_method},
       max_marks = ${input.max_marks},
       pass_percentage = ${input.pass_percentage},
@@ -1763,7 +1793,7 @@ export async function createSectionOverride(
       ${g.rounding_mode}, ${g.missing_mark_policy}, ${g.absent_policy}, ${g.retake_policy},
       ${g.retake_cap_percentage}, ${g.teachers_can_add_assessments},
       ${g.teacher_assessments_require_approval}, ${g.instructions}, ${mode === "exclude"},
-      ${g.revision}
+      ${g.revision}, ${g.credits}, ${g.course_level}, ${g.gpa_boost}
     )
     RETURNING id
   `;
@@ -2236,7 +2266,8 @@ export async function collectPublishIssues(
   for (const row of configs) {
     if (row.is_excluded) continue;
     const loadedConfig = context.details.get(row.id);
-    for (const issue of validateSubjectConfig(toEngineConfig(loadedConfig))) {
+    const weighting = configWeighting(loadedConfig.config);
+    for (const issue of validateSubjectConfig(toEngineConfig(loadedConfig), weighting)) {
       issues.push({
         severity: issue.severity,
         code: issue.code,

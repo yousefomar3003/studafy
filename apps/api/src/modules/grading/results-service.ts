@@ -102,6 +102,7 @@ function overallFor(subjects: StudentSubjectComputation[]): OverallResult {
     requirement: subject.snapshot.requirement,
     includeInAverage: subject.snapshot.include_in_average,
     averageWeight: subject.snapshot.average_weight,
+    credits: subject.snapshot.credits ?? null,
     exempt: subject.exempt,
     result: subject.result,
   }));
@@ -380,6 +381,10 @@ async function storeComputation(
         max_marks: subject.snapshot.engine.maxMarks,
         grade_label: status === "complete" ? result!.gradeLabel : null,
         gpa_points: status === "complete" ? result!.gpaPoints : null,
+        weighted_gpa_points: status === "complete" ? (result!.weightedGpaPoints ?? null) : null,
+        credits: subject.snapshot.credits ?? null,
+        course_level: subject.snapshot.course_level ?? null,
+        gpa_boost: subject.snapshot.engine.gpaBoost ?? 0,
         passed: status === "complete" ? result!.passed : null,
         include_in_average: subject.snapshot.include_in_average,
         include_on_certificate: subject.snapshot.include_on_certificate,
@@ -394,17 +399,20 @@ async function storeComputation(
       INSERT INTO app.student_subject_results (
         school_id, finalization_id, student_id, subject_id, subject_config_id, status, percentage,
         marks_obtained, max_marks, grade_label, gpa_points, passed, include_in_average,
-        include_on_certificate, is_descriptive, config_snapshot, breakdown
+        include_on_certificate, is_descriptive, config_snapshot, breakdown, credits, course_level,
+        gpa_boost, weighted_gpa_points
       )
       SELECT ${schoolId}::uuid, ${finalizationId}::uuid, x.student_id, x.subject_id,
              x.subject_config_id, x.status, x.percentage, x.marks_obtained, x.max_marks,
              x.grade_label, x.gpa_points, x.passed, x.include_in_average,
-             x.include_on_certificate, x.is_descriptive, x.config_snapshot, x.breakdown
+             x.include_on_certificate, x.is_descriptive, x.config_snapshot, x.breakdown,
+             x.credits, x.course_level, x.gpa_boost, x.weighted_gpa_points
       FROM jsonb_to_recordset(${tx.json(chunk as never)}::jsonb) AS x(
         student_id uuid, subject_id uuid, subject_config_id uuid, status text, percentage numeric,
         marks_obtained numeric, max_marks numeric, grade_label text, gpa_points numeric,
         passed boolean, include_in_average boolean, include_on_certificate boolean,
-        is_descriptive boolean, config_snapshot jsonb, breakdown jsonb
+        is_descriptive boolean, config_snapshot jsonb, breakdown jsonb, credits numeric,
+        course_level text, gpa_boost numeric, weighted_gpa_points numeric
       )
     `;
   }
@@ -418,22 +426,26 @@ async function storeComputation(
     grade_label: student.overall.gradeLabel,
     subjects_failed: student.overall.subjectsFailed,
     academic_status: student.overall.academicStatus,
+    weighted_result_value: student.overall.weightedGpa,
+    credits_attempted: student.overall.creditsAttempted,
+    credits_earned: student.overall.creditsEarned,
   }));
   for (const chunk of chunks(overallRows, STORE_CHUNK * 5)) {
     await tx`
       INSERT INTO app.student_overall_results (
         school_id, finalization_id, student_id, status, average_percentage, total_obtained,
         total_max, grade_label, subjects_failed, academic_status, result_format,
-        result_scale_max, result_value
+        result_scale_max, result_value, weighted_result_value, credits_attempted, credits_earned
       )
       SELECT ${schoolId}::uuid, ${finalizationId}::uuid, x.student_id, x.status,
              x.average_percentage, x.total_obtained, x.total_max, x.grade_label,
              x.subjects_failed, x.academic_status, x.result_format, x.result_scale_max,
-             x.result_value
+             x.result_value, x.weighted_result_value, x.credits_attempted, x.credits_earned
       FROM jsonb_to_recordset(${tx.json(chunk as never)}::jsonb) AS x(
         student_id uuid, status text, average_percentage numeric, total_obtained numeric,
         total_max numeric, grade_label text, subjects_failed int, academic_status text,
-        result_format text, result_scale_max numeric, result_value numeric
+        result_format text, result_scale_max numeric, result_value numeric,
+        weighted_result_value numeric, credits_attempted numeric, credits_earned numeric
       )
     `;
   }
@@ -799,6 +811,12 @@ export interface StoredSubjectResult {
   max_marks: number;
   grade_label: string | null;
   gpa_points: number | null;
+  /** GPA points with the subject's boost; null without a boost (and on results before 000253). */
+  weighted_gpa_points: number | null;
+  /** Credit hours as finalized; null when the subject has none. */
+  credits: number | null;
+  /** Course level label as finalized (Honors, AP, HL...); null for none. */
+  course_level: string | null;
   passed: boolean | null;
   include_in_average: boolean;
   include_on_certificate: boolean;
@@ -863,6 +881,11 @@ export interface StoredStudentResult {
   grade_label: string | null;
   /** The final result in the grade's format; null while incomplete. */
   result_display: ResultDisplay | null;
+  /** The GPA with boosted subjects' weighted points; null unless a GPA has boosted subjects. */
+  weighted_gpa: number | null;
+  /** Credits of the counted complete subjects, and of those passed; null without credits. */
+  credits_attempted: number | null;
+  credits_earned: number | null;
   subjects_failed: number;
   academic_status: "promoted" | "supplementary" | "retained" | "incomplete";
   subjects: StoredSubjectResult[];
@@ -919,12 +942,16 @@ export async function readFinalizationResults(
       result_format: ResultDisplay["format"] | null;
       result_scale_max: string | null;
       result_value: string | null;
+      weighted_result_value: string | null;
+      credits_attempted: string | null;
+      credits_earned: string | null;
     }[]
   >`
     SELECT overall.student_id, student.first_name, student.last_name, student.admission_number,
            overall.status, overall.average_percentage, overall.total_obtained, overall.total_max,
            overall.grade_label, overall.subjects_failed, overall.academic_status,
-           overall.result_format, overall.result_scale_max, overall.result_value
+           overall.result_format, overall.result_scale_max, overall.result_value,
+           overall.weighted_result_value, overall.credits_attempted, overall.credits_earned
     FROM app.student_overall_results AS overall
     JOIN app.students AS student ON student.id = overall.student_id AND student.school_id = overall.school_id
     WHERE overall.school_id = ${schoolId}::uuid AND overall.finalization_id = ${finalizationId}::uuid
@@ -944,6 +971,9 @@ export async function readFinalizationResults(
       max_marks: string;
       grade_label: string | null;
       gpa_points: string | null;
+      weighted_gpa_points: string | null;
+      credits: string | null;
+      course_level: string | null;
       passed: boolean | null;
       include_in_average: boolean;
       include_on_certificate: boolean;
@@ -953,6 +983,7 @@ export async function readFinalizationResults(
   >`
     SELECT result.student_id, result.subject_id, result.status, result.percentage,
            result.marks_obtained, result.max_marks, result.grade_label, result.gpa_points,
+           result.weighted_gpa_points, result.credits, result.course_level,
            result.passed, result.include_in_average, result.include_on_certificate,
            result.config_snapshot, result.breakdown
     FROM app.student_subject_results AS result
@@ -972,6 +1003,9 @@ export async function readFinalizationResults(
     total_max: n(row.total_max),
     grade_label: row.grade_label,
     result_display: storedDisplay(row),
+    weighted_gpa: n(row.weighted_result_value),
+    credits_attempted: n(row.credits_attempted),
+    credits_earned: n(row.credits_earned),
     subjects_failed: row.subjects_failed,
     academic_status: row.academic_status,
     subjects: subjects
@@ -987,6 +1021,9 @@ export async function readFinalizationResults(
         max_marks: Number(subject.max_marks),
         grade_label: subject.grade_label,
         gpa_points: n(subject.gpa_points),
+        weighted_gpa_points: n(subject.weighted_gpa_points),
+        credits: n(subject.credits),
+        course_level: subject.course_level,
         passed: subject.passed,
         include_in_average: subject.include_in_average,
         include_on_certificate: subject.include_on_certificate,
@@ -1133,6 +1170,9 @@ export function computationView(computation: SectionComputation) {
       total_max: student.overall.totalMax,
       grade_label: student.overall.gradeLabel,
       result_display: student.overall.display,
+      weighted_gpa: student.overall.weightedGpa,
+      credits_attempted: student.overall.creditsAttempted,
+      credits_earned: student.overall.creditsEarned,
       subjects_failed: student.overall.subjectsFailed,
       academic_status: student.overall.academicStatus,
       subjects: student.subjects.map((subject) => ({
@@ -1150,6 +1190,8 @@ export function computationView(computation: SectionComputation) {
         marks_obtained: subject.result?.marksObtained ?? null,
         max_marks: subject.snapshot.engine.maxMarks,
         grade_label: subject.result?.gradeLabel ?? null,
+        credits: subject.snapshot.credits ?? null,
+        course_level: subject.snapshot.course_level ?? null,
         passed: subject.result?.passed ?? null,
         missing_assessments: subject.result?.missingAssessments.map((m) => m.name) ?? [],
         is_descriptive: subject.snapshot.engine.method === "descriptive",

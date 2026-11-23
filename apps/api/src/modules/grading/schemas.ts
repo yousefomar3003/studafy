@@ -99,6 +99,20 @@ export const resultDisplaySchema = z
     description:
       "The final result in the grade's format. value is null when it can't be worked out (a GPA with a subject that has no GPA points).",
   });
+/** A student's weighted GPA and credit totals, beside the result display. */
+const creditFields = {
+  weighted_gpa: z.number().nullable().openapi({
+    description:
+      "The GPA with each boosted subject's (Honors, AP, HL) weighted points, on the same scale as result_display. Null unless the result is a GPA and a counted subject has a boost.",
+  }),
+  credits_attempted: z.number().nullable().openapi({
+    description:
+      "Credits of the subjects counted in the average that are complete; null when none carries credits.",
+  }),
+  credits_earned: z.number().nullable().openapi({
+    description: "Credits of those subjects that were passed; null when none carries credits.",
+  }),
+};
 const aggregationSchema = z.enum(["weighted_average", "total_points"]);
 const markStatusSchema = z.enum(["graded", "absent", "excused", "not_applicable"]);
 const gradingMethodSchema = z.enum(["weighted", "total_points", "descriptive"]).openapi({
@@ -359,6 +373,17 @@ const configFields = {
   include_in_average: z.boolean().default(true),
   include_on_certificate: z.boolean().default(true),
   average_weight: z.number().positive().max(100).default(1),
+  credits: z.number().min(0).max(100).multipleOf(0.01).nullable().default(null).openapi({
+    description:
+      "Credit hours the subject is worth (American and IB schools); null when credits are not used. Reported as credits attempted and earned; average_weight still weights the average and GPA.",
+  }),
+  course_level: z.string().trim().min(1).max(40).nullable().default(null).openapi({
+    description: 'A short course level shown with the subject, e.g. "Honors", "AP", "HL".',
+  }),
+  gpa_boost: z.number().min(0).max(5).multipleOf(0.01).default(0).openapi({
+    description:
+      "Added to a passed subject's GPA points for the weighted GPA (Honors 0.5, AP 1). 0 for none.",
+  }),
   grading_method: gradingMethodSchema.default("weighted"),
   max_marks: z.number().positive().max(100000).default(100),
   pass_percentage: percentage.default(50),
@@ -454,6 +479,9 @@ export const subjectConfigSchema = z
     include_in_average: z.boolean(),
     include_on_certificate: z.boolean(),
     average_weight: z.number(),
+    credits: z.number().nullable(),
+    course_level: z.string().nullable(),
+    gpa_boost: z.number(),
     grading_method: gradingMethodSchema,
     max_marks: z.number(),
     pass_percentage: z.number(),
@@ -1041,6 +1069,7 @@ export const resultPreviewSchema = z
           total_max: z.number().nullable(),
           grade_label: z.string().nullable(),
           result_display: resultDisplaySchema.nullable(),
+          ...creditFields,
           subjects_failed: z.number().int(),
           academic_status: z.enum(["promoted", "supplementary", "retained", "incomplete"]),
           subjects: z.array(
@@ -1048,6 +1077,8 @@ export const resultPreviewSchema = z
               .object({
                 subject_id: uuidSchema,
                 subject_name: z.string(),
+                credits: z.number().nullable(),
+                course_level: z.string().nullable(),
                 exempt: z.boolean(),
                 status: z.enum(["complete", "incomplete", "exempt"]),
                 percentage: z.number().nullable(),
@@ -1155,6 +1186,16 @@ const storedSubjectResultSchema = z
     max_marks: z.number(),
     grade_label: z.string().nullable(),
     gpa_points: z.number().nullable(),
+    weighted_gpa_points: z.number().nullable().openapi({
+      description:
+        "GPA points with the subject's boost (its course level): the points plus the boost when passed, the points when not. Null when the subject has no boost.",
+    }),
+    credits: z.number().nullable().openapi({
+      description: "Credit hours as finalized; null when the subject has none.",
+    }),
+    course_level: z.string().nullable().openapi({
+      description: 'Course level as finalized ("Honors", "AP", "HL"); null for none.',
+    }),
     passed: z.boolean().nullable(),
     include_in_average: z.boolean(),
     include_on_certificate: z.boolean(),
@@ -1206,6 +1247,7 @@ export const storedStudentResultSchema = z
     total_max: z.number().nullable(),
     grade_label: z.string().nullable(),
     result_display: resultDisplaySchema.nullable(),
+    ...creditFields,
     subjects_failed: z.number().int(),
     academic_status: z.enum(["promoted", "supplementary", "retained", "incomplete"]),
     subjects: z.array(storedSubjectResultSchema),
@@ -1477,6 +1519,15 @@ export const certificateContentSchema = z
           grade_label: z.string().nullable(),
           passed: z.boolean().nullable(),
           exempt: z.boolean(),
+          credits: z.number().nullable().optional().openapi({
+            description: "Credit hours. Absent on certificates issued before credits existed.",
+          }),
+          course_level: z.string().nullable().optional().openapi({
+            description: "Course level (Honors, AP, HL). Absent on older certificates.",
+          }),
+          weighted_gpa_points: z.number().nullable().optional().openapi({
+            description: "GPA points with the course level's boost. Absent on older certificates.",
+          }),
           terms: z.array(
             z
               .object({
@@ -1516,7 +1567,14 @@ export const certificateContentSchema = z
           description:
             "The final result in the grade's format. Absent on certificates issued before result formats existed: those show average_percentage.",
         }),
+        weighted_gpa: z.number().nullable().optional().openapi({
+          description:
+            "The GPA with boosted subjects' weighted points. Absent on certificates issued before credits existed.",
+        }),
+        credits_attempted: z.number().nullable().optional(),
+        credits_earned: z.number().nullable().optional(),
         subjects_failed: z.number().int(),
+
         academic_status: z.string(),
       })
       .openapi("CertificateContentOverall"),
