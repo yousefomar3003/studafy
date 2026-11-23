@@ -21,6 +21,15 @@ import type { RoundingRule } from "./types";
  *
  * Descriptive subjects (graded with descriptors, never with a percentage) never count, exactly as
  * they never count in their own year's average.
+ *
+ * Course levels and credits (American and IB schools):
+ *  - the weighted GPA is the same weighted mean with each boosted subject's weighted points (its
+ *    points plus its Honors/AP/HL boost when passed). It exists only when the GPA does and at least
+ *    one counted subject has a boost; otherwise it is null, for the same reasons as the GPA;
+ *  - credits attempted and earned add the credits of every complete, non-exempt subject that
+ *    carries credits, and of those passed -- including descriptive (pass/fail) subjects and those
+ *    left out of the average (PE, electives), which still earn credits. They are null when no such
+ *    subject has credits.
  */
 
 export interface CumulativeSubjectInput {
@@ -31,7 +40,13 @@ export interface CumulativeSubjectInput {
   averageWeight: number;
   percentage: number | null;
   gpaPoints: number | null;
-  /** Graded with descriptors: never counted. */
+  /** The subject's weighted GPA points; null or absent when it has no boost. */
+  weightedGpaPoints?: number | null;
+  /** Credit hours; null or absent when the school does not use credits. */
+  credits?: number | null;
+  /** Whether the subject was passed; counts its credits as earned. */
+  passed?: boolean | null;
+  /** Graded with descriptors: never counted in the average or GPA (its credits still count). */
   descriptive?: boolean;
 }
 
@@ -51,6 +66,8 @@ export interface CumulativeResult {
   averagePercentage: number | null;
   /** Weighted mean GPA points; null when any counted subject has none. */
   gpa: number | null;
+  /** The GPA with boosted subjects' weighted points; null when the GPA is, or nothing is boosted. */
+  weightedGpa: number | null;
   gpaUnavailableReason: CumulativeGpaUnavailableReason | null;
   /** Counted subjects with no GPA points, by label (only when that is the reason). */
   subjectsWithoutGpaPoints: string[];
@@ -62,6 +79,10 @@ export interface CumulativeResult {
   subjectsCounted: number;
   /** Sum of the counted subjects' weights. */
   totalWeight: number;
+  /** Credits of the complete, non-exempt subjects that carry credits; null when none does. */
+  creditsAttempted: number | null;
+  /** The same over the passed subjects; null when no such subject has credits. */
+  creditsEarned: number | null;
 }
 
 /** GPA points are always shown to two decimals, rounded half up. */
@@ -87,16 +108,19 @@ export function calculateCumulativeResult(
     mixedGpaScales: [] as { label: string; max: number }[],
   };
   const totalWeight = counted.reduce((total, subject) => total + subject.averageWeight, 0);
+  const credits = creditTotals(years.flatMap((year) => year.subjects));
 
   if (counted.length === 0 || totalWeight <= 0) {
     return {
       averagePercentage: null,
       gpa: null,
+      weightedGpa: null,
       gpaUnavailableReason: "no_subjects",
       subjectsWithoutGpaPoints: [],
       ...scale,
       subjectsCounted: counted.length,
       totalWeight,
+      ...credits,
     };
   }
 
@@ -107,11 +131,13 @@ export function calculateCumulativeResult(
     return {
       averagePercentage: null,
       gpa: null,
+      weightedGpa: null,
       gpaUnavailableReason: "incomplete",
       subjectsWithoutGpaPoints: [],
       ...scale,
       subjectsCounted: counted.length,
       totalWeight,
+      ...credits,
     };
   }
 
@@ -125,12 +151,14 @@ export function calculateCumulativeResult(
     return {
       averagePercentage,
       gpa: null,
+      weightedGpa: null,
       gpaUnavailableReason: "mixed_gpa_scales",
       subjectsWithoutGpaPoints: [],
       gpaScaleMax: null,
       mixedGpaScales: gpaYears,
       subjectsCounted: counted.length,
       totalWeight,
+      ...credits,
     };
   }
 
@@ -139,11 +167,13 @@ export function calculateCumulativeResult(
     return {
       averagePercentage,
       gpa: null,
+      weightedGpa: null,
       gpaUnavailableReason: "missing_gpa_points",
       subjectsWithoutGpaPoints: withoutPoints.map((subject) => subject.label),
       ...scale,
       subjectsCounted: counted.length,
       totalWeight,
+      ...credits,
     };
   }
 
@@ -152,13 +182,57 @@ export function calculateCumulativeResult(
       totalWeight,
     GPA_ROUNDING,
   );
+  const boosted = counted.some(
+    (subject) => subject.weightedGpaPoints !== null && subject.weightedGpaPoints !== undefined,
+  );
+  const weightedGpa = boosted
+    ? roundTo(
+        counted.reduce(
+          (total, subject) =>
+            total + (subject.weightedGpaPoints ?? subject.gpaPoints!) * subject.averageWeight,
+          0,
+        ) / totalWeight,
+        GPA_ROUNDING,
+      )
+    : null;
   return {
     averagePercentage,
     gpa,
+    weightedGpa,
     gpaUnavailableReason: null,
     subjectsWithoutGpaPoints: [],
     ...scale,
     subjectsCounted: counted.length,
     totalWeight,
+    ...credits,
+  };
+}
+
+/** Credits carry two decimals (numeric(5,2)). */
+const CREDIT_ROUNDING: RoundingRule = { decimals: 2, mode: "half_up" };
+
+/**
+ * Credits over every non-exempt subject that carries them, counted in the average or not: a
+ * pass/fail subject or one left out of the average still earns credits. Exported for the
+ * graduation requirements checker, which totals the credits of a group of subjects the same way.
+ */
+export function creditTotals(subjects: readonly CumulativeSubjectInput[]): {
+  creditsAttempted: number | null;
+  creditsEarned: number | null;
+} {
+  const withCredits = subjects.filter(
+    (subject) =>
+      subject.status !== "exempt" && subject.credits !== null && subject.credits !== undefined,
+  );
+  if (withCredits.length === 0) return { creditsAttempted: null, creditsEarned: null };
+  const total = (subjects: readonly CumulativeSubjectInput[]) =>
+    roundTo(
+      subjects.reduce((sum, subject) => sum + subject.credits!, 0),
+      CREDIT_ROUNDING,
+    );
+  const complete = withCredits.filter((subject) => subject.status === "complete");
+  return {
+    creditsAttempted: total(complete),
+    creditsEarned: total(complete.filter((subject) => subject.passed === true)),
   };
 }

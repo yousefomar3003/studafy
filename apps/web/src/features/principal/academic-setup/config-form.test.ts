@@ -180,4 +180,19 @@ describe("config-form", () => {
     draft.assessments = [{ ...quiz, maxMarks: "20" }];
     expect(hasIncompleteFields(draft)).toBe(false);
   });
+
+  test("credits, course level and boost: optional, sent as numbers, warned when unlike the weight", () => {
+    const draft = emptyDraft(TERMS.slice(0, 1));
+    expect(draftToBody(draft)).toMatchObject({ credits: null, course_level: null, gpa_boost: 0 });
+
+    const ap = { ...draft, credits: "1", courseLevel: " AP ", gpaBoost: "1" };
+    expect(draftToBody(ap)).toMatchObject({ credits: 1, course_level: "AP", gpa_boost: 1 });
+    const codes = (value: typeof draft) =>
+      validateDraft(value, TERMS.slice(0, 1)).issues.map((issue) => issue.code);
+    expect(codes(ap)).not.toContain("CREDITS_DIFFER_FROM_COEFFICIENT");
+    expect(codes({ ...ap, credits: "0.5" })).toContain("CREDITS_DIFFER_FROM_COEFFICIENT");
+
+    expect(hasIncompleteFields({ ...ap, credits: "abc" })).toBe(true);
+    expect(hasIncompleteFields({ ...ap, credits: "" })).toBe(false);
+  });
 });

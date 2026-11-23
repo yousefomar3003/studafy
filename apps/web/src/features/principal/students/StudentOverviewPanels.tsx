@@ -6,13 +6,16 @@ import { Link } from "react-router-dom";
 import { api } from "../../../lib/api";
 import { usePermissions } from "../../../lib/auth";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
-import { ResultValue } from "../academic-setup/components";
+import { ClassRankLabel, CreditsEarned, ResultValue } from "../academic-setup/components";
 import {
   DISCIPLINE_SEVERITY_LABEL_KEYS,
   DISCIPLINE_STATUS_LABEL_KEYS,
   DISCIPLINE_TYPE_LABEL_KEYS,
 } from "../discipline/labels";
 
+import { GraduationPanel } from "./GraduationPanel";
+import { PredictedGradesPanel } from "./predicted-grades/PredictedGradesPanel";
+import { TestScoresPanel } from "./TestScoresPanel";
 import { TranscriptPanel } from "./transcripts/TranscriptPanel";
 
 import type { DisciplineIncident } from "../discipline/queries";
@@ -140,7 +143,25 @@ export function StudentOverviewPanels({ studentId }: { studentId: string }) {
                     <ResultValue
                       display={row.result.result_display}
                       percentage={row.result.average_percentage}
+                      weightedGpa={row.result.weighted_gpa}
                     />
+                    {row.result.credits_attempted == null ? null : (
+                      <div>
+                        <small>
+                          <CreditsEarned
+                            attempted={row.result.credits_attempted}
+                            earned={row.result.credits_earned}
+                          />
+                        </small>
+                      </div>
+                    )}
+                    {row.result.class_rank ? (
+                      <div>
+                        <small>
+                          <ClassRankLabel rank={row.result.class_rank} />
+                        </small>
+                      </div>
+                    ) : null}
                   </Table.Cell>
                   <Table.Cell>{row.result.grade_label ?? "—"}</Table.Cell>
                   <Table.Cell>
@@ -204,6 +225,11 @@ export function StudentOverviewPanels({ studentId }: { studentId: string }) {
           )}
         </Card.Body>
       </Card>
+
+      <TestScoresPanel studentId={studentId} />
+      <PredictedGradesPanel studentId={studentId} />
+
+      <GraduationPanel studentId={studentId} />
 
       <TranscriptPanel studentId={studentId} />
 

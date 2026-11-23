@@ -20,6 +20,7 @@ import { blockingReasons } from "../certificate-service";
 import { listPrograms, listSectionSubjects } from "../config-service";
 import {
   buildSnapshot,
+  configWeighting,
   loadConfigDetail,
   loadMarks,
   loadRoster,
@@ -47,6 +48,7 @@ function overallFor(subjects: StudentSubjectComputation[]): OverallResult {
     requirement: subject.snapshot.requirement,
     includeInAverage: subject.snapshot.include_in_average,
     averageWeight: subject.snapshot.average_weight,
+    credits: subject.snapshot.credits ?? null,
     exempt: subject.exempt,
     result: subject.result,
   }));
@@ -208,7 +210,7 @@ export async function legacyListConfigSummaries(
     if (row.is_excluded) continue;
     const loaded = await loadConfigDetail(tx, schoolId, row.id);
     const engine = toEngineConfig(loaded);
-    const issues = validateSubjectConfig(engine);
+    const issues = validateSubjectConfig(engine, configWeighting(loaded.config));
     const weights = summarizeWeights(engine);
     summaries.push({
       config_id: row.id,
@@ -249,7 +251,10 @@ export async function legacyCollectPublishIssues(
   for (const row of configs) {
     if (row.is_excluded) continue;
     const loaded = await loadConfigDetail(tx, schoolId, row.id);
-    for (const issue of validateSubjectConfig(toEngineConfig(loaded))) {
+    for (const issue of validateSubjectConfig(
+      toEngineConfig(loaded),
+      configWeighting(loaded.config),
+    )) {
       issues.push({
         severity: issue.severity,
         code: issue.code,

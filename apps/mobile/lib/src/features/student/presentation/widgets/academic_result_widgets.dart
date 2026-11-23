@@ -18,6 +18,41 @@ String formatResultNumber(num value) {
 String formatResultPercent(num? value) =>
     value == null ? '—' : '${formatResultNumber(value)}%';
 
+/// A place as the app's language says it: "3rd" in English, "3" in Arabic (whose sentence carries
+/// the ordinal: "المرتبة 3").
+String formatOrdinal(BuildContext context, int n) {
+  if (context.locale.languageCode != 'en') return '$n';
+  final lastTwo = n % 100;
+  final suffix = lastTwo >= 11 && lastTwo <= 13
+      ? 'th'
+      : switch (n % 10) {
+          1 => 'st',
+          2 => 'nd',
+          3 => 'rd',
+          _ => 'th',
+        };
+  return '$n$suffix';
+}
+
+/// "3rd of 120"; "Not ranked" for an incomplete result; "Rank pending" while a grade-wide rank
+/// waits for every section to be finalized.
+String formatClassRank(BuildContext context, ClassRank rank) =>
+    switch (rank.status) {
+      ClassRankStatus.ranked => 'academicResults.rank.place'.tr(
+        namedArgs: {
+          'place': formatOrdinal(context, rank.rank!),
+          'cohort': '${rank.cohortSize}',
+        },
+      ),
+      ClassRankStatus.notRanked => 'academicResults.rank.notRanked'.tr(),
+      ClassRankStatus.pending => 'academicResults.rank.pending'.tr(),
+    };
+
+/// Credits earned out of attempted ("3 / 4"); null when the result carries no credits.
+String? formatCreditsEarned(num? attempted, num? earned) => attempted == null
+    ? null
+    : '${formatResultNumber(earned ?? 0)} / ${formatResultNumber(attempted)}';
+
 /// The final result as the grade shows it ("16.5 / 20", "GPA 3.4 / 4"); the percentage when the
 /// grade shows percentages or the result predates result formats.
 String formatResultValue(ResultDisplay? display, num? percentage) {
@@ -113,6 +148,33 @@ class OverallResultSummary extends StatelessWidget {
                   ? null
                   : formatResultPercent(overall.averagePercentage),
             ),
+            // Honors/AP/HL boosts: only results that have them carry a weighted GPA.
+            if (overall.weightedGpa case final weighted?)
+              _Stat(
+                label: 'academicResults.weightedGpa'.tr(),
+                value: formatResultNumber(weighted),
+              ),
+            if (formatCreditsEarned(
+                  overall.creditsAttempted,
+                  overall.creditsEarned,
+                )
+                case final credits?)
+              _Stat(
+                label: 'academicResults.creditsEarned'.tr(),
+                value: credits,
+              ),
+            if (overall.classRank case final rank?)
+              _Stat(
+                label: 'academicResults.rank.label'.tr(),
+                value: formatClassRank(context, rank),
+                detail: rank.percentile == null
+                    ? null
+                    : 'academicResults.rank.percentile'.tr(
+                        namedArgs: {
+                          'place': formatOrdinal(context, rank.percentile!),
+                        },
+                      ),
+              ),
             _Stat(label: 'academicResults.total'.tr(), value: total),
             _Stat(
               label: 'academicResults.grade'.tr(),
@@ -336,6 +398,33 @@ class SubjectResultsTable extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(subject.name, style: theme.textTheme.bodyMedium),
+                  if (subject.courseLevel != null || subject.credits != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: AppSpacing.space4),
+                      child: Wrap(
+                        spacing: AppSpacing.space8,
+                        runSpacing: AppSpacing.space4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          if (subject.courseLevel case final level?)
+                            StatusPill(
+                              label: level,
+                              tone: StatusPillTone.neutral,
+                            ),
+                          if (subject.credits case final credits?)
+                            Text(
+                              'academicResults.subjectCredits'.tr(
+                                namedArgs: {
+                                  'value': formatResultNumber(credits),
+                                },
+                              ),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
                   if (_termLine(subject) case final line?)
                     Text(
                       line,
@@ -379,6 +468,19 @@ class SubjectResultsTable extends StatelessWidget {
                       subject.gradeLabel!,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  if (!subject.isExempt && subject.weightedGpaPoints != null)
+                    Text(
+                      'academicResults.weightedPoints'.tr(
+                        namedArgs: {
+                          'value': formatResultNumber(
+                            subject.weightedGpaPoints!,
+                          ),
+                        },
+                      ),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                   _SubjectOutcome(subject: subject),

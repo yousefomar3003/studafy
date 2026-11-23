@@ -32,13 +32,44 @@ export function summarizeWeights(config: SubjectGradingConfig): WeightSummary {
   return { termCategoryTotal, annualTotal, valid };
 }
 
+/** How a subject counts towards the overall result, for the credits check. */
+export interface SubjectWeighting {
+  /** The coefficient that weights the average and GPA. */
+  averageWeight: number;
+  /** Credit hours; null when the school does not use credits. */
+  credits: number | null;
+}
+
 /**
  * Everything that would make the configuration compute something other than what the school
  * intends. `error` issues block publication (and any save while the year is active); `warning`
  * issues are shown but allowed.
+ *
+ * With `weighting`, a numeric subject whose credits differ from its coefficient is also warned
+ * about: the coefficient weights the average and GPA, so credits that say otherwise usually mean
+ * one of the two was not updated (an American school sets both to the same number).
  */
-export function validateSubjectConfig(config: SubjectGradingConfig): ValidationIssue[] {
+export function validateSubjectConfig(
+  config: SubjectGradingConfig,
+  weighting?: SubjectWeighting,
+): ValidationIssue[] {
   if (config.method === "descriptive") return validateDescriptiveConfig(config);
+  return [...validateNumericConfig(config), ...validateCredits(weighting)];
+}
+
+function validateCredits(weighting: SubjectWeighting | undefined): ValidationIssue[] {
+  if (!weighting || weighting.credits === null) return [];
+  if (Math.abs(weighting.credits - weighting.averageWeight) <= WEIGHT_TOLERANCE) return [];
+  return [
+    {
+      code: "CREDITS_DIFFER_FROM_COEFFICIENT",
+      severity: "warning",
+      message: `This subject is worth ${weighting.credits} credits but counts ${weighting.averageWeight} times in the average and GPA. Schools that weight by credit hours set both to the same number.`,
+    },
+  ];
+}
+
+function validateNumericConfig(config: SubjectGradingConfig): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   const error = (code: string, message: string, ref?: string) =>
     issues.push({ code, severity: "error", message, ref });

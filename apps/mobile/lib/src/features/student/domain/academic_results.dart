@@ -39,6 +39,9 @@ class SubjectResult {
     this.comment,
     this.isDescriptive = false,
     this.skills = const [],
+    this.credits,
+    this.courseLevel,
+    this.weightedGpaPoints,
   });
 
   factory SubjectResult.fromJson(Map<String, Object?> json) => SubjectResult(
@@ -75,6 +78,10 @@ class SubjectResult {
           descriptor: skill['descriptor_label'] as String?,
         ),
     ],
+    // Absent on results, certificates and transcripts from servers or documents before credits.
+    credits: _num(json['credits']),
+    courseLevel: _text(json['course_level']),
+    weightedGpaPoints: _num(json['weighted_gpa_points']),
   );
 
   final String subjectId;
@@ -95,6 +102,7 @@ class SubjectResult {
   /// The subject teacher's report card comment; null when there is none (and on results and
   /// certificates from before report card notes).
   final String? comment;
+
   /// Graded with descriptors (kindergarten, early primary): no marks or percentage; [gradeLabel]
   /// is the subject's descriptor when its scale has points, and [skills] carry the detail.
   final bool isDescriptive;
@@ -111,6 +119,15 @@ class SubjectResult {
     })
   >
   skills;
+
+  /// Credit hours (American and IB schools); null when the subject has none.
+  final double? credits;
+
+  /// Course level shown beside the subject ("Honors", "AP", "HL"); null for none.
+  final String? courseLevel;
+
+  /// GPA points with the course level's boost; null when the subject has no boost.
+  final double? weightedGpaPoints;
 
   bool get isExempt => status == 'exempt';
   bool get isIncomplete => status == 'incomplete';
@@ -164,6 +181,10 @@ class OverallResult {
     required this.subjectsFailed,
     required this.academicStatus,
     this.display,
+    this.weightedGpa,
+    this.creditsAttempted,
+    this.creditsEarned,
+    this.classRank,
   });
 
   /// Reads a finalized result (`result_display`) or a certificate's overall block (`display`).
@@ -176,6 +197,12 @@ class OverallResult {
     subjectsFailed: (json['subjects_failed'] as num?)?.toInt() ?? 0,
     academicStatus: AcademicStatus.fromWire(json['academic_status']),
     display: ResultDisplay.fromJson(json['result_display'] ?? json['display']),
+    // Absent from older servers and documents: no weighted GPA, no credits.
+    weightedGpa: _num(json['weighted_gpa']),
+    creditsAttempted: _num(json['credits_attempted']),
+    creditsEarned: _num(json['credits_earned']),
+    // Absent when the grade does not rank, the school keeps it for staff, and on older results.
+    classRank: ClassRank.fromJson(json['class_rank']),
   );
 
   final double? averagePercentage;
@@ -185,6 +212,69 @@ class OverallResult {
   final int subjectsFailed;
   final AcademicStatus academicStatus;
   final ResultDisplay? display;
+
+  /// The GPA with Honors/AP/HL boosts, beside a GPA [display]; null when there is none.
+  final double? weightedGpa;
+
+  /// Credits of the counted subjects, and of those passed; null when none carries credits.
+  final double? creditsAttempted;
+  final double? creditsEarned;
+
+  /// Where the result places the student in their section or grade; null when not shown.
+  final ClassRank? classRank;
+}
+
+/// A class rank's state: a place, a result that takes none (incomplete), or a grade-wide rank
+/// waiting for every section to be finalized.
+enum ClassRankStatus { ranked, notRanked, pending }
+
+/// A finalized result's class rank ("3rd of 120", 84th percentile), from a result's `class_rank`
+/// or the rank an issued certificate or transcript kept (which carries no status: always ranked).
+class ClassRank {
+  const ClassRank({
+    required this.status,
+    this.rank,
+    this.cohortSize,
+    this.percentile,
+  });
+
+  /// Null for anything that isn't a rank this build understands, so an unknown status shows nothing.
+  static ClassRank? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final rank = _int(json['rank']);
+    final cohortSize = _int(json['cohort_size']);
+    final percentile = _int(json['percentile']);
+    final status = switch (json['status']) {
+      'ranked' => ClassRankStatus.ranked,
+      'not_ranked' => ClassRankStatus.notRanked,
+      'pending' => ClassRankStatus.pending,
+      // A document's rank has no status: it was ranked when issued.
+      null when rank != null => ClassRankStatus.ranked,
+      _ => null,
+    };
+    if (status == null) return null;
+    if (status == ClassRankStatus.ranked &&
+        (rank == null || cohortSize == null)) {
+      return null;
+    }
+    return ClassRank(
+      status: status,
+      rank: rank,
+      cohortSize: cohortSize,
+      percentile: percentile,
+    );
+  }
+
+  final ClassRankStatus status;
+
+  /// 1 for the best; tied students share a place (1, 2, 2, 4).
+  final int? rank;
+
+  /// How many students were ranked.
+  final int? cohortSize;
+
+  /// The whole-number share of ranked students with a lower result.
+  final int? percentile;
 }
 
 /// Days of recorded attendance in the report's period. Late days are counted within present days;
@@ -511,6 +601,8 @@ Map<String, Object?> _map(Object? value) =>
     value is Map ? Map<String, Object?>.from(value) : const {};
 
 double? _num(Object? value) => value is num ? value.toDouble() : null;
+
+int? _int(Object? value) => value is num ? value.toInt() : null;
 
 /// A non-blank string, or null.
 String? _text(Object? value) =>

@@ -169,6 +169,152 @@ Overall: subjects counted in the average (`include_in_average`, not exempt); if 
 max marks, failures count mandatory and elective subjects only, and the academic status is
 `promoted` (0 failures), `supplementary` (≤ `max_failed_subjects_for_supplementary`) or `retained`.
 
+### Credits, course levels and the weighted GPA (000253)
+
+For American and IB schools a subject config may also carry `credits` (credit hours, 0–100; null
+when the school does not use them), `course_level` (a label such as "Honors", "AP", "HL", ≤ 40
+characters) and `gpa_boost` (0–5, default 0). All three are opt-in; a school that leaves them empty
+sees no change anywhere.
+
+- **Weighted points** (per subject): `gpa_points + gpa_boost` when the subject is passed; its plain
+  `gpa_points` when failed. Null when the subject has no boost, is incomplete or its band has no GPA
+  points. Descriptive subjects never have a boost.
+- **Weighted GPA** (overall): only for a GPA result (`result_format = gpa`) with at least one counted
+  subject boosted. The same mean as the GPA (`Σ points × average_weight / Σ average_weight`, program
+  rounding) with each boosted subject's weighted points; null whenever the GPA is null. The GPA
+  itself never changes.
+- **Credits attempted / earned**: the credits of every complete, non-exempt subject that carries
+  credits, and of those passed — including subjects left out of the average (PE, electives) and
+  descriptive (pass/fail) subjects, which earn their credits when passed (no descriptor marked "not
+  achieved"), as in American schools. Null when no such subject carries credits. The average, GPA
+  and weighted GPA still count only the subjects in the average. `average_weight` remains the
+  coefficient that weights the average and GPA; a subject whose credits differ from it gets the
+  `CREDITS_DIFFER_FROM_COEFFICIENT` warning.
+- Until WS-F (000258) credits counted only the subjects in the average. Results finalized before
+  then keep the totals stored on `student_overall_results` (snapshots, never recomputed); new
+  finalizations, previews, and the cumulative credits of transcripts issued from then on (worked
+  out from the subject rows) use the rule above.
+- Changing `credits` or `gpa_boost` on a config with marks asks for impact confirmation like the
+  coefficient; `course_level` is a label and does not.
+
+Finalization snapshots `credits`, `course_level`, `gpa_boost` and `weighted_gpa_points` on each
+`student_subject_results` row (also in `config_snapshot`), and `weighted_result_value`,
+`credits_attempted` and `credits_earned` on `student_overall_results`. Section overrides, copied
+years and the exam-structure rebuild carry the three config fields over. Rows finalized before 000253
+read back with all of them null. Transcripts add the cumulative weighted GPA (same unavailable
+reasons as the cumulative GPA) and cumulative credits; certificates and transcripts gain the subject
+and overall fields only when they are set, so documents issued earlier still render unchanged.
+
+## Curriculum templates
+
+Built-in starting points for a whole curriculum, defined in code
+(`packages/grading-engine/src/templates.ts`, no table): each template carries a grading scale (or,
+for descriptive templates, a descriptor scale), the result format and its maximum, the overall and
+subject rounding, the subject pass mark and maximum marks, the default categories and weights, and
+optional subject credits (and the course levels a subject can be given afterwards). Names, band
+labels and category names exist in English and Arabic.
+
+| Template                   | Scale                                                                                     | Result     | Subjects                                                                                                                        |
+| -------------------------- | ----------------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| National percentage        | Excellent 90 … Pass 50, Fail                                                              | percentage | pass 50; the school's exam system (School Settings)                                                                             |
+| IGCSE 9–1 / A\*–G, A-Level | 9…1 / A\*…G / A\*…E in steps of 10%, U                                                    | percentage | pass 40; homework 10, classwork 15, tests 25, end-of-term exam 50                                                               |
+| BTEC                       | Distinction\* 90, Distinction 75, Merit 60, Pass 40, Unclassified                         | percentage | pass 40; assignments 70, practical 30                                                                                           |
+| British Key Stages, IB PYP | descriptors (Greater depth / Expected / Working towards; Exceeding … Beginning)           | percentage | descriptive, one "Attainment" skill per term                                                                                    |
+| IB MYP                     | 1–7 at totals 0, 6, 10, 15, 19, 24, 28 of 32 (as % of 32), GPA points 1–7                 | GPA of 7   | total points; criteria A–D out of 8 per term; max marks 32; pass at grade 3; 3-decimal rounding                                 |
+| IB DP subjects             | 7 80, 6 70, 5 60, 4 50, 3 40, 2 25, 1                                                     | GPA of 7   | pass 40; internal assessment 25, tests 25, end-of-term exam 50; HL/SL as course levels                                          |
+| American                   | A+ 97 (4.0) … D 65 (1.0), F (0.0)                                                         | GPA of 4   | pass 65; tests 40, quizzes 20, homework 15, classwork 15, projects 10; 1 credit = coefficient 1; Standard / Honors +0.5 / AP +1 |
+| French                     | Très bien 80, Bien 70, Assez bien 60, Passable 50, Insuffisant                            | out of 20  | max marks 20, pass 50; the school's exam system                                                                                 |
+| Irish Junior Cycle         | Distinction 90, Higher Merit 75, Merit 55, Achieved 40, Partially Achieved 20, Not Graded | percentage | pass 40; the school's exam system                                                                                               |
+| Irish Leaving Certificate  | H1 90 … H7 30, H8                                                                         | percentage | pass 40; the school's exam system                                                                                               |
+
+Boundaries are defaults, not awarding-body boundaries; the school edits them like any other scale.
+
+`POST /api/grading/years/{yearId}/curriculum-template/preview` and `.../apply` take a template and a
+list of grade levels (`academicConfig:manage`; `GET /api/grading/curriculum-templates` lists them).
+Applying:
+
+1. creates the template's scale in the year (named after the template), reuses one with that name
+   and the same bands, or replaces the bands of one with that name;
+2. creates or updates each grade program: scale, result format and maximum, overall rounding, and
+   the descriptor scale for descriptive templates;
+3. rebuilds each grade default subject on the template (method, maximum marks, pass mark, rounding,
+   categories with one assessment per term, equal term weights, credits where the template sets
+   them; the subject then inherits the grade's scale). Requirement, average and certificate flags,
+   policies and instructions are kept.
+
+Every write goes through the ordinary services (`createScale`, `upsertProgram`,
+`updateSubjectConfig`), so validation, revisions, the impact check and their audit entries apply, and
+one `curriculum_template_applied` audit entry summarises the apply. The preview reports each step as
+create / update / unchanged; when anything that already exists would change, `requires_confirmation`
+is true and the apply is refused with `ACADEMIC_CONFIG_IMPACT_UNCONFIRMED` unless it is resent with
+`confirm: true`. Never touched: subjects with recorded marks (`has_marks`), grade defaults with
+section-only assessments, section overrides, and every subject when the year has no terms yet. A
+grade or subject the rules refuse is reported (`error` / `invalid`) and the rest still applies.
+Which template a grade came from is not recorded: subjects added later start from the school's exam
+system, and applying the template again brings them in line (it is idempotent).
+
+### Class rank and percentile (000257)
+
+For American transcripts and the top students ("الأوائل") of Jordanian and Egyptian schools, a grade
+program may rank its students. Four columns on `app.grade_programs`, copied with the year:
+
+| Column            | Values                           | Default   |
+| ----------------- | -------------------------------- | --------- |
+| `rank_enabled`    | true / false                     | `false`   |
+| `rank_basis`      | `average`, `gpa`, `weighted_gpa` | `average` |
+| `rank_scope`      | `section`, `grade_level`         | `section` |
+| `rank_visibility` | `staff`, `students_and_parents`  | `staff`   |
+
+Rules (`@studafy/grading-engine` `calculateRanks`, pure and unit-tested):
+
+- **Who is ranked**: students with a complete overall result in the cohort. An incomplete result (or
+  one without a value on the basis, e.g. a GPA with a subject that has no GPA points) takes no place
+  and is not counted in the cohort size.
+- **Basis**: `average` ranks by `average_percentage`; `gpa` by the GPA (`result_value` of a GPA
+  result); `weighted_gpa` by `weighted_result_value`, falling back to the plain GPA for a student
+  without a boosted subject (000253 stores the weighted GPA only then). A GPA basis needs
+  `result_format = gpa`: the API refuses it otherwise (400 `VALIDATION_FAILED`, from the engine's
+  `RANK_BASIS_NEEDS_GPA` issue), also when the format is what changes, and
+  `ck_grade_programs_rank_gpa_basis` backs it up.
+- **Ties**: values are compared after the program's overall rounding; equal values share a rank and
+  the next rank skips (1, 2, 2, 4).
+- **Percentile**: the share of ranked students with a strictly lower value, as a whole-number
+  percentage rounded down (the top of 200 is the 99th; a cohort of one is the 0th).
+- **Scope**: `section` ranks a section's current finalization of the period (a term, or the year);
+  `grade_level` ranks every section of the grade together, and only once every section that has
+  students (and is not archived) has a current finalization for the period. Until then the rank is
+  `pending`, never a rank among the sections that happen to be done. A student finalized in two
+  sections of the grade for the same period (they moved) counts once, with the later finalization.
+
+Rank is **computed on read**, never stored on results: from the current (not superseded) finalized
+overall results, which change only through audited corrections. A correction therefore re-ranks the
+whole cohort, and a superseded finalization has no rank. The rank settings are live configuration
+(not part of `config_snapshot`): turning ranking on or off, or changing its basis or scope, changes
+what results show from then on, but never an issued document.
+
+Reading a cohort is one query through `app.class_rank_cohort(year, grade_level, term, section)`
+(SECURITY DEFINER). A student's rank depends on classmates' results that RLS keeps from the student
+and their parents, so the function returns the cohort's sections, current finalizations and overall
+values itself; it returns nothing unless the grade ranks and the caller is leadership or the rank is
+`students_and_parents`, and names only the students whose results the caller may read
+(`app.can_read_student_result`): a student sees their own row and anonymous values. It uses the
+existing indexes (`uq_sections_school_year_grade_name`, the partial current-finalization unique
+indexes, `uq_student_overall_results_finalization_student`).
+
+Where it shows (`class_rank`: `status` `ranked` / `not_ranked` / `pending`, `basis`, `scope`,
+`rank`, `cohort_size`, `percentile`; null when off, hidden from the caller, or superseded):
+
+- Staff: the finalization detail (`GET /api/grading/finalizations/{id}`) and leadership reading a
+  student's results. Top students (`GET /api/grading/years/{yearId}/programs/{gradeLevelId}/top-students`,
+  `result:finalize`): the best `limit` places with ties included (every student ranked ≤ limit),
+  one list for a grade-level rank or one per section for a section rank, for a term or the year.
+- Students and parents (`GET /api/grading/students/{id}/results`): only when `rank_visibility` is
+  `students_and_parents`.
+- Documents: report cards, certificates and transcripts store `overall.class_rank` (`rank`,
+  `cohort_size`, `percentile`, `basis`, `scope`) in their immutable content at issue, when the grade
+  ranks, the rank is visible to students and parents (the documents are issued to them) and the
+  student was ranked. Absent otherwise and on documents issued before 000257.
+
 ## Certificates and report cards
 
 Issued from a **current** finalization: annual → `annual_certificate`, term → `term_report`. Only a
@@ -201,6 +347,9 @@ parents, or a teacher assigned to the section (`app.can_read_student_result`). 0
 `section_subject_teachers` sees that subject and the section's students, as class teachers already
 did. Every write emits an `app.audit_logs` row in the same transaction; mark changes record old and
 new values.
+
+Predicted grades (000254) are a separate, opt-in table per grade and year that nothing above reads;
+see [`docs/modules/predicted-grades.md`](../modules/predicted-grades.md).
 
 ## Policy decisions left to each school
 

@@ -58,6 +58,8 @@ export function withMethod(draft: ConfigDraft, gradingMethod: GradingMethod): Co
       ...draft,
       gradingMethod,
       includeInAverage: false,
+      // No GPA points, so no weighted GPA either.
+      gpaBoost: "0",
       retakePolicy: "none",
       retakeCapPercentage: "",
       finalExamPassPercentage: "",
@@ -130,6 +132,12 @@ export interface ConfigDraft {
   includeInAverage: boolean;
   includeOnCertificate: boolean;
   averageWeight: string;
+  /** Credit hours; "" when the school does not use credits. */
+  credits: string;
+  /** Course level label (Honors, AP, HL); "" for none. */
+  courseLevel: string;
+  /** Weighted GPA boost; "0" (or "") for none. */
+  gpaBoost: string;
   gradingMethod: GradingMethod;
   maxMarks: string;
   passPercentage: string;
@@ -176,6 +184,9 @@ export function emptyDraft(terms: readonly Pick<Term, "id">[]): ConfigDraft {
     includeInAverage: true,
     includeOnCertificate: true,
     averageWeight: "1",
+    credits: "",
+    courseLevel: "",
+    gpaBoost: "0",
     gradingMethod: "weighted",
     maxMarks: "100",
     passPercentage: "50",
@@ -253,6 +264,9 @@ export function draftFromConfig(config: SubjectConfig): ConfigDraft {
     includeInAverage: config.include_in_average,
     includeOnCertificate: config.include_on_certificate,
     averageWeight: str(config.average_weight),
+    credits: str(config.credits),
+    courseLevel: config.course_level ?? "",
+    gpaBoost: str(config.gpa_boost),
     gradingMethod: config.grading_method,
     maxMarks: str(config.max_marks),
     passPercentage: str(config.pass_percentage),
@@ -389,6 +403,7 @@ export function draftToEngine(
     ...(draft.gradingMethod === "descriptive"
       ? { descriptors: descriptors.length > 0 ? [...descriptors] : [...DEFAULT_SCALE_PREVIEW] }
       : {}),
+    gpaBoost: optionalNumber(draft.gpaBoost) ?? 0,
   };
 }
 
@@ -403,7 +418,11 @@ export function validateDraft(
   descriptors: readonly EngineDescriptor[] = DEFAULT_SCALE_PREVIEW,
 ): LiveValidation {
   const engine = draftToEngine(draft, terms, descriptors);
-  return { summary: summarizeWeights(engine), issues: validateSubjectConfig(engine) };
+  const weighting = {
+    averageWeight: toNumber(draft.averageWeight),
+    credits: optionalNumber(draft.credits),
+  };
+  return { summary: summarizeWeights(engine), issues: validateSubjectConfig(engine, weighting) };
 }
 
 type ConfigBody = Omit<UpdateSubjectConfigBody, "confirm_impact" | "expected_updated_at">;
@@ -416,6 +435,9 @@ export function draftToBody(draft: ConfigDraft): ConfigBody {
     include_in_average: draft.includeInAverage,
     include_on_certificate: draft.includeOnCertificate,
     average_weight: toNumber(draft.averageWeight),
+    credits: optionalNumber(draft.credits),
+    course_level: draft.courseLevel.trim() === "" ? null : draft.courseLevel.trim(),
+    gpa_boost: optionalNumber(draft.gpaBoost) ?? 0,
     grading_method: draft.gradingMethod,
     max_marks: toNumber(draft.maxMarks),
     pass_percentage: toNumber(draft.passPercentage),
@@ -473,8 +495,11 @@ export function draftToCreateBody(
  */
 export function hasIncompleteFields(draft: ConfigDraft): boolean {
   const invalid = (value: string) => !Number.isFinite(toNumber(value));
+  const invalidOptional = (value: string) => value.trim() !== "" && invalid(value);
   return (
     invalid(draft.averageWeight) ||
+    invalidOptional(draft.credits) ||
+    invalidOptional(draft.gpaBoost) ||
     invalid(draft.maxMarks) ||
     invalid(draft.passPercentage) ||
     invalid(draft.roundingDecimals) ||

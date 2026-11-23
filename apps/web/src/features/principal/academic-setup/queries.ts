@@ -37,6 +37,13 @@ export type CertificateReadinessStudent = CertificateReadiness["students"][numbe
 export type AcademicCertificate = Schemas["AcademicCertificate"];
 export type CertificateContent = Schemas["CertificateContent"];
 export type CopyGradingYearSummary = Schemas["CopyGradingYearSummary"];
+export type CurriculumTemplate = Schemas["CurriculumTemplate"];
+export type CurriculumTemplatePlan = Schemas["CurriculumTemplatePlan"];
+export type CurriculumTemplateLocale = Schemas["CurriculumTemplateLocale"];
+export type ClassRank = Schemas["ClassRank"];
+export type DocumentClassRank = Schemas["DocumentClassRank"];
+export type TopStudents = Schemas["TopStudents"];
+export type RankBasis = Schemas["RankBasis"];
 
 /**
  * Reads behind the academic setup area (`/portal/principal/academic-setup`). Every key sits under
@@ -50,6 +57,8 @@ export const gradingKeys = {
   overview: (yearId: string) => [...GRADING_KEY, "overview", yearId] as const,
   publishCheck: (yearId: string) => [...GRADING_KEY, "publish-check", yearId] as const,
   examTemplate: (yearId: string) => [...GRADING_KEY, "exam-template", yearId] as const,
+  curriculumTemplates: (locale: string) =>
+    [...GRADING_KEY, "curriculum-templates", locale] as const,
   scales: (yearId: string) => [...GRADING_KEY, "scales", yearId] as const,
   programs: (yearId: string) => [...GRADING_KEY, "programs", yearId] as const,
   gradeSubjects: (yearId: string, gradeLevelId: string) =>
@@ -73,6 +82,8 @@ export const gradingKeys = {
   certificates: (finalizationId: string) =>
     [...GRADING_KEY, "certificates", finalizationId] as const,
   certificate: (certificateId: string) => [...GRADING_KEY, "certificate", certificateId] as const,
+  topStudents: (yearId: string, gradeLevelId: string, termId: string | null, limit: number) =>
+    [...GRADING_KEY, "top-students", yearId, gradeLevelId, termId ?? "annual", limit] as const,
 };
 
 /**
@@ -108,6 +119,22 @@ export function useExamTemplate(yearId: string | undefined) {
         params: { path: { yearId: yearId! } },
       });
       return required<ExamTemplate>(data, "Exam template");
+    },
+  });
+}
+
+/** The built-in curriculum templates (IGCSE, IB, American...), named in `locale`. */
+export function useCurriculumTemplates(locale: CurriculumTemplateLocale, enabled = true) {
+  return useQuery({
+    queryKey: gradingKeys.curriculumTemplates(locale),
+    enabled,
+    // Code-defined on the server: they change only with a deploy.
+    staleTime: Number.POSITIVE_INFINITY,
+    queryFn: async () => {
+      const { data } = await api.GET("/api/grading/curriculum-templates", {
+        params: { query: { locale } },
+      });
+      return required<Schemas["CurriculumTemplateList"]>(data, "Curriculum templates").templates;
     },
   });
 }
@@ -326,6 +353,31 @@ export function useFinalizationDetail(finalizationId: string | undefined) {
         params: { path: { finalizationId: finalizationId! } },
       });
       return required<ResultFinalizationDetail>(data, "Finalization");
+    },
+  });
+}
+
+/** A grade's top students for a term (or the year, `termId` null), by class rank. */
+export function useTopStudents(
+  yearId: string,
+  gradeLevelId: string | undefined,
+  termId: string | null,
+  limit: number,
+) {
+  return useQuery({
+    queryKey: gradingKeys.topStudents(yearId, gradeLevelId ?? "", termId, limit),
+    enabled: gradeLevelId !== undefined,
+    queryFn: async () => {
+      const { data } = await api.GET(
+        "/api/grading/years/{yearId}/programs/{gradeLevelId}/top-students",
+        {
+          params: {
+            path: { yearId, gradeLevelId: gradeLevelId! },
+            query: { limit, ...(termId ? { term_id: termId } : {}) },
+          },
+        },
+      );
+      return required<TopStudents>(data, "Top students");
     },
   });
 }

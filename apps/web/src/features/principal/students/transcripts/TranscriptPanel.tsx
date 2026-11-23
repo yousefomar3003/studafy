@@ -5,7 +5,14 @@ import { Link } from "react-router-dom";
 
 import { usePermissions } from "../../../../lib/auth";
 import { useFormatters, useTranslation } from "../../../../lib/i18n";
-import { Badge, Num, Percent, ReasonModal } from "../../academic-setup/components";
+import {
+  Badge,
+  CreditsEarned,
+  Num,
+  Percent,
+  ReasonModal,
+  WeightedGpa,
+} from "../../academic-setup/components";
 import { problemMessage } from "../../academic-setup/errors";
 
 import {
@@ -143,10 +150,24 @@ export function TranscriptPanel({ studentId }: { studentId: string }) {
                       {readiness.data.cumulative.gpa === null ? (
                         t("academicGrading.transcript.gpaUnavailable")
                       ) : (
-                        <Num value={readiness.data.cumulative.gpa} />
+                        <>
+                          <Num value={readiness.data.cumulative.gpa} />
+                          <WeightedGpa value={readiness.data.cumulative.weighted_gpa} />
+                        </>
                       )}
                     </dd>
                   </div>
+                  {readiness.data.cumulative.credits_attempted == null ? null : (
+                    <div>
+                      <dt>{t("academicGrading.credits.cumulative")}</dt>
+                      <dd>
+                        <CreditsEarned
+                          attempted={readiness.data.cumulative.credits_attempted}
+                          earned={readiness.data.cumulative.credits_earned}
+                        />
+                      </dd>
+                    </div>
+                  )}
                 </dl>
               ) : null}
               {readiness.data.reasons.length > 0 ? (

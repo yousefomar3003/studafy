@@ -192,7 +192,12 @@ approved_flexible_columns(table_name, column_name) AS (
     -- date, choice list, yes/no), validated by apps/api/src/modules/records against that type;
     -- the subject, field, version and timestamps remain normalized, constrained columns. Sensitive
     -- answers are never here (value_ciphertext, ADR-019).
-    ('record_answers', 'value')
+    ('record_answers', 'value'),
+    -- 000255: an external exam component's allowed labels (A*, A, B...), best first. A closed,
+    -- ordered list -- a CHECK holds it to 1..50 non-null entries -- read whole with the component
+    -- and never joined or filtered on; the order is the payload, so a child table would add an
+    -- ordinal column to store what the array already guarantees.
+    ('external_exam_components', 'allowed_labels')
 ),
 relations AS (
   SELECT

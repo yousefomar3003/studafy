@@ -311,6 +311,25 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "Students and linked parents read only their own finalized results and certificates.",
     },
     {
+      name: "External exams",
+      description:
+        "External exams and test scores (SAT, ACT, AP, IELTS, TOEFL, IGCSE, A Level and IB DP " +
+        "finals): the school's catalogue, built from presets or custom, and each student's results " +
+        "with the total worked out from the component scores. Leadership (academicConfig:manage) " +
+        "manages both; a student's results are read by leadership, the student's teachers, the " +
+        "student and linked parents.",
+    },
+    {
+      name: "Graduation requirements",
+      description:
+        "Graduation requirements checker: a school's requirement sets (total credits, credits in a " +
+        "group of subjects, subjects passed, a cumulative GPA or average, an external exam) and " +
+        "each student's checklist, worked out from their finalized annual results and exam " +
+        "results. Leadership (academicConfig:manage) manages the sets and reads the not-on-track " +
+        "report; a checklist is read by leadership, the student's teachers, and the student and " +
+        "linked parents when the set is shown to them.",
+    },
+    {
       name: "Gradebook Configuration",
       description:
         "Gradebook configuration endpoints. Authenticated and tenant-scoped. " +

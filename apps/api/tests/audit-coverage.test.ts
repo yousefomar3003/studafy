@@ -235,6 +235,10 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/grading/certificates/{certificateId}/reissue",
   "POST /api/grading/certificates/{certificateId}/revoke",
   "POST /api/grading/exam-structure/apply",
+  // Curriculum templates: the apply writes through the configuration services (each audited) and
+  // records one summary entry; the preview writes nothing and declares the table its apply audits.
+  "POST /api/grading/years/{yearId}/curriculum-template/preview",
+  "POST /api/grading/years/{yearId}/curriculum-template/apply",
   // Transcripts (000207).
   "POST /api/grading/students/{studentId}/transcripts",
   "POST /api/grading/transcripts/{transcriptId}/reissue",
@@ -243,6 +247,23 @@ const EXPECTED_MUTATING_ROUTES = [
   "PUT /api/grading/report-card-settings",
   "PUT /api/grading/sections/{sectionId}/report-notes",
   "PUT /api/grading/sections/{sectionId}/subjects/{subjectId}/report-comments",
+  // External exams and test scores (000255): leadership behind academicConfig:manage; each write
+  // records its old and new values in the service.
+  "POST /api/grading/external-exams",
+  "POST /api/grading/external-exams/from-preset",
+  "PUT /api/grading/external-exams/{examId}",
+  "POST /api/grading/external-exams/{examId}/archive",
+  "POST /api/grading/external-exams/{examId}/restore",
+  "POST /api/grading/students/{studentId}/external-exam-results",
+  "PUT /api/grading/external-exam-results/{resultId}",
+  "DELETE /api/grading/external-exam-results/{resultId}",
+  // Predicted grades (000254): the service records each student's old and new label and note.
+  "PUT /api/grading/sections/{sectionId}/subjects/{subjectId}/predicted-grades",
+  // Graduation requirements (000258): leadership behind academicConfig:manage; each write records
+  // its old and new values in the service.
+  "POST /api/grading/graduation-requirement-sets",
+  "PUT /api/grading/graduation-requirement-sets/{setId}",
+  "DELETE /api/grading/graduation-requirement-sets/{setId}",
   // Timetable (ST-101). Version lifecycle + slot CRUD with conflict detection.
   "POST /api/academics/timetable-versions",
   "PATCH /api/academics/timetable-versions/{versionId}",
