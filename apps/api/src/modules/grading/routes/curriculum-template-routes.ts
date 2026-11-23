@@ -101,7 +101,7 @@ export function gradingCurriculumTemplateRoutes(database: Database): OpenAPIHono
 
   routes.openapi(listRoute, (c) => {
     const { locale } = c.req.valid("query");
-    return c.json({ templates: listCurriculumTemplates(locale) }, 200);
+    return c.json({ templates: listCurriculumTemplates(locale ?? "en") }, 200);
   });
 
   routes.openapi(previewRoute, async (c) => {

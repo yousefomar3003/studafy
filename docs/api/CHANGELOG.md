@@ -13,6 +13,19 @@ when it required the `version-bump` label.
 
 ### Added
 
+- Class rank and percentile (migration 000257; docs/database/academic-grading.md "Class rank and
+  percentile"). New `listTopStudents`
+  (`GET /api/grading/years/{yearId}/programs/{gradeLevelId}/top-students`, `result:finalize`;
+  query `term_id`, `limit` 1–100, default 10) returning `TopStudents`. `GradeProgramBody` takes
+  optional `rank_enabled`, `rank_basis` (`RankBasis`: `average`, `gpa`, `weighted_gpa`),
+  `rank_scope` (`RankScope`: `section`, `grade_level`) and `rank_visibility` (`RankVisibility`:
+  `staff`, `students_and_parents`); `GradeProgram` returns them; a GPA basis on a grade that is not
+  a GPA is a 400. `FinalizedStudentResult` adds `class_rank` (`ClassRank`, nullable: `status`
+  `ranked` / `not_ranked` / `pending`, `basis`, `scope`, `rank`, `cohort_size`, `percentile`),
+  shown to students and parents only when the grade allows. `CertificateContentOverall` and
+  `TranscriptYearOverall` add optional `class_rank` (`DocumentClassRank`), absent on documents
+  issued before or without a visible rank.
+
 - Credits, course levels and the weighted GPA (migration 000253; docs/database/academic-grading.md
   "Credits, course levels and the weighted GPA"). No new paths. `CreateSubjectConfigBody` /
   `UpdateSubjectConfigBody` take optional `credits` (0–100, nullable), `course_level` (≤ 40,

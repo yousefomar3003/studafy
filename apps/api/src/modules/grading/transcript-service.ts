@@ -7,9 +7,11 @@ import { CodedHttpException } from "../../coded-http-exception";
 import { emitAuditLog } from "../../middleware/auditEmitter";
 import { transcriptExternalExams } from "../external-exams/service";
 
-import { blockingReasons } from "./certificate-service";
+import { blockingReasons, withDocumentRank } from "./certificate-service";
+import { attachClassRanks } from "./class-rank-service";
 import { readFinalizationResults } from "./results-service";
 
+import type { DocumentClassRank } from "./class-rank-service";
 import type { StoredStudentResult } from "./results-service";
 import type { TranscriptExternalExam } from "../external-exams/service";
 import type { CumulativeResult, ResultDisplay, RoundingRule } from "@studafy/grading-engine";
@@ -77,6 +79,8 @@ export interface TranscriptYear {
     weighted_gpa?: number;
     credits_attempted?: number;
     credits_earned?: number;
+    /** The year's class rank when issued (000257); absent without one and on older transcripts. */
+    class_rank?: DocumentClassRank;
   };
 }
 
@@ -360,6 +364,7 @@ function renderYear(year: CoveredYear): TranscriptYear {
       ...(result.credits_attempted !== null
         ? { credits_attempted: result.credits_attempted, credits_earned: result.credits_earned! }
         : {}),
+      ...withDocumentRank(result),
     },
   };
 }
@@ -380,6 +385,13 @@ async function renderContent(
   `;
   const student = years[0]!.result;
   const externalExams = await transcriptExternalExams(tx, schoolId, student.student_id);
+  // Each year's rank among its section or grade level, as the documents issued to students show it.
+  await attachClassRanks(
+    tx,
+    schoolId,
+    years.map((year) => ({ finalizationId: year.finalization.id, results: [year.result] })),
+    "document",
+  );
   return {
     version: 1,
     kind: "transcript",

@@ -135,11 +135,16 @@ export async function copyYearConfiguration(
       result_scale_max: string | null;
       predicted_grades_enabled: boolean;
       predicted_grades_visibility: string;
+      rank_enabled: boolean;
+      rank_basis: string;
+      rank_scope: string;
+      rank_visibility: string;
     }[]
   >`
     SELECT grade_level_id, grade_scale_id, max_failed_subjects_for_supplementary,
            mark_approval_required, average_rounding_decimals, average_rounding_mode,
-           result_format, result_scale_max, predicted_grades_enabled, predicted_grades_visibility
+           result_format, result_scale_max, predicted_grades_enabled, predicted_grades_visibility,
+           rank_enabled, rank_basis, rank_scope, rank_visibility
     FROM app.grade_programs WHERE school_id = ${schoolId}::uuid AND academic_year_id = ${sourceYearId}::uuid
   `;
   for (const program of programs) {
@@ -148,14 +153,16 @@ export async function copyYearConfiguration(
         school_id, academic_year_id, grade_level_id, grade_scale_id,
         max_failed_subjects_for_supplementary, mark_approval_required,
         average_rounding_decimals, average_rounding_mode, result_format, result_scale_max,
-        predicted_grades_enabled, predicted_grades_visibility
+        predicted_grades_enabled, predicted_grades_visibility,
+        rank_enabled, rank_basis, rank_scope, rank_visibility
       ) VALUES (
         ${schoolId}::uuid, ${targetYearId}::uuid, ${program.grade_level_id}::uuid,
         ${mapScale(program.grade_scale_id)}::uuid, ${program.max_failed_subjects_for_supplementary},
         ${program.mark_approval_required}, ${program.average_rounding_decimals},
         ${program.average_rounding_mode}, ${program.result_format},
         ${program.result_scale_max}::numeric, ${program.predicted_grades_enabled},
-        ${program.predicted_grades_visibility}
+        ${program.predicted_grades_visibility}, ${program.rank_enabled}, ${program.rank_basis},
+        ${program.rank_scope}, ${program.rank_visibility}
       )
     `;
     // The grade's descriptor scale (descriptive subjects) comes along with it.

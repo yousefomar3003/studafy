@@ -32,6 +32,8 @@ export type {
   CumulativeSubjectInput,
   CumulativeYearInput,
 } from "./cumulative";
+export { calculateRanks, rankValue, topRanked, validateRankSettings } from "./rank";
+export type { RankBasis, RankCandidate, RankOutcome, RankScope, RankedStudent } from "./rank";
 export {
   calculateDescriptiveResult,
   descriptorsWithPoints,

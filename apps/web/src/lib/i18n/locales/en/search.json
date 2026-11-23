@@ -335,6 +335,11 @@
       "where": "Principal › Academic setup › Results",
       "keywords": "results, finalize results, report cards, certificates, term results, annual results, transcripts, print certificate"
     },
+    "academic-top-students": {
+      "title": "Top students",
+      "where": "Principal › Academic setup › Top students",
+      "keywords": "top students, class rank, rank, percentile, honor roll, best students, valedictorian, top of the class"
+    },
     "academic-report-cards": {
       "title": "Report card comments",
       "where": "Principal › Academic setup › Report cards",

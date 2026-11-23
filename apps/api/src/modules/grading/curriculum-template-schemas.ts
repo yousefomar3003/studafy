@@ -21,15 +21,14 @@ const templateIdSchema = z
   .enum(CURRICULUM_TEMPLATE_IDS as [CurriculumTemplateId, ...CurriculumTemplateId[]])
   .openapi("CurriculumTemplateId");
 
-const templateLocaleSchema = z.enum(["en", "ar"]).openapi("CurriculumTemplateLocale", {
-  description: "Language of the names a template shows and writes (scale, bands, categories).",
-});
+// Language of the names a template shows and writes (scale, bands, categories). Referenced plainly,
+// without per-field descriptions or defaults: either makes the generated Dart client wrap the enum
+// in a class it can't compile. Defaults are applied in the handlers instead.
+const templateLocaleSchema = z.enum(["en", "ar"]).openapi("CurriculumTemplateLocale");
 
 export const curriculumTemplateQuerySchema = z.object({
-  locale: templateLocaleSchema.default("en").openapi({
-    param: { name: "locale", in: "query" },
-    description: "Language of the template names and descriptions.",
-  }),
+  // Language of the template names and descriptions; English when absent.
+  locale: templateLocaleSchema.optional(),
 });
 
 export const curriculumTemplateSchema = z
@@ -102,9 +101,8 @@ export const curriculumTemplateListSchema = z
 const requestFields = {
   template_id: templateIdSchema,
   grade_level_ids: z.array(uuidSchema).min(1).max(100),
-  locale: templateLocaleSchema.optional().openapi({
-    description: "Language of the names the template writes; the school's language by default.",
-  }),
+  // Language of the names the template writes; the school's language when absent.
+  locale: templateLocaleSchema.optional(),
 };
 
 export const curriculumTemplatePreviewBodySchema = z

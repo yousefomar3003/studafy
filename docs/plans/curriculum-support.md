@@ -242,11 +242,11 @@ After merging: `bun run ci:local`, the API integration tests for grades/academic
 
 ## Progress
 
-- [ ] WS-B credits and weighted GPA
-- [ ] WS-C predicted grades
-- [ ] WS-D external exams and test scores
-- [ ] Integration of B, C, D
+- [x] WS-B credits and weighted GPA
+- [x] WS-C predicted grades
+- [x] WS-D external exams and test scores
+- [x] Integration of B, C, D
 - [x] WS-A curriculum templates (`feat/grading-curriculum-templates`; no migration)
-- [ ] WS-E class rank and percentile
+- [x] WS-E class rank and percentile (`feat/grading-class-rank`, migration 000257)
 - [ ] WS-F graduation requirements checker
 - [ ] Phase 2: IB Diploma points and core; exam entries

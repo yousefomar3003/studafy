@@ -3,6 +3,7 @@ import {
   hasErrors,
   summarizeWeights,
   validateGradeScale,
+  validateRankSettings,
   validateSubjectConfig,
 } from "@studafy/grading-engine";
 
@@ -43,6 +44,7 @@ import type {
   LoadedConfig,
   PredictedGradesVisibility,
   ProgramRow,
+  RankVisibility,
   SectionRow,
   SubjectConfigRow,
   TermRow,
@@ -53,6 +55,8 @@ import type {
   CategoryScope,
   EngineDescriptor,
   GradeBand,
+  RankBasis,
+  RankScope,
   ResultFormatKind,
   RoundingMode,
   SubjectGradingConfig,
@@ -81,6 +85,10 @@ export interface ProgramInput {
   result_scale_max?: number | null;
   predicted_grades_enabled?: boolean;
   predicted_grades_visibility?: PredictedGradesVisibility;
+  rank_enabled?: boolean;
+  rank_basis?: RankBasis;
+  rank_scope?: RankScope;
+  rank_visibility?: RankVisibility;
   /** Replaces the grade's descriptor scale (highest first) when given. */
   descriptors?: DescriptorInput[];
 }
@@ -587,6 +595,7 @@ export async function listPrograms(
            program.average_rounding_decimals, program.average_rounding_mode,
            program.result_format, program.result_scale_max::float8 AS result_scale_max,
            program.predicted_grades_enabled, program.predicted_grades_visibility,
+           program.rank_enabled, program.rank_basis, program.rank_scope, program.rank_visibility,
            program.updated_at
     FROM app.grade_programs AS program
     JOIN app.grade_levels AS grade
@@ -630,6 +639,36 @@ function resultFormatValues(
   return { result_format: format, result_scale_max: max };
 }
 
+type RankSettings = Pick<
+  ProgramRow,
+  "rank_enabled" | "rank_basis" | "rank_scope" | "rank_visibility"
+>;
+
+/**
+ * The class rank settings a program saves: the request's choices merged onto the saved ones. A GPA
+ * basis is refused on a grade whose result is not a GPA (also when the format is what changes).
+ */
+function rankValues(
+  input: ProgramInput,
+  existing: RankSettings | undefined,
+  resultFormat: ResultFormatKind,
+): RankSettings {
+  const values: RankSettings = {
+    rank_enabled: input.rank_enabled ?? existing?.rank_enabled ?? false,
+    rank_basis: input.rank_basis ?? existing?.rank_basis ?? "average",
+    rank_scope: input.rank_scope ?? existing?.rank_scope ?? "section",
+    rank_visibility: input.rank_visibility ?? existing?.rank_visibility ?? "staff",
+  };
+  const issues = validateRankSettings(
+    { enabled: values.rank_enabled, basis: values.rank_basis },
+    resultFormat,
+  );
+  if (hasErrors(issues)) {
+    throw new CodedHttpException(400, ERROR_CODES.VALIDATION_FAILED, issues[0]!.message);
+  }
+  return values;
+}
+
 /** Sets up a grade for a year (or updates its policies). Idempotent per grade and year. */
 export async function upsertProgram(
   tx: TransactionSql,
@@ -650,7 +689,8 @@ export async function upsertProgram(
     SELECT id, grade_scale_id, max_failed_subjects_for_supplementary, mark_approval_required,
            average_rounding_decimals, average_rounding_mode,
            result_format, result_scale_max::float8 AS result_scale_max,
-           predicted_grades_enabled, predicted_grades_visibility
+           predicted_grades_enabled, predicted_grades_visibility,
+           rank_enabled, rank_basis, rank_scope, rank_visibility
     FROM app.grade_programs
     WHERE school_id = ${schoolId}::uuid AND academic_year_id = ${yearId}::uuid
       AND grade_level_id = ${gradeLevelId}::uuid
@@ -672,6 +712,7 @@ export async function upsertProgram(
     }
   }
 
+  const format = resultFormatValues(input, existing);
   const values = {
     grade_scale_id: scaleId,
     max_failed_subjects_for_supplementary:
@@ -684,7 +725,8 @@ export async function upsertProgram(
       input.average_rounding_decimals ?? existing?.average_rounding_decimals ?? 2,
     average_rounding_mode:
       input.average_rounding_mode ?? existing?.average_rounding_mode ?? "half_up",
-    ...resultFormatValues(input, existing),
+    ...format,
+    ...rankValues(input, existing, format.result_format),
     predicted_grades_enabled:
       input.predicted_grades_enabled ?? existing?.predicted_grades_enabled ?? false,
     predicted_grades_visibility:
@@ -703,6 +745,10 @@ export async function upsertProgram(
         result_scale_max = ${values.result_scale_max},
         predicted_grades_enabled = ${values.predicted_grades_enabled},
         predicted_grades_visibility = ${values.predicted_grades_visibility},
+        rank_enabled = ${values.rank_enabled},
+        rank_basis = ${values.rank_basis},
+        rank_scope = ${values.rank_scope},
+        rank_visibility = ${values.rank_visibility},
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ${existing.id}::uuid AND school_id = ${schoolId}::uuid
     `;
@@ -712,13 +758,15 @@ export async function upsertProgram(
         school_id, academic_year_id, grade_level_id, grade_scale_id,
         max_failed_subjects_for_supplementary, mark_approval_required,
         average_rounding_decimals, average_rounding_mode, result_format, result_scale_max,
-        predicted_grades_enabled, predicted_grades_visibility
+        predicted_grades_enabled, predicted_grades_visibility,
+        rank_enabled, rank_basis, rank_scope, rank_visibility
       ) VALUES (
         ${schoolId}::uuid, ${yearId}::uuid, ${gradeLevelId}::uuid, ${values.grade_scale_id}::uuid,
         ${values.max_failed_subjects_for_supplementary}, ${values.mark_approval_required},
         ${values.average_rounding_decimals}, ${values.average_rounding_mode},
         ${values.result_format}, ${values.result_scale_max},
-        ${values.predicted_grades_enabled}, ${values.predicted_grades_visibility}
+        ${values.predicted_grades_enabled}, ${values.predicted_grades_visibility},
+        ${values.rank_enabled}, ${values.rank_basis}, ${values.rank_scope}, ${values.rank_visibility}
       )
     `;
   }

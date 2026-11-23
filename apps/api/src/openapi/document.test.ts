@@ -450,6 +450,7 @@ describe("structure", () => {
         "/api/grading/years/{yearId}/programs",
         "/api/grading/years/{yearId}/programs/{gradeLevelId}",
         "/api/grading/years/{yearId}/programs/{gradeLevelId}/subjects",
+        "/api/grading/years/{yearId}/programs/{gradeLevelId}/top-students",
         "/api/grading/years/{yearId}/proposed-assessments",
         "/api/grading/years/{yearId}/publish-check",
         "/api/grading/years/{yearId}/scales",
@@ -1427,6 +1428,7 @@ describe("security", () => {
         // External exams and test scores (000255): the catalogue behind academicConfig:read/manage,
         // a student's results behind grade:read plus app.can_read_student.
         "GET /api/grading/curriculum-templates",
+        "GET /api/grading/years/{yearId}/programs/{gradeLevelId}/top-students",
         "POST /api/grading/years/{yearId}/curriculum-template/preview",
         "POST /api/grading/years/{yearId}/curriculum-template/apply",
         "GET /api/grading/external-exam-presets",

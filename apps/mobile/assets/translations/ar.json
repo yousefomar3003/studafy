@@ -2559,6 +2559,13 @@
     "creditsEarned": "الساعات المكتسبة",
     "subjectCredits": "الساعات: {value}",
     "weightedPoints": "الموزون {value}",
+    "rank": {
+      "label": "الترتيب",
+      "place": "المرتبة {place} من {cohort}",
+      "percentile": "المئين {place}",
+      "notRanked": "غير مُرتَّب",
+      "pending": "الترتيب قيد الانتظار"
+    },
     "total": "المجموع",
     "grade": "التقدير",
     "failed": "مواد الرسوب",

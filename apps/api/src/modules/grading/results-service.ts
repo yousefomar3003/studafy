@@ -5,6 +5,7 @@ import { CodedHttpException } from "../../coded-http-exception";
 import { emitAuditLog } from "../../middleware/auditEmitter";
 
 import { requireYear } from "./access";
+import { attachClassRanks } from "./class-rank-service";
 import {
   buildSnapshot,
   effectiveSubjects,
@@ -21,6 +22,7 @@ import {
 } from "./engine-config";
 import { readReportNotes, snapshotReportNotes } from "./report-card-service";
 
+import type { ClassRank, RankAudience } from "./class-rank-service";
 import type {
   ConfigDetails,
   ConfigSnapshot,
@@ -891,6 +893,11 @@ export interface StoredStudentResult {
   subjects: StoredSubjectResult[];
   /** Report card notes and attendance as finalized; null for finalizations made before 000209. */
   report: ReportNotes | null;
+  /**
+   * Class rank (000257), computed on read by {@link attachClassRanks}; null until attached, when
+   * the grade does not rank, or when the reader may not see it.
+   */
+  class_rank: ClassRank | null;
 }
 
 const n = (value: string | null): number | null => (value === null ? null : Number(value));
@@ -993,6 +1000,7 @@ export async function readFinalizationResults(
   const report = await readReportNotes(tx, schoolId, finalizationId, filter.studentId);
   return overall.map((row) => ({
     report: report.notes.get(row.student_id) ?? null,
+    class_rank: null,
     student_id: row.student_id,
     first_name: row.first_name,
     last_name: row.last_name,
@@ -1090,11 +1098,15 @@ export async function listFinalizations(
   `;
 }
 
-/** A student's (or a linked parent's) view: every current finalized result, newest year first. */
+/**
+ * A student's (or a linked parent's) view: every current finalized result, newest year first. The
+ * class rank is attached for the audience reading it (staff, or the student and their parents).
+ */
 export async function listStudentResults(
   tx: TransactionSql,
   schoolId: string,
   studentId: string,
+  audience: RankAudience,
 ): Promise<
   {
     finalization_id: string;
@@ -1147,6 +1159,12 @@ export async function listStudentResults(
       finalization_id: finalization.id,
     });
   }
+  await attachClassRanks(
+    tx,
+    schoolId,
+    out.map((row) => ({ finalizationId: row.finalization_id, results: [row.result] })),
+    audience,
+  );
   return out.map(({ id: _id, ...rest }) => rest);
 }
 

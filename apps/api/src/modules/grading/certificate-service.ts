@@ -5,8 +5,10 @@ import { ERROR_CODES } from "@studafy/constants";
 import { CodedHttpException } from "../../coded-http-exception";
 import { emitAuditLog } from "../../middleware/auditEmitter";
 
+import { attachClassRanks, documentClassRank } from "./class-rank-service";
 import { readFinalizationResults, requireFinalization } from "./results-service";
 
+import type { DocumentClassRank } from "./class-rank-service";
 import type { ReportNotes } from "./report-card-service";
 import type { FinalizationRow, StoredStudentResult } from "./results-service";
 import type { ResultDisplay } from "@studafy/grading-engine";
@@ -74,6 +76,12 @@ export interface CertificateContent {
     weighted_gpa?: number;
     credits_attempted?: number;
     credits_earned?: number;
+    /**
+     * Class rank, cohort size and percentile when issued (000257): present only when the grade
+     * ranks, shows its rank to students and parents, and the student was ranked. Absent on
+     * documents issued before; readers treat absent as no rank.
+     */
+    class_rank?: DocumentClassRank;
     subjects_failed: number;
     academic_status: string;
   };
@@ -210,6 +218,12 @@ async function loadRenderContext(
   return { ...context!, terms };
 }
 
+/** The class rank an issued document keeps, as an optional field (absent without one). */
+export function withDocumentRank(result: StoredStudentResult): { class_rank?: DocumentClassRank } {
+  const rank = documentClassRank(result.class_rank);
+  return rank ? { class_rank: rank } : {};
+}
+
 function renderContent(
   context: RenderContext,
   schoolId: string,
@@ -286,6 +300,7 @@ function renderContent(
       ...(result.credits_attempted !== null
         ? { credits_attempted: result.credits_attempted, credits_earned: result.credits_earned! }
         : {}),
+      ...withDocumentRank(result),
       subjects_failed: result.subjects_failed,
       academic_status: result.academic_status,
     },
@@ -322,6 +337,12 @@ async function insertCertificates(
   const kind: CertificateKind =
     finalization.term_id === null ? "annual_certificate" : "term_report";
   const context = await loadRenderContext(tx, schoolId, userId, finalization);
+  await attachClassRanks(
+    tx,
+    schoolId,
+    [{ finalizationId: finalization.id, results: items.map((item) => item.result) }],
+    "document",
+  );
   const rows = items.map(({ result, reissueOf }) => {
     const serial = newSerial(context.year_code, kind);
     const content = renderContent(

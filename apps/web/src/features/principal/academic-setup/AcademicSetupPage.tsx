@@ -18,6 +18,7 @@ import { ResultsTab } from "./ResultsTab";
 import { ScalesTab } from "./ScalesTab";
 import { SectionsTab } from "./SectionsTab";
 import { SubjectsTab } from "./SubjectsTab";
+import { TopStudentsTab } from "./TopStudentsTab";
 
 import type { SetupContext } from "./context";
 
@@ -38,6 +39,7 @@ const TABS: readonly TabDef[] = [
   { path: "external-exams", key: "externalExams", show: () => true },
   { path: "approvals", key: "approvals", show: (ctx) => ctx.can.review },
   { path: "results", key: "results", show: (ctx) => ctx.can.finalize || ctx.can.certify },
+  { path: "top-students", key: "topStudents", show: (ctx) => ctx.can.finalize },
   {
     path: "report-cards",
     key: "reportCards",
@@ -57,6 +59,7 @@ const TABS: readonly TabDef[] = [
  * - external exams — the school's SAT, IELTS, IGCSE finals... (not tied to the year);
  * - approvals — submitted mark sheets and teacher-proposed assessments;
  * - results — preview, finalize, correct, and certificates; `certificates/:id` prints one.
+ * - top students — a grade's best places by class rank for a term or the year (leadership).
  * - report cards — which sections report cards show, and the comments, conduct ratings and
  *   principal's comments written before a term or year is finalized.
  *
@@ -157,6 +160,9 @@ export default function AcademicSetupPage() {
           {ctx.can.review ? <Route path="approvals" element={<ApprovalsTab ctx={ctx} />} /> : null}
           {ctx.can.finalize || ctx.can.certify ? (
             <Route path="results" element={<ResultsTab ctx={ctx} />} />
+          ) : null}
+          {ctx.can.finalize ? (
+            <Route path="top-students" element={<TopStudentsTab ctx={ctx} />} />
           ) : null}
           {ctx.can.manage || ctx.can.reportNotes ? (
             <Route path="report-cards" element={<ReportCardsTab ctx={ctx} />} />

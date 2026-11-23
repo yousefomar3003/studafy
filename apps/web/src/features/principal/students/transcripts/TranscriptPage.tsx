@@ -6,6 +6,7 @@ import { useFormatters, useTranslation } from "../../../../lib/i18n";
 import {
   CourseLevel,
   CreditsEarned,
+  DocumentRankFact,
   Num,
   Percent,
   QueryState,
@@ -230,6 +231,7 @@ export function TranscriptDocument({
                 </dd>
               </div>
             )}
+            <DocumentRankFact rank={year.overall.class_rank} />
             <div>
               <dt>{t("academicGrading.certificate.overallGrade")}</dt>
               <dd>{year.overall.grade_label ?? "—"}</dd>

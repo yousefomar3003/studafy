@@ -256,8 +256,61 @@ function studentResult(id: string, first: string, status: "complete" | "incomple
     subjects_failed: 0,
     academic_status: status === "complete" ? "promoted" : "incomplete",
     subjects: [],
+    class_rank:
+      status === "complete"
+        ? {
+            status: "ranked",
+            basis: "average",
+            scope: "grade_level",
+            rank: 3,
+            cohort_size: 120,
+            percentile: 97,
+          }
+        : {
+            status: "not_ranked",
+            basis: "average",
+            scope: "grade_level",
+            rank: null,
+            cohort_size: 120,
+            percentile: null,
+          },
   };
 }
+
+const TOP_STUDENTS = {
+  academic_year_id: "year-1",
+  grade_level_id: "grade-10",
+  grade_level_name: "Grade 10",
+  term_id: null,
+  enabled: true,
+  basis: "average",
+  scope: "grade_level",
+  visibility: "students_and_parents",
+  groups: [
+    {
+      section_id: null,
+      section_name: null,
+      status: "ranked",
+      pending_sections: [],
+      cohort_size: 120,
+      students: [
+        ["s-1", "Lina", 1, 98.5, 99],
+        ["s-3", "Yara", 2, 97, 98],
+        ["s-4", "Adam", 2, 97, 98],
+      ].map(([id, first, rank, value, percentile]) => ({
+        student_id: id,
+        first_name: first,
+        last_name: "Haddad",
+        admission_number: `ADM-${id}`,
+        section_id: "sec-10c",
+        section_name: "C",
+        rank,
+        percentile,
+        value,
+      })),
+    },
+  ],
+};
 
 const RATINGS = [
   { code: "excellent", label: "Excellent", label_ar: "ممتاز" },
@@ -435,12 +488,17 @@ const GET_RESPONSES: Record<string, unknown> = {
         average_rounding_mode: "half_up",
         result_format: "percentage",
         result_scale_max: null,
+        rank_enabled: false,
+        rank_basis: "average",
+        rank_scope: "section",
+        rank_visibility: "staff",
         descriptors: [],
         updated_at: "2026-10-01T00:00:00.000Z",
       },
     ],
   },
   "/api/grading/years/{yearId}/programs/{gradeLevelId}/subjects": { configs: [MATH_CONFIG] },
+  "/api/grading/years/{yearId}/programs/{gradeLevelId}/top-students": TOP_STUDENTS,
   "/api/grading/subject-configs/{configId}": MATH_CONFIG,
   "/api/grading/subject-configs/{configId}/impact": IMPACT,
   "/api/grading/sections/{sectionId}/subjects": SECTION_SUBJECTS,
@@ -721,6 +779,63 @@ describe("AcademicSetupPage", () => {
       predicted_grades_enabled: true,
       predicted_grades_visibility: "students_and_parents",
     });
+  });
+
+  test("a grade can rank its students across the grade, shown to students and parents", async () => {
+    await renderAt("/subjects");
+
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Rank students in this grade" }));
+    // A percentage grade ranks by its average only.
+    fireEvent.click(screen.getByRole("combobox", { name: "Rank by" }));
+    expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual(["Average"]);
+    fireEvent.click(screen.getByRole("option", { name: "Average" }));
+    fireEvent.click(screen.getByRole("combobox", { name: "Rank among" }));
+    fireEvent.click(screen.getByRole("option", { name: "The whole grade" }));
+    fireEvent.click(screen.getByRole("combobox", { name: "Who sees the rank" }));
+    fireEvent.click(screen.getByRole("option", { name: "Staff, students and parents" }));
+    putMock.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "Save policies" }));
+
+    await waitFor(() => expect(putMock).toHaveBeenCalledTimes(1));
+    const [, init] = putMock.mock.calls[0]! as [string, { body: Record<string, unknown> }];
+    expect(init.body).toMatchObject({
+      rank_enabled: true,
+      rank_basis: "average",
+      rank_scope: "grade_level",
+      rank_visibility: "students_and_parents",
+    });
+  });
+
+  test("shows each result's class rank and percentile", async () => {
+    await renderAt("/results");
+
+    expect(await screen.findByText("3rd of 120")).toBeTruthy();
+    expect(within(rowOf("3rd of 120")).getByText("97th percentile")).toBeTruthy();
+    expect(within(rowOf("Not ranked")).getByText(/Sami/)).toBeTruthy();
+  });
+
+  test("lists a grade's top students, ties sharing a place", async () => {
+    await renderAt("/top-students");
+
+    expect(await screen.findByRole("heading", { name: "Top students" })).toBeTruthy();
+    expect(await screen.findByText("Ranked by Average")).toBeTruthy();
+    expect(screen.getByText("120 students ranked")).toBeTruthy();
+    expect(within(rowOf("Lina Haddad")).getByText("1st")).toBeTruthy();
+    expect(within(rowOf("Yara Haddad")).getByText("2nd")).toBeTruthy();
+    expect(within(rowOf("Adam Haddad")).getByText("2nd")).toBeTruthy();
+    expect(within(rowOf("Lina Haddad")).getByText("99th")).toBeTruthy();
+    await waitFor(() =>
+      expect(getMock).toHaveBeenCalledWith(
+        "/api/grading/years/{yearId}/programs/{gradeLevelId}/top-students",
+        { params: { path: { yearId: "year-1", gradeLevelId: "grade-10" }, query: { limit: 10 } } },
+      ),
+    );
+  });
+
+  test("has no accessibility violations on the top students screen", async () => {
+    const { container } = await renderAt("/top-students");
+    await screen.findByText("120 students ranked");
+    await expectNoA11yViolations(container);
   });
 
   test("a descriptive subject drops marks and weights for skills and descriptors", async () => {
