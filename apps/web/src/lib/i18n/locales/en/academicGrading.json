@@ -945,5 +945,77 @@
     "useDefaults": "Use the default scale",
     "addDescriptor": "Add descriptor",
     "saveScale": "Save scale"
+  },
+  "templates": {
+    "action": "Use a curriculum template",
+    "title": "Set up {{year}} from a curriculum template",
+    "description": "Creates the grading scale, result format and assessment categories of a curriculum for the grades you choose.",
+    "template": "Curriculum",
+    "editableDefaults": "Boundaries, weights and pass marks are editable defaults: change them afterwards under Scales and Subjects.",
+    "grades": "Grades to set up",
+    "noGrades": "Add grade levels first.",
+    "preview": "Preview",
+    "back": "Back",
+    "apply": "Apply",
+    "applyConfirm": "Apply and change existing set-up",
+    "confirmWarning": "Some of this is already set up. Applying makes the changes listed below. Subjects with marks are never changed.",
+    "nothingToChange": "Everything already matches this template.",
+    "applied": "{{name}} was applied. Review the grades before publishing.",
+    "result": {
+      "percentage": "Percentage",
+      "out_of": "Out of {{max}}",
+      "gpa": "GPA out of {{max}}"
+    },
+    "summary": {
+      "result": "Result",
+      "method": "Grading",
+      "pass": "Subject pass mark",
+      "credits": "Credits per subject",
+      "scale": "Scale “{{name}}”:",
+      "descriptors": "Descriptors:",
+      "categories": "Categories:",
+      "examStructure": "your exam system from School Settings",
+      "courseLevels": "Course levels:"
+    },
+    "band": "{{label}} ≥ {{min}}%",
+    "bandGpa": "{{label}} ≥ {{min}}% ({{gpa}})",
+    "category": "{{name}} {{weight}}%",
+    "categoryOutOf": "{{name}} (out of {{max}})",
+    "courseLevelBoost": "{{label}} (+{{boost}})",
+    "plan": {
+      "scale": {
+        "create": "Create the scale “{{name}}”.",
+        "update": "Replace the bands of the existing scale “{{name}}”.",
+        "unchanged": "Use the existing scale “{{name}}”."
+      },
+      "program": {
+        "create": "Set up the grade for this year.",
+        "update": "Change the grade's {{changes}}.",
+        "unchanged": "The grade's settings already match."
+      },
+      "changes": {
+        "grade_scale": "grading scale",
+        "result_format": "result format",
+        "rounding": "rounding"
+      },
+      "descriptors": {
+        "create": "Add the descriptor scale.",
+        "replace": "Replace the descriptor scale.",
+        "unchanged": "The descriptor scale already matches."
+      },
+      "noSubjects": "No subjects yet. Subjects added later start from your exam system; apply the template again to bring them in line.",
+      "subject": {
+        "update": "Rebuilt on the template",
+        "unchanged": "Already matches",
+        "skip": "Left as it is"
+      },
+      "reason": {
+        "has_marks": "it already has marks",
+        "section_assessments": "sections added their own assessments",
+        "no_terms": "the year has no terms yet",
+        "invalid": "it could not be saved"
+      },
+      "gradeError": "This grade could not be set up: {{error}}"
+    }
   }
 }

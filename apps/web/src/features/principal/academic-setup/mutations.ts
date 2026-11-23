@@ -8,6 +8,7 @@ import type {
   AcademicCertificate,
   CopyGradingYearSummary,
   CreateSubjectConfigBody,
+  CurriculumTemplatePlan,
   GradeProgram,
   GradeProgramBody,
   GradeScale,
@@ -76,6 +77,46 @@ export function useCopyGradingYear() {
         },
       });
       return required<CopyGradingYearSummary>(data, "Year copy");
+    },
+  );
+}
+
+export interface CurriculumTemplateInput {
+  yearId: string;
+  templateId: CurriculumTemplatePlan["template_id"];
+  gradeLevelIds: string[];
+}
+
+/** What applying a template would do. Writes nothing, so nothing is refreshed. */
+export function usePreviewCurriculumTemplate() {
+  return useMutation({
+    mutationFn: async ({
+      yearId,
+      templateId,
+      gradeLevelIds,
+    }: CurriculumTemplateInput): Promise<CurriculumTemplatePlan> => {
+      const { data } = await api.POST("/api/grading/years/{yearId}/curriculum-template/preview", {
+        params: { path: { yearId } },
+        body: { template_id: templateId, grade_level_ids: gradeLevelIds },
+      });
+      return required<CurriculumTemplatePlan>(data, "Template preview");
+    },
+  });
+}
+
+export function useApplyCurriculumTemplate() {
+  return useGradingMutation(
+    async ({
+      yearId,
+      templateId,
+      gradeLevelIds,
+      confirm,
+    }: CurriculumTemplateInput & { confirm: boolean }): Promise<CurriculumTemplatePlan> => {
+      const { data } = await api.POST("/api/grading/years/{yearId}/curriculum-template/apply", {
+        params: { path: { yearId } },
+        body: { template_id: templateId, grade_level_ids: gradeLevelIds, confirm },
+      });
+      return required<CurriculumTemplatePlan>(data, "Template apply");
     },
   );
 }
