@@ -988,6 +988,36 @@
         "open": "Open this student's attendance history"
       }
     },
+    "predicted": {
+      "heading": "Predicted grades",
+      "error": "Couldn't load the predicted grades.",
+      "empty": "No predicted grades yet.",
+      "yearOf": "{{year}} · {{grade}} {{section}}",
+      "disabled": "Predicted grades are switched off for this grade; these are kept for the record.",
+      "visibility": {
+        "staff": "Seen by staff only.",
+        "students_and_parents": "The student and their parents see these grades (not the notes)."
+      },
+      "subject": "Subject",
+      "period": "Period",
+      "wholeYear": "Whole year",
+      "grade": "Predicted grade",
+      "chooseGrade": "Choose a grade",
+      "freeLabelHelp": "This subject has no grading scale, so any short grade can be used.",
+      "note": "Note",
+      "noteHelp": "For staff only.",
+      "actions": "Actions",
+      "add": "Add a predicted grade",
+      "formHeading": "Predicted grade",
+      "edit": "Edit",
+      "remove": "Remove",
+      "removeLabel": "Remove the predicted grade for {{subject}}, {{period}}",
+      "save": "Save",
+      "cancel": "Cancel",
+      "saved": "Predicted grade saved",
+      "removed": "Predicted grade removed",
+      "failed": "Couldn't save the predicted grade"
+    },
     "transcripts": {
       "heading": "Transcript",
       "intro": "Every finalized end-of-year result on one document, with the cumulative average and GPA — for example, for university applications.",

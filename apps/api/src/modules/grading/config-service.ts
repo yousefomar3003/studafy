@@ -41,6 +41,7 @@ import type {
   ConfigDetails,
   EffectiveSubject,
   LoadedConfig,
+  PredictedGradesVisibility,
   ProgramRow,
   SectionRow,
   SubjectConfigRow,
@@ -78,6 +79,8 @@ export interface ProgramInput {
   average_rounding_mode?: RoundingMode;
   result_format?: ResultFormatKind;
   result_scale_max?: number | null;
+  predicted_grades_enabled?: boolean;
+  predicted_grades_visibility?: PredictedGradesVisibility;
   /** Replaces the grade's descriptor scale (highest first) when given. */
   descriptors?: DescriptorInput[];
 }
@@ -583,6 +586,7 @@ export async function listPrograms(
            program.max_failed_subjects_for_supplementary, program.mark_approval_required,
            program.average_rounding_decimals, program.average_rounding_mode,
            program.result_format, program.result_scale_max::float8 AS result_scale_max,
+           program.predicted_grades_enabled, program.predicted_grades_visibility,
            program.updated_at
     FROM app.grade_programs AS program
     JOIN app.grade_levels AS grade
@@ -645,7 +649,8 @@ export async function upsertProgram(
   const [existing] = await tx<ProgramRow[]>`
     SELECT id, grade_scale_id, max_failed_subjects_for_supplementary, mark_approval_required,
            average_rounding_decimals, average_rounding_mode,
-           result_format, result_scale_max::float8 AS result_scale_max
+           result_format, result_scale_max::float8 AS result_scale_max,
+           predicted_grades_enabled, predicted_grades_visibility
     FROM app.grade_programs
     WHERE school_id = ${schoolId}::uuid AND academic_year_id = ${yearId}::uuid
       AND grade_level_id = ${gradeLevelId}::uuid
@@ -680,6 +685,10 @@ export async function upsertProgram(
     average_rounding_mode:
       input.average_rounding_mode ?? existing?.average_rounding_mode ?? "half_up",
     ...resultFormatValues(input, existing),
+    predicted_grades_enabled:
+      input.predicted_grades_enabled ?? existing?.predicted_grades_enabled ?? false,
+    predicted_grades_visibility:
+      input.predicted_grades_visibility ?? existing?.predicted_grades_visibility ?? "staff",
   };
 
   if (existing) {
@@ -692,6 +701,8 @@ export async function upsertProgram(
         average_rounding_mode = ${values.average_rounding_mode},
         result_format = ${values.result_format},
         result_scale_max = ${values.result_scale_max},
+        predicted_grades_enabled = ${values.predicted_grades_enabled},
+        predicted_grades_visibility = ${values.predicted_grades_visibility},
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ${existing.id}::uuid AND school_id = ${schoolId}::uuid
     `;
@@ -700,12 +711,14 @@ export async function upsertProgram(
       INSERT INTO app.grade_programs (
         school_id, academic_year_id, grade_level_id, grade_scale_id,
         max_failed_subjects_for_supplementary, mark_approval_required,
-        average_rounding_decimals, average_rounding_mode, result_format, result_scale_max
+        average_rounding_decimals, average_rounding_mode, result_format, result_scale_max,
+        predicted_grades_enabled, predicted_grades_visibility
       ) VALUES (
         ${schoolId}::uuid, ${yearId}::uuid, ${gradeLevelId}::uuid, ${values.grade_scale_id}::uuid,
         ${values.max_failed_subjects_for_supplementary}, ${values.mark_approval_required},
         ${values.average_rounding_decimals}, ${values.average_rounding_mode},
-        ${values.result_format}, ${values.result_scale_max}
+        ${values.result_format}, ${values.result_scale_max},
+        ${values.predicted_grades_enabled}, ${values.predicted_grades_visibility}
       )
     `;
   }

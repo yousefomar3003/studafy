@@ -323,6 +323,13 @@ const descriptorBodySchema = z
   })
   .openapi("GradeDescriptorBody");
 
+export const predictedGradesVisibilitySchema = z
+  .enum(["staff", "students_and_parents"])
+  .openapi("PredictedGradesVisibility", {
+    description:
+      "Who reads predicted grades: staff only, or the student and their linked parents as well.",
+  });
+
 export const programBodySchema = z
   .object({
     grade_scale_id: uuidSchema.nullable().optional(),
@@ -335,6 +342,10 @@ export const programBodySchema = z
       description:
         "The maximum for out_of (e.g. 20) or gpa (4 or 5, up to 10); ignored for percentage.",
     }),
+    predicted_grades_enabled: z.boolean().optional().openapi({
+      description: "Whether teachers record predicted grades for this grade and year.",
+    }),
+    predicted_grades_visibility: predictedGradesVisibilitySchema.optional(),
     descriptors: z.array(descriptorBodySchema).max(20).optional().openapi({
       description:
         "Replaces the grade's descriptor scale (descriptive subjects), highest first. Descriptors left out are removed; one that marks use cannot be removed.",
@@ -355,6 +366,8 @@ export const programSchema = z
     average_rounding_mode: roundingModeSchema,
     result_format: resultFormatSchema,
     result_scale_max: z.number().nullable(),
+    predicted_grades_enabled: z.boolean(),
+    predicted_grades_visibility: predictedGradesVisibilitySchema,
     descriptors: z.array(descriptorSchema),
     updated_at: dateTimeSchema,
   })

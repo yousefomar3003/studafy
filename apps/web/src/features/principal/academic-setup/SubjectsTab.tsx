@@ -93,6 +93,8 @@ export function SubjectsTab({ ctx }: { ctx: SetupContext }) {
 
 type ResultFormat = GradeProgram["result_format"];
 const RESULT_FORMATS: readonly ResultFormat[] = ["percentage", "out_of", "gpa"];
+type PredictedVisibility = GradeProgram["predicted_grades_visibility"];
+const PREDICTED_VISIBILITIES: readonly PredictedVisibility[] = ["staff", "students_and_parents"];
 
 function ProgramForm({
   ctx,
@@ -123,6 +125,10 @@ function ProgramForm({
   const [scaleMax, setScaleMax] = useState(
     program?.result_scale_max == null ? "" : String(program.result_scale_max),
   );
+  const [predicted, setPredicted] = useState(program?.predicted_grades_enabled ?? false);
+  const [predictedVisibility, setPredictedVisibility] = useState<PredictedVisibility>(
+    program?.predicted_grades_visibility ?? "staff",
+  );
   const disabled = !ctx.can.manage || !ctx.configEditable;
 
   function chooseResultFormat(next: ResultFormat) {
@@ -145,6 +151,8 @@ function ProgramForm({
           average_rounding_mode: mode,
           result_format: resultFormat,
           result_scale_max: resultFormat === "percentage" ? null : Number(scaleMax),
+          predicted_grades_enabled: predicted,
+          predicted_grades_visibility: predictedVisibility,
         },
       },
       {
@@ -248,6 +256,26 @@ function ProgramForm({
           checked={approval}
           onChange={(event) => setApproval(event.target.checked)}
         />
+        <Checkbox
+          label={t("academicGrading.subjects.program.predicted")}
+          checked={predicted}
+          onChange={(event) => setPredicted(event.target.checked)}
+        />
+        {predicted ? (
+          <div className="ag-grid">
+            <Select
+              label={t("academicGrading.subjects.program.predictedVisibility")}
+              helperText={t("academicGrading.subjects.program.predictedVisibilityHelp")}
+              options={PREDICTED_VISIBILITIES.map((value) => ({
+                value,
+                label: t(`academicGrading.predictedVisibility.${value}`),
+              }))}
+              value={predictedVisibility}
+              onChange={setPredictedVisibility}
+              disabled={disabled}
+            />
+          </div>
+        ) : null}
       </fieldset>
       {disabled ? null : (
         <div className="ag-actions">

@@ -142,6 +142,7 @@ import {
 import {
   gradingConfigRoutes,
   gradingMarksRoutes,
+  gradingPredictedGradesRoutes,
   gradingReportCardRoutes,
   gradingResultsRoutes,
   gradingTranscriptRoutes,
@@ -1209,6 +1210,8 @@ export function createApp({
     app.route("/", gradingReportCardRoutes(database));
     // External exams and test scores: SAT, IELTS, IGCSE finals... (000255).
     app.route("/", externalExamRoutes(database));
+    // Predicted grades (000254).
+    app.route("/", gradingPredictedGradesRoutes(database));
   }
 
   // Gradebook configuration (ST-112). Weighted assessment categories per gradebook and

@@ -231,6 +231,9 @@ parents, or a teacher assigned to the section (`app.can_read_student_result`). 0
 did. Every write emits an `app.audit_logs` row in the same transaction; mark changes record old and
 new values.
 
+Predicted grades (000254) are a separate, opt-in table per grade and year that nothing above reads;
+see [`docs/modules/predicted-grades.md`](../modules/predicted-grades.md).
+
 ## Policy decisions left to each school
 
 Configured, not hard-coded: weights, structures, number of assessments, pass marks, final-exam rule,

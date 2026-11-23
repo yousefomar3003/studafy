@@ -75,6 +75,8 @@ void main() {
 
     expect(find.text('MATH101-A'), findsOneWidget); // app bar title
     expect(find.text('Mathematics'), findsOneWidget);
+    // The predicted grades entry costs nothing until it is tapped.
+    expect(find.text('Predicted grades'), findsOneWidget);
   });
 
   testWidgets('renders one row per active enrolment', (tester) async {

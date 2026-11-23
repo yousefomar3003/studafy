@@ -6,12 +6,14 @@ import '../../../design/layout/bottom_inset_padding.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
 import '../application/academic_results_providers.dart';
 import '../application/external_exam_results_providers.dart';
+import '../application/predicted_grades_providers.dart';
 import '../application/transcript_providers.dart';
 import '../application/student_context_providers.dart';
 import '../domain/academic_results.dart';
 import 'certificate_detail_screen.dart';
 import 'widgets/academic_result_widgets.dart';
 import 'widgets/test_scores_section.dart';
+import 'widgets/predicted_grades_section.dart';
 import 'widgets/transcripts_section.dart';
 
 /// A student's official, finalized results — by academic year, each term report and the annual
@@ -76,7 +78,8 @@ class _ResultsBody extends ConsumerWidget {
           ..invalidate(studentResultsProvider(studentId))
           ..invalidate(studentCertificatesProvider(studentId))
           ..invalidate(studentTranscriptsProvider(studentId))
-          ..invalidate(studentExternalExamResultsProvider(studentId));
+          ..invalidate(studentExternalExamResultsProvider(studentId))
+          ..invalidate(studentPredictedGradesProvider(studentId));
         await ref.read(studentResultsProvider(studentId).future);
       },
       child: results.when(
@@ -120,6 +123,7 @@ class _ResultsBody extends ConsumerWidget {
                   _ResultCard(result: result, termNames: termNames),
                 const SizedBox(height: AppSpacing.space8),
               ],
+              PredictedGradesSection(studentId: studentId),
               const SizedBox(height: AppSpacing.space8),
               Text(
                 'academicResults.certificates'.tr(),
