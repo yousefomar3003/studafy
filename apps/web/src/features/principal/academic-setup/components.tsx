@@ -178,9 +178,12 @@ export interface ResultDisplayValue {
 export function ResultValue({
   display,
   percentage,
+  weightedGpa,
 }: {
   display: ResultDisplayValue | null | undefined;
   percentage: number | null | undefined;
+  /** The weighted GPA beside a GPA (Honors/AP boosts); absent on older results. */
+  weightedGpa?: number | null;
 }) {
   const { t } = useTranslation();
   const { formatNumber } = useFormatters();
@@ -199,6 +202,7 @@ export function ResultValue({
   return (
     <>
       <bdi>{main}</bdi>
+      {display.format === "gpa" && value !== null ? <WeightedGpa value={weightedGpa} /> : null}
       {percentage === null || percentage === undefined ? null : (
         <>
           {" "}
@@ -208,6 +212,59 @@ export function ResultValue({
         </>
       )}
     </>
+  );
+}
+
+/** " (weighted 4.1)" after a GPA, when there is a weighted GPA; nothing otherwise. */
+export function WeightedGpa({ value }: { value: number | null | undefined }) {
+  const { t } = useTranslation();
+  const { formatNumber } = useFormatters();
+  if (value === null || value === undefined) return null;
+  return (
+    <>
+      {" "}
+      <small className="ag-result-weighted">
+        <bdi>
+          {t("academicGrading.credits.weighted", {
+            value: formatNumber(value, { maximumFractionDigits: 2 }),
+          })}
+        </bdi>
+      </small>
+    </>
+  );
+}
+
+/** A subject's course level ("Honors", "AP", "HL") as a small badge after its name. */
+export function CourseLevel({ level }: { level: string | null | undefined }) {
+  if (!level) return null;
+  return (
+    <>
+      {" "}
+      <span className="ag-course-level">
+        <bdi>{level}</bdi>
+      </span>
+    </>
+  );
+}
+
+/** "3 of 4 credits earned"; nothing when the result carries no credits. */
+export function CreditsEarned({
+  attempted,
+  earned,
+}: {
+  attempted: number | null | undefined;
+  earned: number | null | undefined;
+}) {
+  const { t } = useTranslation();
+  const { formatNumber } = useFormatters();
+  if (attempted === null || attempted === undefined) return null;
+  return (
+    <bdi>
+      {t("academicGrading.credits.earnedOf", {
+        earned: formatNumber(earned ?? 0, { maximumFractionDigits: 2 }),
+        attempted: formatNumber(attempted, { maximumFractionDigits: 2 }),
+      })}
+    </bdi>
   );
 }
 

@@ -184,7 +184,8 @@
     "DESCRIPTORS_REQUIRED": "Set up this grade's descriptor scale: at least two descriptors, such as Excellent and Needs improvement.",
     "DESCRIPTOR_POINTS_PARTIAL": "Give every descriptor points, or none. A subject descriptor is only worked out when all have points.",
     "DESCRIPTOR_NOT_ACHIEVED_UNUSED": "A descriptor is marked \"not achieved\", but without points no subject descriptor is worked out, so no pupil fails this subject.",
-    "NO_SKILLS": "Add at least one skill to assess."
+    "NO_SKILLS": "Add at least one skill to assess.",
+    "CREDITS_DIFFER_FROM_COEFFICIENT": "This subject's credits differ from its weight in the overall average. The weight is what counts in the average and GPA; schools that weight by credit hours set both to the same number."
   },
   "overview": {
     "statusHeading": "Grading for {{year}}",
@@ -387,6 +388,12 @@
     "averageWeightHelp": "1 counts like any other subject; 2 counts double.",
     "averageWeightValue": "Counts as {{value}}×",
     "averageWeightExact": "Exact weight",
+    "credits": "Credits",
+    "creditsHelp": "Credit hours the subject is worth, for schools that use them (e.g. 1 or 0.5). Leave empty if you don't. Results show credits attempted and earned.",
+    "courseLevel": "Course level",
+    "courseLevelHelp": "Shown next to the subject, e.g. Honors, AP, HL or SL. Optional.",
+    "gpaBoost": "GPA boost",
+    "gpaBoostHelp": "Added to the subject's GPA points for the weighted GPA when it is passed: usually 0.5 for Honors and 1 for AP. The regular GPA doesn't change. 0 for none.",
     "roundingDecimals": "Decimal places",
     "roundingMode": "Rounding",
     "missingPolicy": "A missing mark",
@@ -824,6 +831,13 @@
     "gpaValue": "GPA {{value}} / {{max}}",
     "withPercentage": "{{percentage}}%",
     "gpaUnavailable": "GPA not available"
+  },
+  "credits": {
+    "label": "Credits",
+    "column": "Credits",
+    "cumulative": "Credits (all years)",
+    "earnedOf": "{{earned}} of {{attempted}} credits earned",
+    "weighted": "(weighted {{value}})"
   },
   "transcript": {
     "title": "Academic Transcript",

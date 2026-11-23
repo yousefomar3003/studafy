@@ -12,6 +12,7 @@ import {
   ConfirmModal,
   DateTime,
   Num,
+  CreditsEarned,
   ResultValue,
   QueryState,
   ReasonModal,
@@ -399,7 +400,16 @@ function StudentResultsTable({
                 <ResultValue
                   display={student.result_display}
                   percentage={student.average_percentage}
+                  weightedGpa={student.weighted_gpa}
                 />
+                {student.credits_attempted == null ? null : (
+                  <div className="ag-muted">
+                    <CreditsEarned
+                      attempted={student.credits_attempted}
+                      earned={student.credits_earned}
+                    />
+                  </div>
+                )}
               </Table.Cell>
               <Table.Cell>
                 {student.total_obtained === null ? (
