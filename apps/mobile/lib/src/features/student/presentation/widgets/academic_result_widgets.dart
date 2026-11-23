@@ -18,6 +18,36 @@ String formatResultNumber(num value) {
 String formatResultPercent(num? value) =>
     value == null ? '—' : '${formatResultNumber(value)}%';
 
+/// A place as the app's language says it: "3rd" in English, "3" in Arabic (whose sentence carries
+/// the ordinal: "المرتبة 3").
+String formatOrdinal(BuildContext context, int n) {
+  if (context.locale.languageCode != 'en') return '$n';
+  final lastTwo = n % 100;
+  final suffix = lastTwo >= 11 && lastTwo <= 13
+      ? 'th'
+      : switch (n % 10) {
+          1 => 'st',
+          2 => 'nd',
+          3 => 'rd',
+          _ => 'th',
+        };
+  return '$n$suffix';
+}
+
+/// "3rd of 120"; "Not ranked" for an incomplete result; "Rank pending" while a grade-wide rank
+/// waits for every section to be finalized.
+String formatClassRank(BuildContext context, ClassRank rank) =>
+    switch (rank.status) {
+      ClassRankStatus.ranked => 'academicResults.rank.place'.tr(
+        namedArgs: {
+          'place': formatOrdinal(context, rank.rank!),
+          'cohort': '${rank.cohortSize}',
+        },
+      ),
+      ClassRankStatus.notRanked => 'academicResults.rank.notRanked'.tr(),
+      ClassRankStatus.pending => 'academicResults.rank.pending'.tr(),
+    };
+
 /// Credits earned out of attempted ("3 / 4"); null when the result carries no credits.
 String? formatCreditsEarned(num? attempted, num? earned) => attempted == null
     ? null
@@ -132,6 +162,18 @@ class OverallResultSummary extends StatelessWidget {
               _Stat(
                 label: 'academicResults.creditsEarned'.tr(),
                 value: credits,
+              ),
+            if (overall.classRank case final rank?)
+              _Stat(
+                label: 'academicResults.rank.label'.tr(),
+                value: formatClassRank(context, rank),
+                detail: rank.percentile == null
+                    ? null
+                    : 'academicResults.rank.percentile'.tr(
+                        namedArgs: {
+                          'place': formatOrdinal(context, rank.percentile!),
+                        },
+                      ),
               ),
             _Stat(label: 'academicResults.total'.tr(), value: total),
             _Stat(

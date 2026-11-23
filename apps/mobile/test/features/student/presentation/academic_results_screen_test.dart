@@ -354,6 +354,100 @@ void main() {
     },
   );
 
+  testWidgets(
+    'shows the class rank and percentile; a pending rank says so; older results none',
+    (tester) async {
+      final ranked = _result(id: 'fin-annual');
+      (ranked['result']! as Map<String, Object?>)['class_rank'] = {
+        'status': 'ranked',
+        'basis': 'average',
+        'scope': 'grade_level',
+        'rank': 3,
+        'cohort_size': 120,
+        'percentile': 97,
+      };
+      final pending = _result(
+        id: 'fin-t1',
+        termId: 't1',
+        termName: 'Term 1',
+        finalizedAt: '2026-01-20T09:00:00.000Z',
+      );
+      (pending['result']! as Map<String, Object?>)['class_rank'] = {
+        'status': 'pending',
+        'basis': 'average',
+        'scope': 'grade_level',
+        'rank': null,
+        'cohort_size': null,
+        'percentile': null,
+      };
+      // From a server before class ranks: no such field at all.
+      final older = _result(
+        id: 'fin-t2',
+        termId: 't2',
+        termName: 'Term 2',
+        finalizedAt: '2026-03-20T09:00:00.000Z',
+      );
+
+      await _pump(
+        tester,
+        _FakeResultsClient(results: [ranked, pending, older]),
+      );
+
+      expect(find.text('3rd of 120'), findsOneWidget);
+      expect(find.text('97th percentile'), findsOneWidget);
+      expect(find.text('Rank pending'), findsOneWidget);
+      expect(find.text('Class rank'), findsNWidgets(2));
+    },
+  );
+
+  test('a class rank parses defensively', () {
+    ClassRank? parse(Object? json) => ClassRank.fromJson(json);
+    expect(parse(null), isNull);
+    expect(parse('3rd'), isNull);
+    // A status this build doesn't know, or a "ranked" without its numbers: nothing shown.
+    expect(
+      parse({'status': 'provisional', 'rank': 2, 'cohort_size': 9}),
+      isNull,
+    );
+    expect(parse({'status': 'ranked', 'rank': null, 'cohort_size': 9}), isNull);
+    expect(
+      parse({'status': 'not_ranked', 'cohort_size': 9})?.status,
+      ClassRankStatus.notRanked,
+    );
+    // A document's rank has no status: it was ranked when issued.
+    final kept = parse({'rank': 1, 'cohort_size': 30, 'percentile': 96});
+    expect(kept?.status, ClassRankStatus.ranked);
+    expect([kept?.rank, kept?.cohortSize, kept?.percentile], [1, 30, 96]);
+  });
+
+  testWidgets(
+    'a certificate shows the rank it was issued with, in Arabic too',
+    (tester) async {
+      final certificate = _certificate();
+      final content = certificate['content']! as Map<String, Object?>;
+      (content['overall']! as Map<String, Object?>)['class_rank'] = {
+        'rank': 2,
+        'cohort_size': 31,
+        'percentile': 93,
+        'basis': 'average',
+        'scope': 'section',
+      };
+      await _pump(
+        tester,
+        _FakeResultsClient(
+          results: [_result(id: 'fin-annual')],
+          certificates: [certificate],
+        ),
+        locale: const Locale('ar'),
+      );
+      await tester.tap(find.textContaining('2025–2026').last);
+      await tester.pumpAndSettle();
+
+      expect(find.text('المرتبة 2 من 31'), findsOneWidget);
+      expect(find.text('المئين 93'), findsOneWidget);
+    },
+  );
+
   testWidgets('a certificate shows its GPA; an older one its percentage', (
     tester,
   ) async {

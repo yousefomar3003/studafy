@@ -2519,6 +2519,13 @@
     "creditsEarned": "Credits earned",
     "subjectCredits": "Credits: {value}",
     "weightedPoints": "Weighted {value}",
+    "rank": {
+      "label": "Class rank",
+      "place": "{place} of {cohort}",
+      "percentile": "{place} percentile",
+      "notRanked": "Not ranked",
+      "pending": "Rank pending"
+    },
     "total": "Total",
     "grade": "Grade",
     "failed": "Subjects failed",
