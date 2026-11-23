@@ -187,6 +187,22 @@ class _Document extends StatelessWidget {
                         ? '—'
                         : formatResultNumber(cumulative.gpa!),
                   ),
+                  if (cumulative.gpa != null && cumulative.weightedGpa != null)
+                    _Field(
+                      label: 'academicResults.transcript.cumulativeWeightedGpa'
+                          .tr(),
+                      value: formatResultNumber(cumulative.weightedGpa!),
+                    ),
+                  if (formatCreditsEarned(
+                        cumulative.creditsAttempted,
+                        cumulative.creditsEarned,
+                      )
+                      case final credits?)
+                    _Field(
+                      label: 'academicResults.transcript.cumulativeCredits'
+                          .tr(),
+                      value: credits,
+                    ),
                   _Field(
                     label: 'academicResults.transcript.yearsCovered'.tr(),
                     value: '${cumulative.yearsCovered}',

@@ -64,6 +64,9 @@ class TranscriptCumulative {
     required this.subjectsWithoutGpaPoints,
     required this.yearsCovered,
     this.mixedGpaScales = const [],
+    this.weightedGpa,
+    this.creditsAttempted,
+    this.creditsEarned,
   });
 
   factory TranscriptCumulative.fromJson(Map<String, Object?> json) =>
@@ -87,6 +90,10 @@ class TranscriptCumulative {
               max: _num(scale['max']) ?? 0,
             ),
         ],
+        // Absent on transcripts issued before credits existed.
+        weightedGpa: _num(json['weighted_gpa']),
+        creditsAttempted: _num(json['credits_attempted']),
+        creditsEarned: _num(json['credits_earned']),
       );
 
   final double? averagePercentage;
@@ -98,6 +105,13 @@ class TranscriptCumulative {
   /// When [gpaUnavailableReason] is [TranscriptGpaUnavailableReason.mixedGpaScales]: each GPA
   /// year and its maximum.
   final List<({String year, double max})> mixedGpaScales;
+
+  /// The cumulative GPA with Honors/AP/HL boosts; null when there is none.
+  final double? weightedGpa;
+
+  /// Credits across every covered year; null when no subject carries credits.
+  final double? creditsAttempted;
+  final double? creditsEarned;
 }
 
 /// A transcript exactly as issued (`content`).
