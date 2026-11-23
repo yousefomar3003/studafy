@@ -1132,6 +1132,35 @@
   color: var(--mk-muted);
 }
 
+.mk-size__currency {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8) var(--space-16);
+}
+
+/* Five equal segments that shrink to fit a phone-width card instead of overflowing it. */
+.mk-segmented--currency {
+  max-inline-size: 100%;
+}
+
+.mk-segmented--currency .mk-segmented__option {
+  flex: 1 1 0;
+  min-inline-size: 0;
+}
+
+.mk-segmented--currency .mk-segmented__option span {
+  padding-inline: var(--space-8);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.mk-segmented--currency .mk-segmented__option input:checked + span {
+  background-color: var(--mk-ink);
+  color: #ffffff;
+}
+
 /* About: how a school starts */
 .mk-steps__track {
   position: relative;

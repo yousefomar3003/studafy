@@ -1,4 +1,6 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart' hide Material;
 import 'package:flutter_pdfview/flutter_pdfview.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -194,6 +196,14 @@ void _openStudyTool(
   );
 }
 
+/// The PDF sits inside the screen's [ListView], which otherwise wins every vertical drag: the PDF
+/// never scrolled and only its first page(s) could be seen. Claiming drags that start on the PDF
+/// lets it scroll through every page; drags outside it still scroll the screen.
+@visibleForTesting
+final Set<Factory<OneSequenceGestureRecognizer>> materialPdfGestureRecognizers = {
+  Factory<OneSequenceGestureRecognizer>(EagerGestureRecognizer.new),
+};
+
 class _InAppPreview extends ConsumerWidget {
   const _InAppPreview({required this.materialId, required this.kind, this.initialPage});
 
@@ -238,6 +248,7 @@ class _InAppPreview extends ConsumerWidget {
               child: PDFView(
                 filePath: file.path,
                 defaultPage: initialPage == null ? 0 : (initialPage! - 1).clamp(0, 1 << 30),
+                gestureRecognizers: materialPdfGestureRecognizers,
               ),
             )
 : Image.file(
