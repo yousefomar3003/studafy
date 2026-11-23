@@ -188,7 +188,6 @@ describe("overall weighted GPA and credits", () => {
         subject("history", complete(0, false), { credits: 1 }),
         subject("pe", complete(3, true), { credits: 0.5 }),
         subject("club", complete(3, true)),
-        subject("music", complete(3, true), { credits: 2, includeInAverage: false }),
         subject("art", null, { credits: 3, exempt: true }),
       ],
       gpa,
@@ -197,7 +196,30 @@ describe("overall weighted GPA and credits", () => {
     expect(result.creditsEarned).toBe(1.5);
   });
 
-  test("credits are null when no counted subject has credits", () => {
+  test("subjects out of the average and pass/fail subjects still earn credits", () => {
+    const descriptive = (passed: boolean): SubjectResult => ({
+      ...complete(null, passed),
+      percentage: null,
+      marksObtained: null,
+      descriptive: true,
+    });
+    const result = calculateOverallResult(
+      [
+        subject("math", complete(4, true), { credits: 1 }),
+        // An elective left out of the average: earns its credits, never weighs on the GPA.
+        subject("music", complete(3, true), { credits: 2, includeInAverage: false }),
+        // PE graded pass/fail with descriptors: passed, so its credit is earned.
+        subject("pe", descriptive(true), { credits: 0.5, requirement: "optional" }),
+        subject("art", descriptive(false), { credits: 1, requirement: "optional" }),
+      ],
+      gpa,
+    );
+    expect(result.display).toEqual({ format: "gpa", value: 4, max: 4 });
+    expect(result.creditsAttempted).toBe(4.5);
+    expect(result.creditsEarned).toBe(3.5);
+  });
+
+  test("credits are null when no subject has credits", () => {
     const result = calculateOverallResult([subject("math", complete(4, true))], gpa);
     expect(result.creditsAttempted).toBeNull();
     expect(result.creditsEarned).toBeNull();
@@ -277,6 +299,28 @@ describe("cumulative weighted GPA and credits", () => {
     );
     expect(mixed.gpaUnavailableReason).toBe("mixed_gpa_scales");
     expect(mixed.weightedGpa).toBeNull();
+  });
+
+  test("credits count subjects out of the average and descriptive ones, never exempt ones", () => {
+    const result = calculateCumulativeResult(
+      [
+        {
+          subjects: [
+            subject({ credits: 1 }),
+            subject({ credits: 2, includeInAverage: false }),
+            subject({ credits: 0.5, descriptive: true, percentage: null, gpaPoints: null }),
+            subject({ credits: 1, descriptive: true, passed: false, percentage: null }),
+            subject({ credits: 3, status: "exempt" }),
+          ],
+        },
+      ],
+      ROUND_2,
+    );
+    // The GPA is still the one counted subject's.
+    expect(result.gpa).toBe(3);
+    expect(result.subjectsCounted).toBe(1);
+    expect(result.creditsAttempted).toBe(4.5);
+    expect(result.creditsEarned).toBe(3.5);
   });
 
   test("incomplete subjects count no credits", () => {

@@ -26,8 +26,10 @@ import type { RoundingRule } from "./types";
  *  - the weighted GPA is the same weighted mean with each boosted subject's weighted points (its
  *    points plus its Honors/AP/HL boost when passed). It exists only when the GPA does and at least
  *    one counted subject has a boost; otherwise it is null, for the same reasons as the GPA;
- *  - credits attempted and earned add the credits of the counted, complete subjects that carry
- *    credits, and of those passed. They are null when no counted subject has credits.
+ *  - credits attempted and earned add the credits of every complete, non-exempt subject that
+ *    carries credits, and of those passed -- including descriptive (pass/fail) subjects and those
+ *    left out of the average (PE, electives), which still earn credits. They are null when no such
+ *    subject has credits.
  */
 
 export interface CumulativeSubjectInput {
@@ -44,7 +46,7 @@ export interface CumulativeSubjectInput {
   credits?: number | null;
   /** Whether the subject was passed; counts its credits as earned. */
   passed?: boolean | null;
-  /** Graded with descriptors: never counted. */
+  /** Graded with descriptors: never counted in the average or GPA (its credits still count). */
   descriptive?: boolean;
 }
 
@@ -77,9 +79,9 @@ export interface CumulativeResult {
   subjectsCounted: number;
   /** Sum of the counted subjects' weights. */
   totalWeight: number;
-  /** Credits of the counted, complete subjects that carry credits; null when none does. */
+  /** Credits of the complete, non-exempt subjects that carry credits; null when none does. */
   creditsAttempted: number | null;
-  /** The same over the passed subjects; null when no counted subject has credits. */
+  /** The same over the passed subjects; null when no such subject has credits. */
   creditsEarned: number | null;
 }
 
@@ -106,7 +108,7 @@ export function calculateCumulativeResult(
     mixedGpaScales: [] as { label: string; max: number }[],
   };
   const totalWeight = counted.reduce((total, subject) => total + subject.averageWeight, 0);
-  const credits = creditTotals(counted);
+  const credits = creditTotals(years.flatMap((year) => year.subjects));
 
   if (counted.length === 0 || totalWeight <= 0) {
     return {
@@ -209,12 +211,18 @@ export function calculateCumulativeResult(
 /** Credits carry two decimals (numeric(5,2)). */
 const CREDIT_ROUNDING: RoundingRule = { decimals: 2, mode: "half_up" };
 
-function creditTotals(counted: readonly CumulativeSubjectInput[]): {
+/**
+ * Credits over every non-exempt subject that carries them, counted in the average or not: a
+ * pass/fail subject or one left out of the average still earns credits. Exported for the
+ * graduation requirements checker, which totals the credits of a group of subjects the same way.
+ */
+export function creditTotals(subjects: readonly CumulativeSubjectInput[]): {
   creditsAttempted: number | null;
   creditsEarned: number | null;
 } {
-  const withCredits = counted.filter(
-    (subject) => subject.credits !== null && subject.credits !== undefined,
+  const withCredits = subjects.filter(
+    (subject) =>
+      subject.status !== "exempt" && subject.credits !== null && subject.credits !== undefined,
   );
   if (withCredits.length === 0) return { creditsAttempted: null, creditsEarned: null };
   const total = (subjects: readonly CumulativeSubjectInput[]) =>

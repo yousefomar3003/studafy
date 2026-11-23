@@ -402,16 +402,18 @@ function weightedGpaPoints(
 }
 
 /**
- * Credits attempted and earned: the credits of the counted subjects (in the average, not exempt,
- * not descriptive) that are complete, and of those that are passed. Null when no counted subject
- * carries credits, so a school that does not use credits never sees a 0.
+ * Credits attempted and earned: the credits of every complete, non-exempt subject that carries
+ * credits, and of those that are passed. Unlike the average, credits are not limited to subjects
+ * counted in it: a pass/fail (descriptive) subject or one left out of the average (PE, an elective)
+ * still earns its credits, as in American schools. Null when no such subject carries credits, so a
+ * school that does not use credits never sees a 0.
  */
-function creditTotals(counted: readonly SubjectOutcomeForOverall[]): {
+function creditTotals(considered: readonly SubjectOutcomeForOverall[]): {
   creditsAttempted: number | null;
   creditsEarned: number | null;
 } {
-  const withCredits = counted.filter(
-    (subject) => subject.credits !== null && subject.credits !== undefined,
+  const withCredits = considered.filter(
+    (subject) => !subject.exempt && subject.credits !== null && subject.credits !== undefined,
   );
   if (withCredits.length === 0) return { creditsAttempted: null, creditsEarned: null };
   const total = (subjects: readonly SubjectOutcomeForOverall[]) =>
@@ -440,8 +442,9 @@ function creditTotals(counted: readonly SubjectOutcomeForOverall[]): {
  *  - display: the average in the grade's chosen format (see {@link resultDisplay}).
  *  - weighted GPA: for a GPA result where a counted subject has a boost, the same GPA with each
  *    boosted subject's weighted points (see {@link weightedGpa}).
- *  - credits: attempted and earned over the counted subjects that carry credits. The coefficient
- *    (`averageWeight`) still weights the average and GPA; credits are reported, not used to weight.
+ *  - credits: attempted and earned over every complete, non-exempt subject that carries credits,
+ *    counted in the average or not (see {@link creditTotals}). The coefficient (`averageWeight`)
+ *    still weights the average and GPA; credits are reported, not used to weight.
  */
 export function calculateOverallResult(
   subjects: readonly SubjectOutcomeForOverall[],
@@ -471,7 +474,7 @@ export function calculateOverallResult(
       gradeLabel: null,
       display: null,
       weightedGpa: null,
-      ...creditTotals(counted),
+      ...creditTotals(considered),
       subjectsFailed: failedSubjectIds.length,
       failedSubjectIds,
       incompleteSubjectIds,
@@ -513,7 +516,7 @@ export function calculateOverallResult(
     gradeLabel: band?.label ?? null,
     display,
     weightedGpa: weightedGpa(counted, display, policy),
-    ...creditTotals(counted),
+    ...creditTotals(considered),
     subjectsFailed: failed,
     failedSubjectIds,
     incompleteSubjectIds,
