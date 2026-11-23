@@ -13,6 +13,7 @@ import {
   DISCIPLINE_TYPE_LABEL_KEYS,
 } from "../discipline/labels";
 
+import { GraduationPanel } from "./GraduationPanel";
 import { TestScoresPanel } from "./TestScoresPanel";
 import { TranscriptPanel } from "./transcripts/TranscriptPanel";
 
@@ -218,6 +219,8 @@ export function StudentOverviewPanels({ studentId }: { studentId: string }) {
       </Card>
 
       <TestScoresPanel studentId={studentId} />
+
+      <GraduationPanel studentId={studentId} />
 
       <TranscriptPanel studentId={studentId} />
 

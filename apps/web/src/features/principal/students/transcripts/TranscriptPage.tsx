@@ -15,6 +15,7 @@ import {
 
 import { useTranscript } from "./queries";
 import { TranscriptExternalExams } from "./TranscriptExternalExams";
+import { TranscriptGraduation } from "./TranscriptGraduation";
 
 import type { TranscriptContent } from "./queries";
 
@@ -298,6 +299,8 @@ export function TranscriptDocument({
       <p className="ag-muted">{t("academicGrading.transcript.method")}</p>
 
       <TranscriptExternalExams exams={content.external_exams} />
+
+      <TranscriptGraduation requirements={content.graduation_requirements} />
 
       <footer className="ag-certificate__footer">
         <p>

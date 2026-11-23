@@ -285,7 +285,66 @@ const PARENT_SUMMARY = {
   ],
 };
 
+const GRADUATION_CHECKLIST = {
+  student_id: "student-1",
+  grade_level: { id: "grade-12", name: "Grade 12" },
+  current_year_pending: true,
+  years_counted: 3,
+  sets: [
+    {
+      set: { id: "set-1", name: "High school diploma", visible_to_students_and_parents: false },
+      status: "pending",
+      rules_met: 1,
+      rules_total: 3,
+      rules: [
+        {
+          id: "r1",
+          type: "total_credits",
+          min_value: 24,
+          group_name: null,
+          subjects: [],
+          external_exam: null,
+          status: "pending",
+          current: 18.5,
+          required: 24,
+          missing_subjects: [],
+        },
+        {
+          id: "r2",
+          type: "subjects_passed",
+          min_value: null,
+          group_name: "Core sciences",
+          subjects: [
+            { id: "bio", code: "BIO", name: "Biology" },
+            { id: "chem", code: "CHEM", name: "Chemistry" },
+          ],
+          external_exam: null,
+          status: "pending",
+          current: 1,
+          required: 2,
+          missing_subjects: [{ id: "chem", code: "CHEM", name: "Chemistry" }],
+        },
+        {
+          id: "r3",
+          type: "external_exam",
+          min_value: 1200,
+          group_name: null,
+          subjects: [],
+          external_exam: { id: "sat", code: "SAT", name: "SAT" },
+          status: "met",
+          current: 1480,
+          required: 1200,
+          missing_subjects: [],
+        },
+      ],
+    },
+  ],
+};
+
 const getMock = mock((path: string, _init?: RequestInit) => {
+  if (path === "/api/grading/students/{studentId}/graduation-requirements") {
+    return Promise.resolve<unknown>({ data: GRADUATION_CHECKLIST });
+  }
   if (path === "/api/students") {
     return Promise.resolve<unknown>({ data: { students: [STUDENT], next_cursor: null } });
   }
@@ -553,6 +612,41 @@ describe("Principal > Students", () => {
     const [path, init] = deleteMock.mock.calls[0] as [string, RequestInit];
     expect(path).toBe("/api/grading/external-exam-results/{resultId}");
     expect(init.params?.path).toEqual({ resultId: "ext-result-1" });
+  });
+
+  test("the student page shows the graduation requirements checklist", async () => {
+    await renderAsPrincipal("/portal/principal/students/student-1");
+
+    const panel = await screen.findByRole("region", { name: "Graduation requirements" });
+    expect(await within(panel).findByText("High school diploma")).toBeTruthy();
+    expect(within(panel).getByText("1 of 3 met")).toBeTruthy();
+    expect(within(panel).getByText(/This year is not finalized yet/)).toBeTruthy();
+    const credits = within(panel).getByText("Total credits").closest("tr")!;
+    expect(within(credits).getByText("18.5 of 24")).toBeTruthy();
+    expect(within(credits).getByText("In progress")).toBeTruthy();
+    const sciences = within(panel).getByText("Pass Core sciences").closest("tr")!;
+    expect(within(sciences).getByText("Not passed yet: Chemistry")).toBeTruthy();
+    const sat = within(panel).getByText("SAT").closest("tr")!;
+    expect(within(sat).getByText("At least 1,200")).toBeTruthy();
+    expect(within(sat).getByText("Met")).toBeTruthy();
+  });
+
+  test("a transcript says whether the graduation requirements were met, as issued", async () => {
+    transcriptDocument = {
+      ...TRANSCRIPT,
+      content: {
+        ...TRANSCRIPT_CONTENT,
+        graduation_requirements: [
+          { name: "High school diploma", status: "met", rules_met: 5, rules_total: 5 },
+        ],
+      },
+    };
+    await renderAsPrincipal("/portal/principal/students/student-1/transcripts/transcript-1");
+
+    const document = await screen.findByRole("article", { name: "Academic Transcript" });
+    const section = within(document).getByRole("region", { name: "Graduation requirements" });
+    expect(within(section).getByText("Graduation requirements met")).toBeTruthy();
+    expect(within(section).getByText("(5 of 5 requirements met)")).toBeTruthy();
   });
 
   test("a transcript shows its external examinations as issued", async () => {
