@@ -71,12 +71,20 @@ export const AI_LLM_RETRY_AFTER_SECONDS = 30;
 export const AI_ASK_QUESTION_MAX_CHARS = 2000;
 
 /**
- * Minimum fused RRF score a grounded answer requires from its best retrieval hit in **hybrid** mode,
- * AND-ed with that hit having matched the keyword leg (see `ask/refusal.ts` for why the AND is
- * load-bearing). Below this, the route refuses rather than answers from noise. It is unreachable by
- * one leg alone (max `1/61` ≈ 0.0164), so lexical-only retrieval (ADR-020) does not apply it.
+ * Minimum cosine similarity between the question and its closest chunk for Ask AI to answer from
+ * the materials when no chunk matched the question's keywords (ADR-024, `ask/refusal.ts`). Sized on
+ * `google/gemini-embedding-001` at 1536 dimensions, 2026-11-24:
+ *   - golden set (one-sentence English chunks): questions scored 0.62-0.82 against their chunk;
+ *     the near-topic refusal cases (volcanoes against an earthquake chunk, CRISPR against DNA)
+ *     0.52-0.57;
+ *   - chunk-length Arabic study text (700-1400 characters, dialect and cross-language questions):
+ *     questions 0.535-0.87 against their passage, unrelated questions at most 0.52.
+ * 0.55 refuses every unrelated question and the closer half of the near-topic ones, and loses about
+ * one question in 25 asked across languages against a long chunk. A near-topic question that passes
+ * still meets prompt rule 4 (say so when the sources do not answer). Re-measure with
+ * tests/ai-eval/retrieval.integration.test.ts (live-hybrid) when the embedding model changes.
  */
-export const AI_ASK_MIN_RELEVANCE_SCORE = 0.02;
+export const AI_ASK_MIN_SEMANTIC_SIMILARITY = 0.55;
 
 /** How many retrieval hits are handed to the model as numbered, citable sources. */
 export const AI_ASK_SOURCE_LIMIT = 6;

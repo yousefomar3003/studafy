@@ -50,6 +50,7 @@ code no longer matches must be superseded before the code, not after.
 | [ADR-019](0019-sensitive-record-field-encryption.md)  | App-level AES-256-GCM for sensitive record values, keyring app secret, stored masks; SSE-KMS documents | Data protection      |
 | [ADR-020](0020-lexical-only-retrieval.md)             | Lexical-only retrieval in production until a real embedding provider is wired (F-06)                   | AI retrieval         |
 | [ADR-023](0023-mobile-no-certificate-pinning.md)      | No TLS certificate pinning in the mobile app (accepted risk, QA-084)                                   | Mobile security      |
+| [ADR-024](0024-semantic-retrieval.md)                 | Semantic retrieval with gemini-embedding-001 through OpenRouter; same-model filter; re-embed sweep     | AI retrieval         |
 
 ## Platform decision coverage
 

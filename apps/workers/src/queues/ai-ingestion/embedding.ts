@@ -1,3 +1,5 @@
+import { AI_EMBEDDING_DIMENSIONS, aiEmbeddingModelId } from "@studafy/constants";
+
 import { TokenBucket } from "../notifications/email/rate-limiter";
 
 import { estimateTokens } from "./chunker";
@@ -26,7 +28,7 @@ import type { Now } from "../notifications/email/rate-limiter";
 
 export const EMBEDDING_MODEL = "mock-embedding-3-small@1";
 
-export const EMBEDDING_DIMENSIONS = 1536;
+export const EMBEDDING_DIMENSIONS = AI_EMBEDDING_DIMENSIONS;
 
 /** At most this many chunks in one provider call. */
 export const DEFAULT_MAX_BATCH_CHUNKS = 16;
@@ -292,6 +294,116 @@ export function createMockEmbeddingProvider(): EmbeddingProvider {
     model: EMBEDDING_MODEL,
     async embed(texts) {
       return texts.map((text) => mockEmbedding(text));
+    },
+  };
+}
+
+/** One provider call's whole-request timeout. */
+export const EMBEDDING_REQUEST_TIMEOUT_MS = 30_000;
+
+export interface OpenAiCompatibleEmbeddingProviderOptions {
+  apiKey: string;
+  /** The API root (…/v1); `/embeddings` is appended. */
+  baseUrl: string;
+  /** The provider's model id, e.g. `google/gemini-embedding-001`. */
+  model: string;
+  timeoutMs?: number;
+  fetch?: typeof fetch;
+}
+
+/**
+ * The live provider (ADR-024): an OpenAI-compatible `/embeddings` endpoint (OpenRouter), asked for
+ * {@link EMBEDDING_DIMENSIONS} dimensions and, on OpenRouter, only for hosts that neither retain nor
+ * train on the data -- the same routing the chat calls use. Its vectors are labeled
+ * `aiEmbeddingModelId(model)`, the value the API's query embedder reports, so the semantic leg can
+ * compare a question with them. HTTP 429 is {@link EmbeddingRateLimitError}, retried by the stage.
+ */
+export function createOpenAiCompatibleEmbeddingProvider(
+  options: OpenAiCompatibleEmbeddingProviderOptions,
+): EmbeddingProvider {
+  const url = `${options.baseUrl.replace(/\/+$/, "")}/embeddings`;
+  const fetchImpl = options.fetch ?? fetch;
+  const timeoutMs = options.timeoutMs ?? EMBEDDING_REQUEST_TIMEOUT_MS;
+  const host = URL.canParse(options.baseUrl) ? new URL(options.baseUrl).hostname : "";
+  const privacy =
+    host === "openrouter.ai" || host.endsWith(".openrouter.ai")
+      ? { provider: { data_collection: "deny" } }
+      : {};
+  return {
+    model: aiEmbeddingModelId(options.model),
+    async embed(texts) {
+      const response = await fetchImpl(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${options.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: options.model,
+          input: texts,
+          dimensions: EMBEDDING_DIMENSIONS,
+          ...privacy,
+        }),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      if (response.status === 429) throw new EmbeddingRateLimitError();
+      if (!response.ok) throw new Error(`embedding provider answered HTTP ${response.status}`);
+      return parseEmbeddingVectors(await response.json(), texts.length);
+    },
+  };
+}
+
+/**
+ * The vectors of an OpenAI-compatible embeddings response as pgvector literals, in input order.
+ * Throws unless there is exactly one finite {@link EMBEDDING_DIMENSIONS}-number vector per input.
+ */
+export function parseEmbeddingVectors(body: unknown, expected: number): string[] {
+  const data = (body as { data?: unknown } | null)?.data;
+  if (!Array.isArray(data) || data.length !== expected) {
+    throw new Error(
+      `embedding provider returned ${Array.isArray(data) ? data.length : 0} vectors for ${expected} inputs`,
+    );
+  }
+  return [...data]
+    .sort(
+      (a, b) =>
+        Number((a as { index?: number }).index ?? 0) - Number((b as { index?: number }).index ?? 0),
+    )
+    .map((item) => {
+      const vector = (item as { embedding?: unknown }).embedding;
+      if (
+        !Array.isArray(vector) ||
+        vector.length !== EMBEDDING_DIMENSIONS ||
+        !vector.every((value) => typeof value === "number" && Number.isFinite(value))
+      ) {
+        throw new Error(
+          `embedding provider returned a malformed ${EMBEDDING_DIMENSIONS}-dimension vector`,
+        );
+      }
+      return `[${vector.join(",")}]`;
+    });
+}
+
+/**
+ * A stage that falls back to another when the first fails outright (ADR-024). Ingestion embeds
+ * through the live provider and, if it is down past its retries, stores the mock's vectors instead,
+ * so an outage never blocks a material: the keyword leg finds it at once, the semantic leg ignores
+ * it (another `embedding_model`), and the re-embed sweep gives it real vectors later.
+ */
+export function createFallbackEmbeddingStage(
+  primary: EmbeddingStage,
+  fallback: EmbeddingStage,
+  onFallback: (error: unknown) => void,
+): EmbeddingStage {
+  return {
+    provider: primary.provider,
+    async embed(chunks, context) {
+      try {
+        return await primary.embed(chunks, context);
+      } catch (error) {
+        onFallback(error);
+        return fallback.embed(chunks, context);
+      }
     },
   };
 }

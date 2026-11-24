@@ -20,6 +20,12 @@
  * empty semantic CTE. The fusion SQL is unchanged, so every hit's `semanticRank` is null and its
  * `rrfScore` is the keyword leg's `1 / (k + rank)` alone. Production runs this way until a real
  * provider is wired for both ingestion and query under one model id.
+ *
+ * Semantic retrieval (ADR-024): the caller passes the embedder's `embeddingModel` with the vector,
+ * and the semantic leg reads only chunks labeled with that model. A chunk still carrying another
+ * model's vector (the mock, before the re-embed sweep reaches it) is invisible to the semantic leg
+ * and found by the keyword leg alone, so one comparison never mixes two vector spaces. Each
+ * semantic hit carries its cosine similarity, which the Ask AI grounding gate reads.
  */
 
 import type { TransactionSql } from "postgres";
@@ -50,6 +56,11 @@ export interface HybridSearchInput {
    * pass (no embedding provider wired; ADR-020), which skips the semantic leg entirely.
    */
   queryVector: string | null;
+  /**
+   * The `embedding_model` the query vector was produced by. The semantic leg reads only chunks with
+   * this value (ADR-024). Omitted, it reads every chunk -- tests over the mock corpus only.
+   */
+  embeddingModel?: string;
   /** How many fused results to return (default `HYBRID_DEFAULT_LIMIT`). */
   limit?: number;
   /**
@@ -72,6 +83,11 @@ export interface HybridSearchHit {
   semanticRank: number | null;
   /** The chunk's rank in the keyword leg, or null when only the semantic leg found it. */
   keywordRank: number | null;
+  /**
+   * Cosine similarity between the question and the chunk (`1 - cosine distance`), or null when the
+   * semantic leg did not return the chunk (or did not run).
+   */
+  semanticSimilarity: number | null;
 }
 
 export interface HybridSearchResult {
@@ -97,6 +113,7 @@ interface RawHit {
   rrf_score: number;
   semantic_rank: number | null;
   keyword_rank: number | null;
+  semantic_similarity: number | null;
 }
 
 function setHnswSettings(tx: TransactionSql, efSearch: number): Promise<unknown> {
@@ -112,11 +129,13 @@ function semanticLegCount(
   tx: TransactionSql,
   queryVector: string,
   materialId?: string,
+  embeddingModel?: string,
 ): Promise<number> {
   return tx<{ id: string }[]>`
     SELECT id
     FROM app.material_chunks
     WHERE ${materialId === undefined ? tx`TRUE` : tx`material_id = ${materialId}::uuid`}
+      AND ${sameModel(tx, embeddingModel)}
       AND ${groundable(tx, "app.material_chunks", materialId)}
     ORDER BY embedding <=> ${queryVector}::public.vector
     LIMIT ${HYBRID_LEG_LIMIT}
@@ -157,18 +176,26 @@ function groundable(
   )`;
 }
 
+/** The semantic leg's model filter: only chunks embedded by the query vector's model (ADR-024). */
+function sameModel(tx: TransactionSql, embeddingModel: string | undefined) {
+  return embeddingModel === undefined ? tx`TRUE` : tx`embedding_model = ${embeddingModel}`;
+}
+
 function runHybridQuery(tx: TransactionSql, input: HybridSearchInput): Promise<HybridSearchHit[]> {
   const limit = clampLimit(input.limit);
-  const { materialId, queryVector } = input;
+  const { materialId, queryVector, embeddingModel } = input;
   // Lexical mode: an empty, correctly-typed semantic leg, so the fusion below is the keyword leg's
   // ranking alone and no ANN scan runs.
   const semantic =
     queryVector === null
-      ? tx`SELECT NULL::uuid AS id, NULL::bigint AS rank WHERE FALSE`
+      ? tx`SELECT NULL::uuid AS id, NULL::bigint AS rank, NULL::float8 AS similarity WHERE FALSE`
       : tx`
-      SELECT id, row_number() OVER (ORDER BY embedding <=> ${queryVector}::public.vector) AS rank
+      SELECT id,
+             row_number() OVER (ORDER BY embedding <=> ${queryVector}::public.vector) AS rank,
+             1 - (embedding <=> ${queryVector}::public.vector) AS similarity
       FROM app.material_chunks
       WHERE ${materialId === undefined ? tx`TRUE` : tx`material_id = ${materialId}::uuid`}
+        AND ${sameModel(tx, embeddingModel)}
         AND ${groundable(tx, "app.material_chunks", materialId)}
       ORDER BY embedding <=> ${queryVector}::public.vector
       LIMIT ${HYBRID_LEG_LIMIT}`;
@@ -188,6 +215,7 @@ function runHybridQuery(tx: TransactionSql, input: HybridSearchInput): Promise<H
       SELECT COALESCE(s.id, k.id) AS id,
              s.rank AS semantic_rank,
              k.rank AS keyword_rank,
+             s.similarity AS semantic_similarity,
              COALESCE(1.0 / (${HYBRID_RRF_K} + s.rank), 0) +
                COALESCE(1.0 / (${HYBRID_RRF_K} + k.rank), 0) AS rrf_score
       FROM semantic s FULL OUTER JOIN keyword k ON k.id = s.id
@@ -200,7 +228,8 @@ function runHybridQuery(tx: TransactionSql, input: HybridSearchInput): Promise<H
            c.content,
            f.rrf_score,
            f.semantic_rank,
-           f.keyword_rank
+           f.keyword_rank,
+           f.semantic_similarity
     FROM fused f
     JOIN app.material_chunks c ON c.id = f.id
     JOIN app.materials m ON m.id = c.material_id AND m.school_id = c.school_id
@@ -231,6 +260,7 @@ function runHybridQuery(tx: TransactionSql, input: HybridSearchInput): Promise<H
       // contract exposes real numbers.
       semanticRank: row.semantic_rank === null ? null : Number(row.semantic_rank),
       keywordRank: row.keyword_rank === null ? null : Number(row.keyword_rank),
+      semanticSimilarity: row.semantic_similarity === null ? null : Number(row.semantic_similarity),
     })),
   );
 }
@@ -257,13 +287,13 @@ export async function hybridSearch(
     return { hits, mode: "lexical", semanticLegCount: 0, retried: false };
   }
   await setHnswSettings(tx, HYBRID_EF_SEARCH);
-  let count = await semanticLegCount(tx, queryVector, input.materialId);
+  let count = await semanticLegCount(tx, queryVector, input.materialId, input.embeddingModel);
   let retried = false;
   // One material legitimately has fewer chunks than a leg's limit, so a short semantic leg there
   // says nothing about recall; the retry is only for the corpus-wide search.
   if (count < HYBRID_LEG_LIMIT && input.materialId === undefined) {
     await setHnswSettings(tx, HYBRID_EF_SEARCH_RETRY);
-    count = await semanticLegCount(tx, queryVector);
+    count = await semanticLegCount(tx, queryVector, undefined, input.embeddingModel);
     retried = true;
   }
   const hits = await runHybridQuery(tx, input);

@@ -394,6 +394,10 @@ export const envSchema = z
       .enum(["true", "false"])
       .optional()
       .transform((value) => value === "true"),
+    // Semantic retrieval (ADR-024): the provider model id the question is embedded with, e.g.
+    // google/gemini-embedding-001, on the same OpenAI-compatible host and key as the chat calls.
+    // Must match the workers' AI_EMBEDDING_MODEL. Unset, retrieval is lexical-only (ADR-020).
+    AI_EMBEDDING_MODEL: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // OCR for Ask AI photo text (POST /api/ai/photo-text), the workers' engine and settings
     // (packages/ocr). OCR_WORKER_PATH and OCR_LANG_PATH point at the bundled tesseract worker-script
     // and the traineddata in the image, which has no node_modules; unset in development, where the
@@ -653,6 +657,18 @@ export const envSchema = z
           });
         }
       }
+    }
+    // Embeddings ride the chat provider's OpenAI-compatible host and key, so they need it armed.
+    if (
+      env.AI_EMBEDDING_MODEL !== undefined &&
+      !(env.AI_LLM_ENABLED && env.AI_LLM_PROVIDER === "openai-compatible")
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["AI_EMBEDDING_MODEL"],
+        message:
+          "AI_EMBEDDING_MODEL needs AI_LLM_ENABLED=true with AI_LLM_PROVIDER=openai-compatible",
+      });
     }
     for (const key of ["ANTHROPIC_API_KEY", "AI_LLM_API_KEY"] as const) {
       if (!env.AI_LLM_ENABLED && env[key] !== undefined) {

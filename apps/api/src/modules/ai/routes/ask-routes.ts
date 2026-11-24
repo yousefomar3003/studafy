@@ -29,6 +29,7 @@ import { AI_MODEL_TIERS, resolveAiModel } from "../llm/routing";
 import { effectiveAgeLevel } from "../moderation/age-level";
 import { recordBlockedContent } from "../moderation/enforce";
 import { moderateInput, moderateOutput, type AgeLevel } from "../moderation/moderate";
+import { embedForSearch } from "../retrieval/embeddings";
 import { hybridSearch } from "../retrieval/search";
 import { loadSummaryMaterial } from "../summary/materials";
 import { recordDurableUsage, splitByTier } from "../usage/durable";
@@ -441,10 +442,13 @@ export function aiAskRoutes(deps: {
     // conversation resolution — runs here, so its failures are ordinary problem+json responses.
     // It is one short tenant transaction; the provider call (tens of seconds) never holds a
     // database connection.
+    const searchVector = await embedForSearch(embedder, body.question, (error) =>
+      c.get("log")?.warn({ err: error }, "question embedding failed; searching by keyword only"),
+    );
     const preflight = await withTenantTx(database, tenantFrom(c), async (tx) => {
       const search = await hybridSearch(tx, {
         query: body.question,
-        queryVector: embedder ? embedder.embed(body.question) : null,
+        ...searchVector,
         limit: AI_ASK_SOURCE_LIMIT,
         ...(body.material_id !== undefined ? { materialId: body.material_id } : {}),
       });

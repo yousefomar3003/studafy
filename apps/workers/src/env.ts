@@ -206,6 +206,10 @@ export const envSchema = z
     ),
     AI_LLM_API_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     AI_LLM_BASE_URL: z.preprocess(emptyAsUnset, z.string().url().optional()),
+    // Semantic retrieval (ADR-024): the provider model id chunks are embedded with, on the
+    // AI_LLM_BASE_URL host with AI_LLM_API_KEY. Must match the API's AI_EMBEDDING_MODEL. Unset,
+    // chunks keep the mock vectors the semantic leg never reads.
+    AI_EMBEDDING_MODEL: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
   })
   .superRefine((env, context) => {
     if (

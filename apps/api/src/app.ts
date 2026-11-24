@@ -306,6 +306,12 @@ export interface AppOptions {
    */
   aiLlmProvider?: LlmProvider | null;
   /**
+   * Question embedder for semantic retrieval (ADR-024), built by src/index.ts when
+   * AI_EMBEDDING_MODEL is set. Null (the default) keeps both retrieval surfaces lexical-only
+   * (ADR-020). Never the deterministic mock outside tests: its vectors carry no meaning.
+   */
+  aiQueryEmbedder?: QueryEmbedder | null;
+  /**
    * Reads the text in an Ask AI photo (POST /api/ai/photo-text). Built in src/index.ts from the OCR
    * environment (the bundled worker-script and traineddata in the image); null leaves the route
    * unmounted, the bare-test default.
@@ -440,6 +446,7 @@ export function createApp({
   docsEnabled = false,
   flags = null,
   aiLlmProvider = null,
+  aiQueryEmbedder = null,
   photoTextReader = null,
   aiLlmModelOverrides = {},
   microsoftIdentityVerifier,
@@ -1496,12 +1503,9 @@ export function createApp({
   // would spend unbilled budget, so the whole surface is absent rather than un-metered.
   if (database && redis && entitlements && featureService) {
     const aiMeter = createAiTokenMeter({ redis });
-    // Retrieval is lexical-only (ADR-020, QA-15/F-06). The only embedder in the repository is the
-    // deterministic mock, whose vectors carry no meaning, so no query embedder is wired and both
-    // retrieval surfaces below run the keyword leg alone. Re-enabling the semantic leg means
-    // wiring a real provider here AND in the ingestion worker under one model id, then running the
-    // re-embed procedure — see the ADR — never passing createDeterministicQueryEmbedder() here.
-    const aiQueryEmbedder: QueryEmbedder | null = null;
+    // Retrieval embeds questions with aiQueryEmbedder when index.ts built one (ADR-024): the
+    // semantic leg then compares them with chunks the ingestion worker embedded by the same model.
+    // Without one, both retrieval surfaces below run the keyword leg alone (ADR-020).
     // A per-student AI route is the student's own: refused for anyone else in the school before
     // consent, quota or the handler run.
     app.use("/api/ai/students/:studentId/*", aiStudentSelfGate({ database }));
@@ -1551,7 +1555,7 @@ export function createApp({
     // AI data-sharing consent (ST-305): the disclosure, grant, and withdrawal. Not behind
     // requireFeature -- it never reaches the provider, and withdrawal must work without an add-on.
     app.route("/", aiConsentRoutes({ database }));
-    // Retrieval (ST-162; lexical-only per ADR-020). Mounted under the same gate so a search
+    // Retrieval (ST-162; semantic per ADR-024 when an embedder is wired, else lexical per ADR-020). Mounted under the same gate so a search
     // reserves and commits the caller's AI quota, and only when the gate's dependencies (a database
     // for entitlements, Redis for the meter) exist — the retrieval surface must never run un-metered. Cross-encoder
     // re-ranking (ST-163) rides the `ai.rerank` feature flag: off (the default), the route returns

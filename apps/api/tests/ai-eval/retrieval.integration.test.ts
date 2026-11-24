@@ -15,6 +15,10 @@
  *   - `mock-hybrid` — the pre-ADR-020 production configuration: chunks and query embedded with the
  *                     content-hash mock (the exact vectors the ingestion worker writes), fused by
  *                     RRF. Printed as the baseline, never gated — it is the defect F-06 describes.
+ *   - `live-hybrid` — ADR-024: chunks and query embedded by a real model, fused by RRF, gated by the
+ *                     keyword-or-similarity rule. Runs only when AI_EVAL_EMBEDDING_API_KEY and
+ *                     AI_EVAL_EMBEDDING_MODEL are set (AI_EVAL_EMBEDDING_BASE_URL defaults to
+ *                     OpenRouter); it calls the provider, so CI, which has no key, skips it.
  *
  * Metrics (scoring.ts), per configuration:
  *   - refusal correctness: the gate's verdict on the real hits vs the case's expectation;
@@ -36,6 +40,7 @@ import { withTenantTx } from "../../src/db/tenant-tx";
 import { assessGrounding } from "../../src/modules/ai/ask/refusal";
 import { AI_ASK_SOURCE_LIMIT } from "../../src/modules/ai/config";
 import {
+  createOpenAiCompatibleQueryEmbedder,
   deterministicQueryEmbedding,
   RETRIEVAL_EMBEDDING_MODEL,
 } from "../../src/modules/ai/retrieval/embeddings";
@@ -67,7 +72,17 @@ const FLOOR_GROUNDEDNESS = 0.75;
 const FLOOR_REFUSAL_CORRECTNESS = 0.6;
 const FLOOR_RECALL = 0.318;
 
-type Config = "lexical" | "mock-hybrid";
+type Config = "lexical" | "mock-hybrid" | "live-hybrid";
+
+/** The real embedding model for `live-hybrid`, from the environment; null skips that configuration. */
+const liveEmbedder =
+  process.env.AI_EVAL_EMBEDDING_API_KEY && process.env.AI_EVAL_EMBEDDING_MODEL
+    ? createOpenAiCompatibleQueryEmbedder({
+        apiKey: process.env.AI_EVAL_EMBEDDING_API_KEY,
+        baseUrl: process.env.AI_EVAL_EMBEDDING_BASE_URL ?? "https://openrouter.ai/api/v1",
+        model: process.env.AI_EVAL_EMBEDDING_MODEL,
+      })
+    : null;
 
 interface CaseResult {
   id: string;
@@ -110,12 +125,14 @@ function relevantIds(c: (typeof GOLDEN_SET)[number]): string[] {
 }
 
 async function evalCase(c: (typeof GOLDEN_SET)[number], config: Config): Promise<CaseResult> {
+  const vector =
+    config === "lexical"
+      ? { queryVector: null }
+      : config === "mock-hybrid"
+        ? { queryVector: deterministicQueryEmbedding(c.query) }
+        : { queryVector: await liveEmbedder!.embed(c.query), embeddingModel: liveEmbedder!.model };
   const search = await withTenantTx(tenantClient!, { schoolId: tenant.schoolId, userId }, (tx) =>
-    hybridSearch(tx, {
-      query: c.query,
-      queryVector: config === "lexical" ? null : deterministicQueryEmbedding(c.query),
-      limit: AI_ASK_SOURCE_LIMIT,
-    }),
+    hybridSearch(tx, { query: c.query, ...vector, limit: AI_ASK_SOURCE_LIMIT }),
   );
   const verdict = assessGrounding(search.hits, search.mode);
   const relevant = relevantIds(c);
@@ -240,9 +257,35 @@ describeDb("RAG eval — golden set through live retrieval", () => {
   });
 
   test(`lexical: no regression below the measured floor (NFR-11 targets: refusal ≥ ${NFR11_REFUSAL_CORRECTNESS}, groundedness ≥ ${NFR11_GROUNDEDNESS} — not yet met)`, async () => {
-    const s = summarize(await run("lexical"));
+    // Cases asked in other words than their chunks are out of reach of keyword search by design.
+    const keywordReachable = new Set(
+      GOLDEN_SET.filter((c) => !c.requiresSemantic).map((c) => c.id),
+    );
+    const s = summarize((await run("lexical")).filter((r) => keywordReachable.has(r.id)));
     expect(s.refusalCorrectness).toBeGreaterThanOrEqual(FLOOR_REFUSAL_CORRECTNESS);
     expect(s.groundedness).toBeGreaterThanOrEqual(FLOOR_GROUNDEDNESS);
     expect(s.recall).toBeGreaterThanOrEqual(FLOOR_RECALL - 1e-9);
   });
+
+  // Last: it relabels the shared corpus with the live model's vectors, after the runs above.
+  (liveEmbedder ? test : test.skip)(
+    "live-hybrid (ADR-024) is measured against NFR-11",
+    async () => {
+      await asAdmin(tenant.schoolId, async (tx) => {
+        for (const [content, id] of idByContent) {
+          await tx`
+            UPDATE app.material_chunks
+            SET embedding = ${await liveEmbedder!.embed(content)}::public.vector,
+                embedding_model = ${liveEmbedder!.model}
+            WHERE id = ${id}::uuid`;
+        }
+      });
+      const out = await run("live-hybrid");
+      console.log(`\n${table("live-hybrid", out)}\n`);
+      const s = summarize(out);
+      expect(s.refusalCorrectness).toBeGreaterThanOrEqual(FLOOR_REFUSAL_CORRECTNESS);
+      expect(s.groundedness).toBeGreaterThanOrEqual(FLOOR_GROUNDEDNESS);
+    },
+    120_000,
+  );
 });
