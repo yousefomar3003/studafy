@@ -1,6 +1,7 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../core/localization/localized_name.dart';
 import '../../../../design/theme/app_semantic_colors.dart';
 import '../../../../design/tokens/app_radius_tokens.dart';
 import '../../../../design/tokens/app_spacing_tokens.dart';
@@ -246,7 +247,7 @@ class ReportNotesSection extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    subject.name,
+                    context.localizedName(subject.name, subject.nameAr),
                     style: theme.textTheme.labelLarge?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
@@ -404,7 +405,10 @@ class SubjectResultsTable extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(subject.name, style: theme.textTheme.bodyMedium),
+                  Text(
+                    context.localizedName(subject.name, subject.nameAr),
+                    style: theme.textTheme.bodyMedium,
+                  ),
                   if (subject.courseLevel != null || subject.credits != null)
                     Padding(
                       padding: const EdgeInsets.only(top: AppSpacing.space4),

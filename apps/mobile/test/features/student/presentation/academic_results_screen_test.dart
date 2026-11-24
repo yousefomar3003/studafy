@@ -1,4 +1,4 @@
-import 'package:easy_localization/easy_localization.dart';
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -1185,6 +1185,71 @@ void main() {
     expect(find.text('النتيجة السنوية'), findsOneWidget);
     expect(find.text('ناجح ومنقول'), findsOneWidget);
   });
+
+  testWidgets(
+    'an Arabic certificate lays out right to left with the Arabic names it was issued with',
+    (tester) async {
+      final certificate = _certificate();
+      final content = certificate['content']! as Map<String, Object?>;
+      content['language'] = 'ar';
+      (content['school']! as Map<String, Object?>)['name_ar'] = 'مدرسة النور';
+      final student = content['student']! as Map<String, Object?>;
+      student['first_name_ar'] = 'لينا';
+      student['last_name_ar'] = 'حداد';
+      final subjects = content['subjects']! as List<Object?>;
+      (subjects.first! as Map<String, Object?>)['name_ar'] = 'الرياضيات';
+      await _pump(
+        tester,
+        _FakeResultsClient(certificates: [certificate]),
+        home: const CertificateDetailScreen(certificateId: 'cert-1'),
+      );
+
+      // The reader's app is in English; the document is Arabic.
+      expect(find.text('مدرسة النور'), findsOneWidget);
+      expect(find.text('لينا حداد'), findsOneWidget);
+      expect(find.text('Al Noor School'), findsNothing);
+      expect(find.text('الرياضيات'), findsOneWidget);
+      expect(
+        Directionality.of(tester.element(find.text('لينا حداد'))),
+        TextDirection.rtl,
+      );
+    },
+  );
+
+  testWidgets('a bilingual certificate shows both spellings', (tester) async {
+    final certificate = _certificate();
+    final content = certificate['content']! as Map<String, Object?>;
+    content['language'] = 'bilingual';
+    (content['school']! as Map<String, Object?>)['name_ar'] = 'مدرسة النور';
+    await _pump(
+      tester,
+      _FakeResultsClient(certificates: [certificate]),
+      home: const CertificateDetailScreen(certificateId: 'cert-1'),
+    );
+
+    expect(find.text('Al Noor School / مدرسة النور'), findsOneWidget);
+    // No Arabic name for the student: the English one stands alone.
+    expect(find.text('Lina Haddad'), findsOneWidget);
+  });
+
+  testWidgets(
+    'a certificate without a language follows the app, in Arabic too',
+    (tester) async {
+      final certificate = _certificate();
+      final content = certificate['content']! as Map<String, Object?>;
+      (content['school']! as Map<String, Object?>)['name_ar'] = 'مدرسة النور';
+      await _pump(
+        tester,
+        _FakeResultsClient(certificates: [certificate]),
+        home: const CertificateDetailScreen(certificateId: 'cert-1'),
+        locale: const Locale('ar'),
+      );
+
+      expect(find.text('مدرسة النور'), findsOneWidget);
+      // An unknown subject name falls back to English.
+      expect(find.text('Lina Haddad'), findsOneWidget);
+    },
+  );
 
   const report = {
     'teacher_comment': 'A kind and focused classmate.',

@@ -13,6 +13,12 @@ import {
   ResultValue,
   WeightedGpa,
 } from "../../academic-setup/components";
+import {
+  DocumentLanguageScope,
+  documentStudentName,
+  localized,
+  useDocumentText,
+} from "../../academic-setup/document-language";
 
 import { useTranscript } from "./queries";
 import { TranscriptExternalExams } from "./TranscriptExternalExams";
@@ -73,6 +79,7 @@ function yearHasCredits(year: TranscriptContent["years"][number]): boolean {
   return year.subjects.some((subject) => typeof subject.credits === "number");
 }
 
+/** The transcript in the language it was issued in, or the reader's when it has none. */
 export function TranscriptDocument({
   content,
   voided,
@@ -80,7 +87,15 @@ export function TranscriptDocument({
   content: TranscriptContent;
   voided: boolean;
 }) {
-  const { t } = useTranslation();
+  return (
+    <DocumentLanguageScope language={content.language}>
+      <TranscriptBody content={content} voided={voided} />
+    </DocumentLanguageScope>
+  );
+}
+
+function TranscriptBody({ content, voided }: { content: TranscriptContent; voided: boolean }) {
+  const { label: t, name, dir, lang } = useDocumentText();
   const { formatDate } = useFormatters();
   const cumulative = content.cumulative;
 
@@ -88,9 +103,14 @@ export function TranscriptDocument({
     <article
       className={`ag-certificate ag-transcript${voided ? " ag-certificate--void" : ""}`}
       aria-labelledby="ag-transcript-title"
+      dir={dir}
+      lang={lang}
+      data-document-language={content.language ?? "viewer"}
     >
       <header className="ag-certificate__header">
-        <p className="ag-certificate__school">{content.school.name}</p>
+        <p className="ag-certificate__school">
+          {name(content.school.name, content.school.name_ar)}
+        </p>
         <h2 id="ag-transcript-title" className="ag-certificate__title">
           {t("academicGrading.transcript.title")}
         </h2>
@@ -99,9 +119,7 @@ export function TranscriptDocument({
       <dl className="ag-certificate__facts">
         <div>
           <dt>{t("academicGrading.certificate.student")}</dt>
-          <dd>
-            {content.student.first_name} {content.student.last_name}
-          </dd>
+          <dd>{documentStudentName({ name }, content.student)}</dd>
         </div>
         <div>
           <dt>{t("academicGrading.certificate.admission")}</dt>
@@ -128,14 +146,16 @@ export function TranscriptDocument({
             className="ag-transcript__year-title"
           >
             {t("academicGrading.transcript.yearHeading", {
-              year: year.academic_year.name,
-              grade: year.grade_level_name,
-              section: year.section_name,
+              year: localized(year.academic_year.name, year.academic_year.name_ar),
+              grade: localized(year.grade_level_name, year.grade_level_name_ar),
+              section: localized(year.section_name, year.section_name_ar),
             })}
           </h3>
           <table className="ag-certificate__table">
             <caption className="sf-visually-hidden">
-              {t("academicGrading.transcript.yearCaption", { year: year.academic_year.name })}
+              {t("academicGrading.transcript.yearCaption", {
+                year: localized(year.academic_year.name, year.academic_year.name_ar),
+              })}
             </caption>
             <thead>
               <tr>
@@ -154,7 +174,7 @@ export function TranscriptDocument({
               {year.subjects.map((subject) => (
                 <tr key={subject.code}>
                   <th scope="row">
-                    {subject.name}
+                    {name(subject.name, subject.name_ar)}
                     <CourseLevel level={subject.course_level} />
                     {subject.descriptive && !subject.exempt && (subject.skills?.length ?? 0) > 0 ? (
                       <ul className="ag-transcript__skills">

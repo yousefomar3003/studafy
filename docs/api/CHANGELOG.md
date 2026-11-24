@@ -78,6 +78,21 @@ when it required the `version-bump` label.
   `SaveDiplomaCoreBody` with `kind` `final` / `predicted`) and `getStudentDiploma`
   (`GET /api/grading/students/{studentId}/diploma`, `grade:read`) returning `StudentDiploma` with
   the predicted total. New error code `DIPLOMA_TOTAL_DISABLED` (409).
+- Arabic + English documents (migration 000263; docs/modules/bilingual-documents.md). New
+  `getDocumentLanguageSettings` / `updateDocumentLanguageSettings`
+  (`GET/PUT /api/grading/document-language-settings`, `academicConfig:read` / `:manage`) with
+  `DocumentLanguageSettings` (`report_card_language`, `certificate_language`,
+  `transcript_language`: `viewer`, `en`, `ar`, `bilingual`; `school_name_ar`). Optional Arabic
+  names: `StudentProfile`, `StudentDemographics`, `StudentSelf` and the create/update bodies add
+  `first_name_ar`, `middle_name_ar`, `last_name_ar`; `Subject`, `GradeLevel`, `Section`, `Term`,
+  `AcademicYear` and their bodies add `name_ar` (`Section` also `grade_level_name_ar`); omitted
+  keeps, null or blank clears. `Course` (list/get), `PublishedGrade.course`,
+  `ChildTimetableCourse`, `FinalizedSubjectResult` and `ReleasedMarkSubject` add the subject's
+  `subject_name_ar`; `FinalizedStudentResult` adds the student's Arabic names.
+  `CertificateContent` and `TranscriptContent` add optional `language` and `name_ar` /
+  `*_name_ar` fields, present only on documents issued with them. The student list search and the
+  global search also match a student's Arabic name.
+
 - Class rank and percentile (migration 000257; docs/database/academic-grading.md "Class rank and
   percentile"). New `listTopStudents`
   (`GET /api/grading/years/{yearId}/programs/{gradeLevelId}/top-students`, `result:finalize`;

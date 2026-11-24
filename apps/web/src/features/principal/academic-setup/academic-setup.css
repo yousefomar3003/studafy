@@ -769,3 +769,23 @@
     display: none;
   }
 }
+
+/* Arabic + English documents (000263). An Arabic document reads right to left (dir="rtl" on the
+   article); Arabic text prefers Noto Sans Arabic, the face the server PDFs embed, when installed. */
+.ag-certificate:lang(ar),
+.ag-certificate [lang="ar"],
+.ag-certificate[data-document-language="bilingual"] {
+  font-family: "Noto Sans Arabic", var(--font-family-sans);
+}
+
+.ag-document-preview {
+  margin-block-start: var(--space-16);
+  max-block-size: 40rem;
+  overflow: auto;
+}
+
+@media print {
+  .ag-document-preview {
+    display: none;
+  }
+}

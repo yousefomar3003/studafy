@@ -24,13 +24,18 @@ class ClassMaterialsSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final classCode = ref.watch(materialsClassCodeProvider(classId));
     final materialsAsync = ref.watch(materialsForClassProvider(classId));
+    // In Arabic, the subject's Arabic name heads the section when the school has one.
+    final subjectNameAr = context.locale.languageCode == 'ar'
+        ? ref.watch(materialsClassSubjectNameArProvider(classId)).value
+        : null;
     final visual = SubjectVisuals.of(classCode.value, fallbackKey: classId);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         AppSectionHeader(
-          title: classCode.value ?? 'materials.unknownClass'.tr(),
+          title:
+              subjectNameAr ?? classCode.value ?? 'materials.unknownClass'.tr(),
           icon: visual.icon,
           accent: visual.accent,
         ),
@@ -75,7 +80,8 @@ class ClassMaterialsSection extends ConsumerWidget {
                     accent: visual.accent,
                     onTap: () => Navigator.of(context).push(
                       MaterialPageRoute<void>(
-                        builder: (_) => MaterialViewerScreen(material: material),
+                        builder: (_) =>
+                            MaterialViewerScreen(material: material),
                       ),
                     ),
                   ),
@@ -97,6 +103,9 @@ class _MessageCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => AppCardSurface(
-    child: Padding(padding: const EdgeInsets.all(AppSpacing.space16), child: child),
+    child: Padding(
+      padding: const EdgeInsets.all(AppSpacing.space16),
+      child: child,
+    ),
   );
 }

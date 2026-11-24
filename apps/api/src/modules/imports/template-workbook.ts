@@ -61,6 +61,9 @@ const COLUMNS: readonly TemplateColumn[] = [
   { field: "parent2_email", width: 24 },
   { field: "email", width: 24 },
   { field: "preferred_name", width: 16 },
+  { field: "first_name_ar", width: 16 },
+  { field: "middle_name_ar", width: 16 },
+  { field: "last_name_ar", width: 16 },
 ];
 
 /** Header text per language. Each is the field's own name or one of its recognised aliases. */
@@ -85,6 +88,9 @@ const HEADERS: Readonly<Record<TemplateLanguage, Readonly<Record<StudentImportFi
     parent2_email: "Parent 2 email",
     email: "Student email",
     preferred_name: "Preferred name",
+    first_name_ar: "First name (Arabic)",
+    middle_name_ar: "Middle name (Arabic)",
+    last_name_ar: "Last name (Arabic)",
   },
   ar: {
     admission_number: "رقم الطالب",
@@ -106,6 +112,9 @@ const HEADERS: Readonly<Record<TemplateLanguage, Readonly<Record<StudentImportFi
     parent2_email: "بريد ولي الأمر 2",
     email: "بريد الطالب",
     preferred_name: "الاسم المفضل",
+    first_name_ar: "الاسم الأول بالعربي",
+    middle_name_ar: "اسم الأب بالعربي",
+    last_name_ar: "اسم العائلة بالعربي",
   },
 };
 
@@ -133,6 +142,7 @@ const NOTES: Readonly<Record<TemplateLanguage, Partial<Record<StudentImportField
     parent2_phone: "Required when you type a second parent.",
     parent2_email: "Optional.",
     email: "Optional. Students without an email sign in with the ID Studafy gives them.",
+    first_name_ar: "Optional. The name in Arabic, shown on Arabic and bilingual documents.",
   },
   ar: {
     admission_number: "مطلوب. رقم الطالب الخاص بمدرستك.",
@@ -155,6 +165,7 @@ const NOTES: Readonly<Record<TemplateLanguage, Partial<Record<StudentImportField
     parent2_phone: "مطلوب عند كتابة ولي أمر ثانٍ.",
     parent2_email: "اختياري.",
     email: "اختياري. الطالب الذي ليس لديه بريد يسجّل الدخول بالرقم الذي يعطيه له Studafy.",
+    first_name_ar: "اختياري. الاسم بالعربية، يظهر في الوثائق العربية وثنائية اللغة.",
   },
 };
 

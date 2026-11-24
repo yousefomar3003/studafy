@@ -579,6 +579,7 @@ const EXPECTED_PATHS = [
   "/api/grading/ministry-exports/preview",
   "/api/grading/my-assignments",
   "/api/grading/my-coordinated-subjects",
+  "/api/grading/document-language-settings",
   "/api/grading/report-card-settings",
   "/api/grading/scales/{scaleId}",
   "/api/grading/sections/{sectionId}/report-notes",

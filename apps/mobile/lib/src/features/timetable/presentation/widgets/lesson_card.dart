@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/api/generated/models/timetable_slot.dart';
 import '../../../../core/auth/auth_providers.dart';
+import '../../../../core/localization/localized_name.dart';
 import '../../../../design/tokens/app_radius_tokens.dart';
 import '../../../../design/tokens/app_spacing_tokens.dart';
 import '../../application/weekly_schedule_providers.dart';
@@ -11,8 +12,12 @@ import '../../domain/weekly_schedule.dart';
 import 'schedule_section.dart';
 
 /// A class's display labels: its section code ("SCI101-A") and, when resolvable, its course's
-/// name ("Integrated Science").
-typedef ScheduleClassLabel = ({String code, String? courseName});
+/// name ("Integrated Science") and its subject's Arabic name (000263).
+typedef ScheduleClassLabel = ({
+  String code,
+  String? courseName,
+  String? subjectNameAr,
+});
 
 /// Resolves a class's labels by id. Riverpod's `.family` cache covers the handful of distinct
 /// classes on one schedule. The course name is best-effort: if that lookup fails the card falls
@@ -22,14 +27,21 @@ final scheduleClassLabelProvider = FutureProvider.autoDispose
       final api = ref.watch(apiClientProvider);
       final classValue = await api.academics.getClass(classId: classId);
       String? courseName;
+      String? subjectNameAr;
       try {
-        courseName = (await api.academics.getCourse(
+        final course = await api.academics.getCourse(
           courseId: classValue.courseId,
-        )).name;
+        );
+        courseName = course.name;
+        subjectNameAr = course.subjectNameAr;
       } on Object {
         courseName = null;
       }
-      return (code: classValue.code, courseName: courseName);
+      return (
+        code: classValue.code,
+        courseName: courseName,
+        subjectNameAr: subjectNameAr,
+      );
     });
 
 /// One lesson in a weekly schedule: a period badge, the subject, and the other party — the
@@ -59,7 +71,11 @@ class LessonCard extends ConsumerWidget {
     final colorScheme = theme.colorScheme;
     final resolved = labels;
     final label = resolved != null
-        ? (code: resolved.classCode, courseName: resolved.title)
+        ? (
+            code: resolved.classCode,
+            courseName: resolved.title,
+            subjectNameAr: resolved.titleAr,
+          )
         : ref.watch(scheduleClassLabelProvider(slot.classId)).value;
     final teacherName = audience != ScheduleAudience.student
         ? null
@@ -71,8 +87,10 @@ class LessonCard extends ConsumerWidget {
         ? scheduleSectionOf(slot)
         : null;
 
-    final title =
-        label?.courseName ?? label?.code ?? 'timetable.slot.unknownClass'.tr();
+    final courseName = label?.courseName;
+    final title = courseName != null
+        ? context.localizedName(courseName, label?.subjectNameAr)
+        : label?.code ?? 'timetable.slot.unknownClass'.tr();
     final details = <(IconData, String)>[
       if (audience == ScheduleAudience.teacher && label != null)
         (Icons.groups_outlined, label.code),

@@ -145,6 +145,7 @@ import {
   gradingCoordinatorRoutes,
   gradingCurriculumTemplateRoutes,
   gradingDiplomaRoutes,
+  gradingDocumentLanguageRoutes,
   gradingMarksRoutes,
   gradingPredictedGradesRoutes,
   gradingReportCardRoutes,
@@ -1214,6 +1215,8 @@ export function createApp({
     app.route("/", gradingTranscriptRoutes(database));
     // Report card comments, attendance and conduct (000209).
     app.route("/", gradingReportCardRoutes(database));
+    // Arabic + English documents: the language each document type is issued in (000263).
+    app.route("/", gradingDocumentLanguageRoutes(database));
     // External exams and test scores: SAT, IELTS, IGCSE finals... (000255).
     app.route("/", externalExamRoutes(database));
     // Exam entries: sessions of those exams and the students entered for them (000261).

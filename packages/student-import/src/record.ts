@@ -20,6 +20,10 @@ export interface StudentImportRecord {
   middle_name: string | null;
   last_name: string;
   preferred_name: string | null;
+  /** Arabic names (000263); null when the file does not provide them. */
+  first_name_ar: string | null;
+  middle_name_ar: string | null;
+  last_name_ar: string | null;
   date_of_birth: string | null;
   status: StudentStatus | null;
   /** The grade and section to place the student in, by name, for the current academic year. */
@@ -146,6 +150,9 @@ const recordSchema = z.object({
   middle_name: optionalText(100),
   last_name: requiredText(100),
   preferred_name: optionalText(100),
+  first_name_ar: optionalText(100),
+  middle_name_ar: optionalText(100),
+  last_name_ar: optionalText(100),
   date_of_birth: z.iso.date({ error: "Use the YYYY-MM-DD format." }).nullable(),
   status: z.enum(STUDENT_STATUSES, { error: `One of: ${STUDENT_STATUSES.join(", ")}.` }).nullable(),
   grade: optionalText(100),
@@ -171,6 +178,9 @@ export function withRecordDefaults(record: StudentImportRecord): StudentImportRe
   return {
     ...record,
     email: record.email ?? null,
+    first_name_ar: record.first_name_ar ?? null,
+    middle_name_ar: record.middle_name_ar ?? null,
+    last_name_ar: record.last_name_ar ?? null,
     parent_name: record.parent_name ?? null,
     parent_phone: record.parent_phone ?? null,
     grade: record.grade ?? null,

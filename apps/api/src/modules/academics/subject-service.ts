@@ -1,5 +1,7 @@
 import { HTTPException } from "hono/http-exception";
 
+import { cleanNameAr } from "./section-service";
+
 import type { TransactionSql } from "postgres";
 
 // ---------------------------------------------------------------------------
@@ -13,6 +15,8 @@ export interface SubjectRow {
   school_id: string;
   code: string;
   name: string;
+  /** Arabic name (000263); null falls back to `name`. */
+  name_ar: string | null;
   description: string | null;
   status: CatalogStatus;
   created_at: Date;
@@ -28,6 +32,7 @@ export interface ListSubjectsParams {
 export interface CreateSubjectParams {
   code: string;
   name: string;
+  name_ar?: string | null;
   description?: string | null;
   status?: string;
 }
@@ -35,6 +40,8 @@ export interface CreateSubjectParams {
 export interface UpdateSubjectParams {
   code?: string;
   name?: string;
+  /** Omitted: unchanged. null or blank: cleared. */
+  name_ar?: string | null;
   description?: string | null;
   status?: string;
 }
@@ -54,7 +61,7 @@ export async function listSubjects(
 
   const [rows, countResult] = await Promise.all([
     tx<SubjectRow[]>`
-      SELECT s.id, s.school_id, s.code, s.name, s.description, s.status,
+      SELECT s.id, s.school_id, s.code, s.name, s.name_ar, s.description, s.status,
              s.created_at, s.updated_at
       FROM app.subjects AS s
       WHERE s.school_id = ${schoolId}
@@ -80,7 +87,7 @@ export async function getSubject(
   subjectId: string,
 ): Promise<SubjectRow | undefined> {
   const [row] = await tx<SubjectRow[]>`
-    SELECT id, school_id, code, name, description, status, created_at, updated_at
+    SELECT id, school_id, code, name, name_ar, description, status, created_at, updated_at
     FROM app.subjects
     WHERE id = ${subjectId} AND school_id = ${schoolId}
   `;
@@ -93,15 +100,16 @@ export async function createSubject(
   params: CreateSubjectParams,
 ): Promise<SubjectRow> {
   const [row] = await tx<SubjectRow[]>`
-    INSERT INTO app.subjects (school_id, code, name, description, status)
+    INSERT INTO app.subjects (school_id, code, name, name_ar, description, status)
     VALUES (
       ${schoolId},
       ${params.code},
       ${params.name},
+      ${cleanNameAr(params.name_ar)},
       ${params.description ?? null},
       ${params.status ?? "draft"}::app.catalog_status
     )
-    RETURNING id, school_id, code, name, description, status, created_at, updated_at
+    RETURNING id, school_id, code, name, name_ar, description, status, created_at, updated_at
   `;
 
   return row!;
@@ -122,11 +130,13 @@ export async function updateSubject(
     UPDATE app.subjects
     SET code = COALESCE(${params.code ?? null}, code),
         name = COALESCE(${params.name ?? null}, name),
+        name_ar = CASE WHEN ${params.name_ar !== undefined}
+          THEN ${cleanNameAr(params.name_ar)}::text ELSE name_ar END,
         description = COALESCE(${params.description ?? null}, description),
         status = COALESCE(${params.status ?? null}::app.catalog_status, status),
         updated_at = CURRENT_TIMESTAMP
     WHERE id = ${subjectId} AND school_id = ${schoolId}
-    RETURNING id, school_id, code, name, description, status, created_at, updated_at
+    RETURNING id, school_id, code, name, name_ar, description, status, created_at, updated_at
   `;
 
   if (!row) {

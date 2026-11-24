@@ -920,7 +920,9 @@
       "done": "Done"
     },
     "classesLink": "Classes",
-    "promotionLink": "Move students to next year"
+    "promotionLink": "Move students to next year",
+    "nameAr": "Arabic name",
+    "nameArHelper": "Optional. Shown on Arabic and bilingual documents."
   },
   "students": {
     "title": "Students",
@@ -1262,7 +1264,9 @@
       "creditsInvalid": "Enter a number above 0.",
       "status": "Status",
       "statusHelper": "Only active courses are offered for new classes.",
-      "save": "Save"
+      "save": "Save",
+      "nameAr": "Arabic name",
+      "nameArHelper": "Optional. Shown on Arabic and bilingual documents and in the app in Arabic."
     }
   },
   "promotion": {

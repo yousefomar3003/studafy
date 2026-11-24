@@ -5,6 +5,13 @@ import { uuidSchema, dateTimeSchema, dateSchema } from "@studafy/shared-schemas"
 // Enums
 // ---------------------------------------------------------------------------
 
+/** An optional Arabic name on a write (000263): omitted keeps it, null or blank clears it. */
+const nameArInput = {
+  name_ar: z.string().trim().max(200).nullable().optional().openapi({
+    description: "Arabic name (000263). Omitted: unchanged. null or blank: cleared.",
+  }),
+};
+
 export const academicYearStatusSchema = z
   .enum(["planned", "active", "closed", "archived"])
   .openapi({ description: "Lifecycle state of an academic year." });
@@ -25,6 +32,9 @@ export const academicYearSchema = z
     name: z
       .string()
       .openapi({ description: "Human-readable name.", example: "Academic Year 2025-2026" }),
+    name_ar: z.string().nullable().optional().openapi({
+      description: "Arabic name (000263); null when there is none, and readers use `name`.",
+    }),
     starts_on: dateSchema.openapi({ description: "First day of the academic year." }),
     ends_on: dateSchema.openapi({ description: "Last day of the academic year." }),
     status: academicYearStatusSchema,
@@ -47,6 +57,7 @@ export const createAcademicYearBodySchema = z
       .min(1)
       .max(200)
       .openapi({ description: "Human-readable name.", example: "Academic Year 2025-2026" }),
+    ...nameArInput,
     starts_on: z.string().date().openapi({ description: "First day (YYYY-MM-DD)." }),
     ends_on: z
       .string()
@@ -62,6 +73,7 @@ export const updateAcademicYearBodySchema = z
   .object({
     code: z.string().min(1).max(50).optional().openapi({ description: "Short unique code." }),
     name: z.string().min(1).max(200).optional().openapi({ description: "Human-readable name." }),
+    ...nameArInput,
     starts_on: z.string().date().optional().openapi({ description: "First day (YYYY-MM-DD)." }),
     ends_on: z.string().date().optional().openapi({ description: "Last day (YYYY-MM-DD)." }),
     status: academicYearStatusSchema.optional(),
@@ -90,6 +102,9 @@ export const termSchema = z
       .string()
       .openapi({ description: "Short unique code within the academic year.", example: "T1" }),
     name: z.string().openapi({ description: "Human-readable name.", example: "Term 1" }),
+    name_ar: z.string().nullable().optional().openapi({
+      description: "Arabic name (000263); null when there is none, and readers use `name`.",
+    }),
     sequence_number: z
       .number()
       .int()
@@ -113,6 +128,7 @@ export const createTermBodySchema = z
       .min(1)
       .max(200)
       .openapi({ description: "Human-readable name.", example: "Term 1" }),
+    ...nameArInput,
     sequence_number: z
       .number()
       .int()
@@ -130,6 +146,7 @@ export const updateTermBodySchema = z
   .object({
     code: z.string().min(1).max(50).optional().openapi({ description: "Short unique code." }),
     name: z.string().min(1).max(200).optional().openapi({ description: "Human-readable name." }),
+    ...nameArInput,
     sequence_number: z
       .number()
       .int()
@@ -241,6 +258,9 @@ export const subjectSchema = z
       .string()
       .openapi({ description: "Short unique code within the school.", example: "MATH" }),
     name: z.string().openapi({ description: "Human-readable name.", example: "Mathematics" }),
+    name_ar: z.string().nullable().optional().openapi({
+      description: "Arabic name (000263); null when there is none, and readers use `name`.",
+    }),
     description: z
       .string()
       .nullable()
@@ -261,6 +281,7 @@ export const createSubjectBodySchema = z
       .min(1)
       .max(200)
       .openapi({ description: "Human-readable name.", example: "Mathematics" }),
+    ...nameArInput,
     description: z
       .string()
       .max(2000)
@@ -277,6 +298,7 @@ export const updateSubjectBodySchema = z
   .object({
     code: z.string().min(1).max(50).optional().openapi({ description: "Short unique code." }),
     name: z.string().min(1).max(200).optional().openapi({ description: "Human-readable name." }),
+    ...nameArInput,
     description: z
       .string()
       .max(2000)
@@ -317,6 +339,10 @@ export const courseSchema = z
       .string()
       .openapi({ description: "Short unique code within the school.", example: "CALC101" }),
     name: z.string().openapi({ description: "Human-readable name.", example: "Calculus I" }),
+    subject_name_ar: z.string().nullable().optional().openapi({
+      description:
+        "The subject's Arabic name (000263), on list and get: apps in Arabic show it for the course. Null when the subject has none.",
+    }),
     description: z.string().nullable().openapi({ description: "Optional description." }),
     credit_hours: z.number().positive().openapi({
       description: "Academic credits used to weight term and cumulative GPA.",
@@ -568,6 +594,9 @@ export const gradeLevelSchema = z
     id: uuidSchema.openapi({ description: "Primary key." }),
     school_id: uuidSchema.openapi({ description: "Owning school tenant." }),
     name: z.string().openapi({ description: "Display name.", example: "Grade 10" }),
+    name_ar: z.string().nullable().optional().openapi({
+      description: "Arabic name (000263); null when there is none, and readers use `name`.",
+    }),
     sort_order: z
       .number()
       .int()
@@ -585,6 +614,7 @@ export type GradeLevel = z.infer<typeof gradeLevelSchema>;
 export const createGradeLevelBodySchema = z
   .object({
     name: z.string().trim().min(1).max(100).openapi({ example: "Grade 10" }),
+    ...nameArInput,
     sort_order: z.number().int().min(0).max(32767),
   })
   .openapi("CreateGradeLevelBody");
@@ -592,6 +622,7 @@ export const createGradeLevelBodySchema = z
 export const updateGradeLevelBodySchema = z
   .object({
     name: z.string().trim().min(1).max(100).optional(),
+    ...nameArInput,
     sort_order: z.number().int().min(0).max(32767).optional(),
     archived: z
       .boolean()
@@ -626,7 +657,15 @@ export const sectionSchema = z
     academic_year_id: uuidSchema.openapi({ description: "Academic year the section runs in." }),
     grade_level_id: uuidSchema.openapi({ description: "Grade the section belongs to." }),
     grade_level_name: z.string().openapi({ description: "The grade's name.", example: "Grade 10" }),
+    grade_level_name_ar: z
+      .string()
+      .nullable()
+      .optional()
+      .openapi({ description: "The grade's Arabic name, if any (000263)." }),
     name: z.string().openapi({ description: "Section name within the grade.", example: "C" }),
+    name_ar: z.string().nullable().optional().openapi({
+      description: "Arabic name (000263); null when there is none, and readers use `name`.",
+    }),
     student_count: z.number().int().openapi({ description: "Students placed in this section." }),
     archived_at: dateTimeSchema
       .nullable()
@@ -643,20 +682,23 @@ export const createSectionBodySchema = z
     academic_year_id: uuidSchema,
     grade_level_id: uuidSchema,
     name: z.string().trim().min(1).max(50).openapi({ example: "C" }),
+    ...nameArInput,
   })
   .openapi("CreateSectionBody");
 
 export const updateSectionBodySchema = z
   .object({
     name: z.string().trim().min(1).max(50).optional(),
+    ...nameArInput,
     archived: z
       .boolean()
       .optional()
       .openapi({ description: "Archive (true) or restore (false) the section. History is kept." }),
   })
-  .refine((body) => body.name !== undefined || body.archived !== undefined, {
-    message: "Provide a name or an archived flag",
-  })
+  .refine(
+    (body) => body.name !== undefined || body.name_ar !== undefined || body.archived !== undefined,
+    { message: "Provide a name, an Arabic name or an archived flag" },
+  )
   .openapi("UpdateSectionBody");
 
 export const sectionListSchema = z

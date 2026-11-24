@@ -87,6 +87,9 @@ export const UPDATABLE_STUDENT_FIELDS = [
   "middle_name",
   "last_name",
   "preferred_name",
+  "first_name_ar",
+  "middle_name_ar",
+  "last_name_ar",
   "date_of_birth",
   "status",
 ] as const;
@@ -184,6 +187,9 @@ interface LiveStudent {
   middle_name: string | null;
   last_name: string;
   preferred_name: string | null;
+  first_name_ar: string | null;
+  middle_name_ar: string | null;
+  last_name_ar: string | null;
   date_of_birth: string | null;
   status: string;
   has_parent: boolean;
@@ -525,6 +531,7 @@ async function loadLiveData(
   const students = await tx<LiveStudent[]>`
     SELECT s.id, s.user_id, s.normalized_admission_number, u.normalized_email,
            s.first_name, s.middle_name, s.last_name, s.preferred_name,
+           s.first_name_ar, s.middle_name_ar, s.last_name_ar,
            s.date_of_birth::text AS date_of_birth, s.status::text AS status,
            EXISTS (
              SELECT 1 FROM app.parent_child_links AS pcl

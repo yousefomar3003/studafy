@@ -1,5 +1,6 @@
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 
+import { useDocumentText } from "./document-language";
 import { conductLabel } from "./report-cards";
 
 import type { CertificateContent } from "./queries";
@@ -10,8 +11,14 @@ import type { CertificateContent } from "./queries";
  * the results were finalized. Renders nothing for certificates issued before report card notes.
  */
 export function ReportNotesBlock({ content }: { content: CertificateContent }) {
-  const { t, i18n } = useTranslation();
+  const { i18n } = useTranslation();
+  const { label: t, name, language } = useDocumentText();
   const { formatDate, formatNumber } = useFormatters();
+  // The conduct rating in the document's language; both labels on a bilingual one.
+  const conduct = (rating: { label: string; label_ar: string | null }) =>
+    language === "bilingual"
+      ? name(rating.label, rating.label_ar)
+      : conductLabel(rating, language ?? i18n.language);
   const report = content.report;
   const subjectComments = content.subjects.filter((subject) => subject.comment);
   if (!report && subjectComments.length === 0) return null;
@@ -29,7 +36,7 @@ export function ReportNotesBlock({ content }: { content: CertificateContent }) {
           <dl className="ag-certificate__comments">
             {subjectComments.map((subject) => (
               <div key={subject.code}>
-                <dt>{subject.name}</dt>
+                <dt>{name(subject.name, subject.name_ar)}</dt>
                 <dd>{subject.comment}</dd>
               </div>
             ))}
@@ -42,7 +49,7 @@ export function ReportNotesBlock({ content }: { content: CertificateContent }) {
           {report.conduct ? (
             <div>
               <dt>{t("academicGrading.certificate.conduct")}</dt>
-              <dd>{conductLabel(report.conduct, i18n.language)}</dd>
+              <dd>{conduct(report.conduct)}</dd>
             </div>
           ) : null}
           {report.attendance ? (

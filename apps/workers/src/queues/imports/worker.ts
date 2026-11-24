@@ -425,11 +425,13 @@ async function createStudent(ctx: ApplyContext, row: PlannedRow): Promise<string
   const [student] = await tx<{ id: string }[]>`
     INSERT INTO app.students (
       school_id, user_id, admission_number, first_name, middle_name,
-      last_name, preferred_name, date_of_birth, admission_date, status
+      last_name, preferred_name, first_name_ar, middle_name_ar, last_name_ar,
+      date_of_birth, admission_date, status
     ) VALUES (
       ${schoolId}::uuid, ${userId}::uuid, ${record.admission_number}, ${record.first_name},
       ${record.middle_name}, ${record.last_name}, ${record.preferred_name},
-      ${record.date_of_birth}::date, CURRENT_DATE,
+      ${record.first_name_ar ?? null}, ${record.middle_name_ar ?? null},
+      ${record.last_name_ar ?? null}, ${record.date_of_birth}::date, CURRENT_DATE,
       ${record.status ?? "applicant"}::app.student_status
     )
     RETURNING id
@@ -447,6 +449,9 @@ async function createStudent(ctx: ApplyContext, row: PlannedRow): Promise<string
       middle_name: record.middle_name,
       last_name: record.last_name,
       preferred_name: record.preferred_name,
+      first_name_ar: record.first_name_ar ?? null,
+      middle_name_ar: record.middle_name_ar ?? null,
+      last_name_ar: record.last_name_ar ?? null,
       date_of_birth: record.date_of_birth,
       status: record.status ?? "applicant",
     },
@@ -466,6 +471,9 @@ async function updateStudent(ctx: ApplyContext, studentId: string, row: PlannedR
         middle_name = COALESCE(${next("middle_name")}, middle_name),
         last_name = COALESCE(${next("last_name")}, last_name),
         preferred_name = COALESCE(${next("preferred_name")}, preferred_name),
+        first_name_ar = COALESCE(${next("first_name_ar")}, first_name_ar),
+        middle_name_ar = COALESCE(${next("middle_name_ar")}, middle_name_ar),
+        last_name_ar = COALESCE(${next("last_name_ar")}, last_name_ar),
         date_of_birth = COALESCE(${next("date_of_birth")}::date, date_of_birth),
         status = COALESCE(${next("status")}::app.student_status, status),
         updated_at = CURRENT_TIMESTAMP

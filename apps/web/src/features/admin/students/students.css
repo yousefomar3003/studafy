@@ -94,6 +94,26 @@
   margin: 0;
 }
 
+/* Arabic names (000263): a quiet group inside the create and edit forms. */
+.students-form__arabic-names {
+  display: grid;
+  gap: var(--space-12);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.students-form__arabic-names legend {
+  padding: 0;
+  font-weight: 600;
+}
+
+.students-form__hint {
+  margin: 0;
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-xs);
+}
+
 .students-guardian-picker__selected {
   display: flex;
   align-items: center;

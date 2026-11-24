@@ -141,7 +141,14 @@ export const childTimetableSlotSchema = z
     // Class, Course and Teacher) in the generated mobile client.
     class: z.object({ id: uuidSchema, code: z.string() }).openapi("ChildTimetableClass"),
     course: z
-      .object({ id: uuidSchema, code: z.string(), name: z.string() })
+      .object({
+        id: uuidSchema,
+        code: z.string(),
+        name: z.string(),
+        subject_name_ar: z.string().optional().openapi({
+          description: "The subject's Arabic name (000263), when it has one.",
+        }),
+      })
       .openapi("ChildTimetableCourse")
       .nullable(),
     teacher: z

@@ -1281,11 +1281,38 @@ const descriptiveSkillSchema = z
   })
   .openapi("DescriptiveSkillResult");
 
+/**
+ * Arabic names (000263) on documents: present only when the school had one at issue, and absent on
+ * documents issued before. Readers fall back to the English name.
+ */
+export const nameArField = {
+  name_ar: z.string().optional().openapi({
+    description: "The Arabic name at issue, when there was one (000263).",
+  }),
+};
+
+export const documentArabicStudentNameFields = {
+  first_name_ar: z.string().optional(),
+  middle_name_ar: z.string().optional(),
+  last_name_ar: z.string().optional(),
+};
+
+/** A student's Arabic names on live reads (000263): null when the school keeps none. */
+export const arabicStudentNameFields = {
+  first_name_ar: z.string().nullable().optional(),
+  middle_name_ar: z.string().nullable().optional(),
+  last_name_ar: z.string().nullable().optional(),
+};
+
 const storedSubjectResultSchema = z
   .object({
     subject_id: uuidSchema,
     subject_code: z.string(),
     subject_name: z.string(),
+    subject_name_ar: z.string().nullable().optional().openapi({
+      description:
+        "The subject's Arabic name, when the school has one (absent from servers before 000263).",
+    }),
     status: z.enum(["complete", "incomplete", "exempt"]),
     percentage: z.number().nullable(),
     marks_obtained: z.number().nullable(),
@@ -1346,6 +1373,7 @@ export const storedStudentResultSchema = z
     student_id: uuidSchema,
     first_name: z.string(),
     last_name: z.string(),
+    ...arabicStudentNameFields,
     admission_number: z.string(),
     status: z.enum(["complete", "incomplete"]),
     average_percentage: z.number().nullable(),
@@ -1487,6 +1515,9 @@ export const studentReleasedMarksSchema = z
                 subject_id: uuidSchema,
                 subject_code: z.string(),
                 subject_name: z.string(),
+                subject_name_ar: z.string().nullable().optional().openapi({
+                  description: "The subject's Arabic name, if any (000263).",
+                }),
                 approved_at: dateTimeSchema.nullable().openapi({
                   description:
                     "When the whole period's mark sheet was approved; null while only single assessments are released.",
@@ -1659,12 +1690,18 @@ export const certificateContentSchema = z
     kind: z.enum(["annual_certificate", "term_report"]),
     serial_number: z.string(),
     issued_at: dateTimeSchema,
-    school: z.object({ id: uuidSchema, name: z.string() }).openapi("CertificateContentSchool"),
+    language: z.enum(["en", "ar", "bilingual"]).optional().openapi({
+      description:
+        "The language the school issued the document in (000263). Absent: the document follows each reader's language, as documents issued before did.",
+    }),
+    school: z
+      .object({ id: uuidSchema, name: z.string(), ...nameArField })
+      .openapi("CertificateContentSchool"),
     academic_year: z
-      .object({ id: uuidSchema, code: z.string(), name: z.string() })
+      .object({ id: uuidSchema, code: z.string(), name: z.string(), ...nameArField })
       .openapi("CertificateContentAcademicYear"),
     term: z
-      .object({ id: uuidSchema, name: z.string() })
+      .object({ id: uuidSchema, name: z.string(), ...nameArField })
       .openapi("CertificateContentTerm")
       .nullable(),
     student: z
@@ -1672,16 +1709,20 @@ export const certificateContentSchema = z
         id: uuidSchema,
         first_name: z.string(),
         last_name: z.string(),
+        ...documentArabicStudentNameFields,
         admission_number: z.string(),
       })
       .openapi("CertificateContentStudent"),
     grade_level_name: z.string(),
+    grade_level_name_ar: z.string().optional(),
     section_name: z.string(),
+    section_name_ar: z.string().optional(),
     subjects: z.array(
       z
         .object({
           code: z.string(),
           name: z.string(),
+          ...nameArField,
           requirement: z.string(),
           marks_obtained: z.number().nullable(),
           max_marks: z.number(),
@@ -1703,6 +1744,7 @@ export const certificateContentSchema = z
               .object({
                 term_id: uuidSchema.nullable(),
                 term_name: z.string().nullable(),
+                term_name_ar: z.string().optional(),
                 percentage: z.number().nullable(),
               })
               .openapi("CertificateContentSubjectTerm"),

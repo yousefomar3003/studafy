@@ -626,6 +626,12 @@ const GET_RESPONSES: Record<string, unknown> = {
   "/api/grading/external-exam-sessions": { sessions: [IGCSE_SESSION] },
   "/api/grading/external-exam-sessions/{sessionId}/entries": SESSION_ENTRIES,
   "/api/grading/report-card-settings": REPORT_SETTINGS,
+  "/api/grading/document-language-settings": {
+    report_card_language: "viewer",
+    certificate_language: "viewer",
+    transcript_language: "viewer",
+    school_name_ar: null,
+  },
   "/api/grading/sections/{sectionId}/report-notes": REPORT_NOTES,
   "/api/grading/certificates/{certificateId}": CERTIFICATE,
   "/api/academics/years": { academic_years: [YEAR], total: 1 },
@@ -1617,6 +1623,45 @@ describe("AcademicSetupPage", () => {
     } finally {
       RESPONSES_BY_PATH.set("/api/academics/subjects", { subjects: [], total: 0 });
     }
+  });
+
+  test("sets the document language and the school's Arabic name, with a preview", async () => {
+    await renderAt("/report-cards");
+
+    fireEvent.click(await screen.findByRole("combobox", { name: "Certificates" }));
+    fireEvent.click(await screen.findByRole("option", { name: "Arabic" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "School name in Arabic" }), {
+      target: { value: "مدرسة النور" },
+    });
+
+    // The preview follows the unsaved choice: an Arabic certificate reads right to left.
+    fireEvent.click(screen.getByRole("button", { name: "Show preview" }));
+    const preview = await screen.findByTestId("document-language-preview");
+    const article = within(preview).getByRole("article");
+    expect(article.getAttribute("dir")).toBe("rtl");
+    expect(within(article).getByText("مدرسة النور")).toBeTruthy();
+
+    putMock.mockImplementation(() =>
+      Promise.resolve<unknown>({
+        data: {
+          report_card_language: "viewer",
+          certificate_language: "ar",
+          transcript_language: "viewer",
+          school_name_ar: "مدرسة النور",
+        },
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Save document settings" }));
+    await waitFor(() =>
+      expect(putMock).toHaveBeenCalledWith("/api/grading/document-language-settings", {
+        body: {
+          report_card_language: "viewer",
+          certificate_language: "ar",
+          transcript_language: "viewer",
+          school_name_ar: "مدرسة النور",
+        },
+      }),
+    );
   });
 
   test("has no accessibility violations on the report cards screen", async () => {

@@ -1,4 +1,5 @@
 import '../../../core/api/generated/models/timetable_settings.dart';
+import '../../../core/localization/localized_name.dart';
 import '../../../core/api/generated/models/timetable_slot.dart';
 import '../../timetable/domain/weekly_schedule.dart';
 
@@ -15,6 +16,7 @@ class ChildTimetableSlot {
     required this.classId,
     required this.classCode,
     this.courseName,
+    this.subjectNameAr,
     this.teacherId,
     this.teacherName,
   });
@@ -30,6 +32,7 @@ class ChildTimetableSlot {
       classId: klass['id']! as String,
       classCode: (klass['code'] as String?) ?? '',
       courseName: course?['name'] as String?,
+      subjectNameAr: arabicNameOf(course?['subject_name_ar']),
       teacherId: teacher?['id'] as String?,
       teacherName: teacher?['name'] as String?,
     );
@@ -41,6 +44,9 @@ class ChildTimetableSlot {
   final String classId;
   final String classCode;
   final String? courseName;
+
+  /// The course's subject's Arabic name (000263); null when there is none.
+  final String? subjectNameAr;
   final String? teacherId;
   final String? teacherName;
 }
@@ -108,11 +114,15 @@ ChildWeeklySchedule childWeeklySchedule(ChildTimetable timetable) {
       ),
   ];
   return (
-    schedule: buildWeeklySchedule(schoolDays: timetable.settings?.schoolDays, slots: slots),
+    schedule: buildWeeklySchedule(
+      schoolDays: timetable.settings?.schoolDays,
+      slots: slots,
+    ),
     labels: {
       for (final slot in timetable.slots)
         slot.id: (
           title: slot.courseName ?? slot.classCode,
+          titleAr: slot.courseName == null ? null : slot.subjectNameAr,
           classCode: slot.classCode,
           teacher: slot.teacherName,
         ),
@@ -121,7 +131,10 @@ ChildWeeklySchedule childWeeklySchedule(ChildTimetable timetable) {
 }
 
 /// A [WeeklySchedule] plus each slot's pre-resolved labels, keyed by slot id.
-typedef ChildWeeklySchedule = ({WeeklySchedule schedule, Map<String, LessonLabels> labels});
+typedef ChildWeeklySchedule = ({
+  WeeklySchedule schedule,
+  Map<String, LessonLabels> labels,
+});
 
 Map<String, Object?>? _mapOrNull(Object? raw) =>
     raw == null ? null : Map<String, Object?>.from(raw as Map);

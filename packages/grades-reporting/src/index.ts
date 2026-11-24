@@ -37,6 +37,8 @@ export interface PublishedGradeRow {
   course_id: string;
   course_code: string;
   course_name: string;
+  /** The course's subject's Arabic name (000263); null or absent when it has none. */
+  subject_name_ar?: string | null;
   credit_hours: string;
   label: string;
   score: string | null;
@@ -67,7 +69,14 @@ export interface PublishedGradeItem {
   grade_submission_id: string;
   gradebook_id: string;
   class: { id: string; code: string };
-  course: { id: string; code: string; name: string; credit_hours: number };
+  /** `subject_name_ar` (000263): present only when the course's subject has an Arabic name. */
+  course: {
+    id: string;
+    code: string;
+    name: string;
+    credit_hours: number;
+    subject_name_ar?: string;
+  };
   label: string;
   score: number | null;
   max_score: number;
@@ -191,6 +200,7 @@ export async function loadPublishedGradeRows(
       co.id AS course_id,
       co.code AS course_code,
       co.name AS course_name,
+      (SELECT n.name_ar FROM app.subject_names_ar(ARRAY[co.subject_id]) AS n) AS subject_name_ar,
       co.credit_hours,
       g.label,
       g.score,
@@ -348,6 +358,7 @@ export async function calculateGradeBreakdown(
         code: row.course_code,
         name: row.course_name,
         credit_hours: Number(row.credit_hours),
+        ...(row.subject_name_ar ? { subject_name_ar: row.subject_name_ar } : {}),
       },
       label: row.label,
       score: row.score === null ? null : Number(row.score),

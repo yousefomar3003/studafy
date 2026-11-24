@@ -217,7 +217,8 @@ services (J and K both touch certificates, report cards and transcripts), i18n f
 - [x] WS-H subject coordinators (`feat/academic-coordinators`, migration 000260; `docs/modules/subject-coordinators.md`)
 - [x] WS-I exam entries ([docs/modules/exam-entries.md](../modules/exam-entries.md))
 - [x] WS-J IB Diploma total (`feat/academic-ib-diploma`, migration 000262; docs/database/academic-grading.md "IB Diploma total")
-- [ ] WS-K Arabic + English documents
+- [x] WS-K Arabic + English documents (`feat/academic-bilingual-docs`, migration 000263;
+      [module doc](../modules/bilingual-documents.md))
 - [x] WS-L ministry results export (`feat/academic-ministry-export`, migration 000264; `docs/modules/ministry-export.md`)
 - [ ] WS-M exam weeks
 - [ ] Integration of batch 1

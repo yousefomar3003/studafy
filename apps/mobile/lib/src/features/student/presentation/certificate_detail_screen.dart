@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/localization/localized_name.dart';
 import '../../../design/layout/bottom_inset_padding.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
 import '../application/academic_results_providers.dart';
@@ -78,6 +79,11 @@ class _Document extends StatelessWidget {
 
     final invalid = !certificate.status.isValid;
     final revokeReason = certificate.revokeReason?.trim();
+    // Names as issued: in the document's language (both when bilingual), or the app's when the
+    // school left the language to each reader. Labels stay in the app's language.
+    final readerLanguage = context.locale.languageCode;
+    String named(String name, String? nameAr) =>
+        documentName(content.language, readerLanguage, name, nameAr);
 
     return ListView(
       padding: const EdgeInsets.all(
@@ -128,119 +134,137 @@ class _Document extends StatelessWidget {
             ),
             child: Padding(
               padding: const EdgeInsets.all(AppSpacing.space16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    content.schoolName,
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: AppSpacing.space4),
-                  Text(
-                    [
-                      certificateKindLabel(content.kind),
-                      content.academicYearName,
-                      ?content.termName,
-                    ].where((part) => part.isNotEmpty).join(' · '),
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: AppSpacing.space8),
-                  Center(
-                    child: CertificateStatusPill(status: certificate.status),
-                  ),
-                  const Divider(height: AppSpacing.space32),
-                  _Field(
-                    label: 'academicResults.certificate.student'.tr(),
-                    value: content.studentName,
-                  ),
-                  _Field(
-                    label: 'academicResults.certificate.admission'.tr(),
-                    value: content.admissionNumber,
-                  ),
-                  _Field(
-                    label: 'academicResults.certificate.section'.tr(),
-                    value: 'academicResults.sectionLine'.tr(
-                      namedArgs: {
-                        'grade': content.gradeLevelName,
-                        'section': content.sectionName,
-                      },
-                    ),
-                  ),
-                  _Field(
-                    label: 'academicResults.certificate.year'.tr(),
-                    value: content.academicYearName,
-                  ),
-                  if (content.termName != null)
-                    _Field(
-                      label: 'academicResults.certificate.term'.tr(),
-                      value: content.termName!,
-                    ),
-                  const SizedBox(height: AppSpacing.space16),
-                  Text(
-                    'academicResults.subjects'.tr(),
-                    style: theme.textTheme.titleSmall,
-                  ),
-                  const SizedBox(height: AppSpacing.space4),
-                  SubjectResultsTable(subjects: content.subjects),
-                  const SizedBox(height: AppSpacing.space16),
-                  Text(
-                    'academicResults.certificate.overall'.tr(),
-                    style: theme.textTheme.titleSmall,
-                  ),
-                  const SizedBox(height: AppSpacing.space8),
-                  OverallResultSummary(overall: content.overall),
-                  ReportNotesSection(
-                    report: content.report,
-                    subjects: content.subjects,
-                  ),
-                  const Divider(height: AppSpacing.space32),
-                  _Field(
-                    label: 'academicResults.certificate.serialLabel'.tr(),
-                    value: content.serialNumber,
-                  ),
-                  _Field(
-                    label: 'academicResults.certificate.issueDate'.tr(),
-                    value: date(content.issuedAt),
-                  ),
-                  if (content.issuedByName != null)
-                    _Field(
-                      label: 'academicResults.certificate.issuedBy'.tr(),
-                      value: content.issuedByName!,
-                    ),
-                  if (content.finalizationVersion != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: AppSpacing.space4),
-                      child: Text(
-                        'academicResults.certificate.finalization'.tr(
-                          namedArgs: {
-                            'version': '${content.finalizationVersion}',
-                            'date': date(content.finalizedAt),
-                          },
-                        ),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                  if (content.reissueOfSerial != null) ...[
-                    const SizedBox(height: AppSpacing.space8),
+              child: DocumentLanguageScope(
+                language: content.language,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
                     Text(
-                      'academicResults.certificate.reissueOf'.tr(
-                        namedArgs: {'serial': content.reissueOfSerial!},
-                      ),
-                      style: theme.textTheme.bodySmall,
+                      named(content.schoolName, content.schoolNameAr),
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.titleLarge,
                     ),
-                    if (content.reissueReason?.trim().isNotEmpty ?? false)
+                    const SizedBox(height: AppSpacing.space4),
+                    Text(
+                      [
+                        certificateKindLabel(content.kind),
+                        named(
+                          content.academicYearName,
+                          content.academicYearNameAr,
+                        ),
+                        if (content.termName case final term?)
+                          named(term, content.termNameAr),
+                      ].where((part) => part.isNotEmpty).join(' · '),
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: AppSpacing.space8),
+                    Center(
+                      child: CertificateStatusPill(status: certificate.status),
+                    ),
+                    const Divider(height: AppSpacing.space32),
+                    _Field(
+                      label: 'academicResults.certificate.student'.tr(),
+                      value: named(content.studentName, content.studentNameAr),
+                    ),
+                    _Field(
+                      label: 'academicResults.certificate.admission'.tr(),
+                      value: content.admissionNumber,
+                    ),
+                    _Field(
+                      label: 'academicResults.certificate.section'.tr(),
+                      value: 'academicResults.sectionLine'.tr(
+                        namedArgs: {
+                          'grade': named(
+                            content.gradeLevelName,
+                            content.gradeLevelNameAr,
+                          ),
+                          'section': named(
+                            content.sectionName,
+                            content.sectionNameAr,
+                          ),
+                        },
+                      ),
+                    ),
+                    _Field(
+                      label: 'academicResults.certificate.year'.tr(),
+                      value: named(
+                        content.academicYearName,
+                        content.academicYearNameAr,
+                      ),
+                    ),
+                    if (content.termName case final term?)
+                      _Field(
+                        label: 'academicResults.certificate.term'.tr(),
+                        value: named(term, content.termNameAr),
+                      ),
+                    const SizedBox(height: AppSpacing.space16),
+                    Text(
+                      'academicResults.subjects'.tr(),
+                      style: theme.textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: AppSpacing.space4),
+                    SubjectResultsTable(subjects: content.subjects),
+                    const SizedBox(height: AppSpacing.space16),
+                    Text(
+                      'academicResults.certificate.overall'.tr(),
+                      style: theme.textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: AppSpacing.space8),
+                    OverallResultSummary(overall: content.overall),
+                    ReportNotesSection(
+                      report: content.report,
+                      subjects: content.subjects,
+                    ),
+                    const Divider(height: AppSpacing.space32),
+                    _Field(
+                      label: 'academicResults.certificate.serialLabel'.tr(),
+                      value: content.serialNumber,
+                    ),
+                    _Field(
+                      label: 'academicResults.certificate.issueDate'.tr(),
+                      value: date(content.issuedAt),
+                    ),
+                    if (content.issuedByName != null)
+                      _Field(
+                        label: 'academicResults.certificate.issuedBy'.tr(),
+                        value: content.issuedByName!,
+                      ),
+                    if (content.finalizationVersion != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: AppSpacing.space4),
+                        child: Text(
+                          'academicResults.certificate.finalization'.tr(
+                            namedArgs: {
+                              'version': '${content.finalizationVersion}',
+                              'date': date(content.finalizedAt),
+                            },
+                          ),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    if (content.reissueOfSerial != null) ...[
+                      const SizedBox(height: AppSpacing.space8),
                       Text(
-                        'academicResults.certificate.reason'.tr(
-                          namedArgs: {'reason': content.reissueReason!.trim()},
+                        'academicResults.certificate.reissueOf'.tr(
+                          namedArgs: {'serial': content.reissueOfSerial!},
                         ),
                         style: theme.textTheme.bodySmall,
                       ),
+                      if (content.reissueReason?.trim().isNotEmpty ?? false)
+                        Text(
+                          'academicResults.certificate.reason'.tr(
+                            namedArgs: {
+                              'reason': content.reissueReason!.trim(),
+                            },
+                          ),
+                          style: theme.textTheme.bodySmall,
+                        ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
           ),

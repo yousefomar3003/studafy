@@ -11,10 +11,16 @@ import { transcriptGraduationRequirements } from "../graduation-requirements/ser
 import { blockingReasons, withDocumentRank } from "./certificate-service";
 import { attachClassRanks } from "./class-rank-service";
 import { withDocumentDiploma } from "./diploma-service";
+import {
+  documentLanguageFor,
+  documentStudentNamesAr,
+  optionalText,
+} from "./document-language-service";
 import { readFinalizationResults } from "./results-service";
 
 import type { DocumentClassRank } from "./class-rank-service";
 import type { DiplomaResultView } from "./diploma-service";
+import type { DocumentLanguage } from "./document-language-service";
 import type { StoredStudentResult } from "./results-service";
 import type { TranscriptExternalExam } from "../external-exams/service";
 import type { TranscriptGraduationRequirement } from "../graduation-requirements/service";
@@ -41,6 +47,8 @@ export type TranscriptStaleReason = "corrected" | "new_results";
 export interface TranscriptSubject {
   code: string;
   name: string;
+  /** The subject's Arabic name at issue (000263); absent when it had none. */
+  name_ar?: string;
   requirement: string;
   marks_obtained: number | null;
   max_marks: number;
@@ -65,9 +73,12 @@ export interface TranscriptSubject {
 }
 
 export interface TranscriptYear {
-  academic_year: { id: string; code: string; name: string };
+  /** `*_ar` fields (000263): the Arabic names at issue; absent when there was none. */
+  academic_year: { id: string; code: string; name: string; name_ar?: string };
   grade_level_name: string;
+  grade_level_name_ar?: string;
   section_name: string;
+  section_name_ar?: string;
   finalization: { id: string; version: number; finalized_at: string };
   subjects: TranscriptSubject[];
   overall: {
@@ -116,8 +127,21 @@ export interface TranscriptContent {
   kind: "transcript";
   serial_number: string;
   issued_at: string;
-  school: { id: string; name: string };
-  student: { id: string; first_name: string; last_name: string; admission_number: string };
+  /**
+   * The language the school issued the transcript in (000263). Absent when the school left it to
+   * each reader's language, and on transcripts issued before.
+   */
+  language?: DocumentLanguage;
+  school: { id: string; name: string; name_ar?: string };
+  student: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    first_name_ar?: string;
+    middle_name_ar?: string;
+    last_name_ar?: string;
+    admission_number: string;
+  };
   years: TranscriptYear[];
   cumulative: TranscriptCumulative;
   issued_by: { user_id: string; name: string | null };
@@ -178,8 +202,11 @@ interface CoveredFinalization {
   academic_year_id: string;
   year_code: string;
   year_name: string;
+  year_name_ar: string | null;
   section_name: string;
+  section_name_ar: string | null;
   grade_level_name: string;
+  grade_level_name_ar: string | null;
   version: number;
   finalized_at: Date;
   starts_on: Date;
@@ -205,8 +232,9 @@ async function currentAnnualFinalizations(
   return tx<CoveredFinalization[]>`
     SELECT DISTINCT ON (finalization.academic_year_id)
            finalization.id, finalization.academic_year_id, year.code AS year_code,
-           year.name AS year_name, section.name AS section_name, grade.name AS grade_level_name,
-           finalization.version, finalization.finalized_at, year.starts_on
+           year.name AS year_name, year.name_ar AS year_name_ar, section.name AS section_name,
+           section.name_ar AS section_name_ar, grade.name AS grade_level_name,
+           grade.name_ar AS grade_level_name_ar, finalization.version, finalization.finalized_at, year.starts_on
     FROM app.student_overall_results AS overall
     JOIN app.result_finalizations AS finalization
       ON finalization.id = overall.finalization_id AND finalization.school_id = overall.school_id
@@ -325,9 +353,12 @@ function renderYear(year: CoveredYear): TranscriptYear {
       id: finalization.academic_year_id,
       code: finalization.year_code,
       name: finalization.year_name,
+      ...optionalText("name_ar", finalization.year_name_ar),
     },
     grade_level_name: finalization.grade_level_name,
+    ...optionalText("grade_level_name_ar", finalization.grade_level_name_ar),
     section_name: finalization.section_name,
+    ...optionalText("section_name_ar", finalization.section_name_ar),
     finalization: {
       id: finalization.id,
       version: finalization.version,
@@ -338,6 +369,7 @@ function renderYear(year: CoveredYear): TranscriptYear {
       .map((subject) => ({
         code: subject.subject_code,
         name: subject.subject_name,
+        ...optionalText("name_ar", subject.subject_name_ar),
         requirement: subject.requirement,
         marks_obtained: subject.marks_obtained,
         max_marks: subject.max_marks,
@@ -390,8 +422,10 @@ async function renderContent(
   serial: string,
   reissue: TranscriptContent["reissue"],
 ): Promise<TranscriptContent> {
-  const [names] = await tx<{ school_name: string; issuer_name: string | null }[]>`
-    SELECT school.name AS school_name,
+  const [names] = await tx<
+    { school_name: string; school_name_ar: string | null; issuer_name: string | null }[]
+  >`
+    SELECT school.name AS school_name, school.name_ar AS school_name_ar,
            (SELECT display_name FROM app.users
             WHERE id = ${userId}::uuid AND school_id = ${schoolId}::uuid) AS issuer_name
     FROM app.schools AS school WHERE school.id = ${schoolId}::uuid
@@ -406,16 +440,23 @@ async function renderContent(
     "document",
   );
   const graduation = await transcriptGraduationRequirements(tx, schoolId, student.student_id);
+  const language = await documentLanguageFor(tx, schoolId, "transcript");
   return {
     version: 1,
     kind: "transcript",
     serial_number: serial,
     issued_at: new Date().toISOString(),
-    school: { id: schoolId, name: names?.school_name ?? "" },
+    ...(language ? { language } : {}),
+    school: {
+      id: schoolId,
+      name: names?.school_name ?? "",
+      ...optionalText("name_ar", names?.school_name_ar),
+    },
     student: {
       id: student.student_id,
       first_name: student.first_name,
       last_name: student.last_name,
+      ...documentStudentNamesAr(student),
       admission_number: student.admission_number,
     },
     years: years.map(renderYear),

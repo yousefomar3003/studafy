@@ -22,6 +22,11 @@ export interface CourseRow {
   status: CatalogStatus;
   created_at: Date;
   updated_at: Date;
+  /**
+   * The subject's Arabic name (000263), on reads only: the Arabic app shows it in place of the
+   * course name. Null or absent when the subject has none.
+   */
+  subject_name_ar?: string | null;
 }
 
 export interface ListCoursesParams {
@@ -66,7 +71,9 @@ export async function listCourses(
     tx<CourseRow[]>`
       SELECT c.id, c.school_id, c.subject_id, c.code, c.name, c.description,
              c.credit_hours::float8 AS credit_hours,
-             c.status, c.created_at, c.updated_at
+             c.status, c.created_at, c.updated_at,
+             (SELECT n.name_ar FROM app.subject_names_ar(ARRAY[c.subject_id]) AS n)
+               AS subject_name_ar
       FROM app.courses AS c
       WHERE c.school_id = ${schoolId}
         ${subjectFilter}
@@ -95,7 +102,8 @@ export async function getCourse(
   const [row] = await tx<CourseRow[]>`
     SELECT id, school_id, subject_id, code, name, description,
            credit_hours::float8 AS credit_hours, status,
-           created_at, updated_at
+           created_at, updated_at,
+           (SELECT n.name_ar FROM app.subject_names_ar(ARRAY[subject_id]) AS n) AS subject_name_ar
     FROM app.courses
     WHERE id = ${courseId} AND school_id = ${schoolId}
   `;

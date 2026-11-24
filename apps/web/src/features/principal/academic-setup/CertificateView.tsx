@@ -16,6 +16,12 @@ import {
 } from "./components";
 import { setupHref } from "./context";
 import { DiplomaSummary } from "./diploma";
+import {
+  DocumentLanguageScope,
+  documentStudentName,
+  localized,
+  useDocumentText,
+} from "./document-language";
 import { useCertificate } from "./queries";
 import { ReportNotesBlock } from "./ReportNotesBlock";
 
@@ -63,6 +69,11 @@ export function CertificateView({ ctx }: { ctx: SetupContext }) {
   );
 }
 
+/**
+ * The document itself, in the language it was issued in (`content.language`): English, Arabic
+ * (right to left) or both. Without one (documents issued before, or a school that leaves it to the
+ * reader) it follows the reader's language, as it always did.
+ */
 export function CertificateDocument({
   content,
   voided,
@@ -70,7 +81,15 @@ export function CertificateDocument({
   content: CertificateContent;
   voided: boolean;
 }) {
-  const { t } = useTranslation();
+  return (
+    <DocumentLanguageScope language={content.language}>
+      <CertificateBody content={content} voided={voided} />
+    </DocumentLanguageScope>
+  );
+}
+
+function CertificateBody({ content, voided }: { content: CertificateContent; voided: boolean }) {
+  const { label: t, name, dir, lang } = useDocumentText();
   const { formatDate } = useFormatters();
   // Term columns, in the order the stored subjects list them (annual certificates only).
   // Certificates issued before credits existed have none: the column only appears when used.
@@ -82,27 +101,36 @@ export function CertificateDocument({
   const title =
     content.kind === "annual_certificate"
       ? t("academicGrading.certificate.annualTitle")
-      : t("academicGrading.certificate.termTitle", { term: content.term?.name ?? "" });
+      : t("academicGrading.certificate.termTitle", {
+          term: localized(content.term?.name ?? "", content.term?.name_ar),
+        });
 
   return (
     <article
       className={`ag-certificate${voided ? " ag-certificate--void" : ""}`}
       aria-labelledby="ag-certificate-title"
+      dir={dir}
+      lang={lang}
+      data-document-language={content.language ?? "viewer"}
     >
       <header className="ag-certificate__header">
-        <p className="ag-certificate__school">{content.school.name}</p>
+        <p className="ag-certificate__school">
+          {name(content.school.name, content.school.name_ar)}
+        </p>
         <h2 id="ag-certificate-title" className="ag-certificate__title">
           {title}
         </h2>
-        <p>{t("academicGrading.certificate.year", { year: content.academic_year.name })}</p>
+        <p>
+          {t("academicGrading.certificate.year", {
+            year: localized(content.academic_year.name, content.academic_year.name_ar),
+          })}
+        </p>
       </header>
 
       <dl className="ag-certificate__facts">
         <div>
           <dt>{t("academicGrading.certificate.student")}</dt>
-          <dd>
-            {content.student.first_name} {content.student.last_name}
-          </dd>
+          <dd>{documentStudentName({ name }, content.student)}</dd>
         </div>
         <div>
           <dt>{t("academicGrading.certificate.admission")}</dt>
@@ -112,8 +140,8 @@ export function CertificateDocument({
           <dt>{t("academicGrading.certificate.class")}</dt>
           <dd>
             {t("academicGrading.certificate.gradeSection", {
-              grade: content.grade_level_name,
-              section: content.section_name,
+              grade: localized(content.grade_level_name, content.grade_level_name_ar),
+              section: localized(content.section_name, content.section_name_ar),
             })}
           </dd>
         </div>
@@ -132,7 +160,7 @@ export function CertificateDocument({
             <th scope="col">{t("academicGrading.certificate.subject")}</th>
             {termColumns.map((term) => (
               <th scope="col" key={term.term_id}>
-                {term.term_name}
+                {name(term.term_name ?? "", term.term_name_ar)}
               </th>
             ))}
             <th scope="col">{t("academicGrading.certificate.marks")}</th>
@@ -146,7 +174,7 @@ export function CertificateDocument({
           {content.subjects.map((subject) => (
             <tr key={subject.code}>
               <th scope="row">
-                {subject.name}
+                {name(subject.name, subject.name_ar)}
                 <CourseLevel level={subject.course_level} />
               </th>
               {termColumns.map((column) => (
@@ -302,7 +330,7 @@ export function CertificateDocument({
  * it was given, grouped by subject. Certificates issued before descriptive grading have none.
  */
 function DescriptiveSkills({ subjects }: { subjects: CertificateContent["subjects"] }) {
-  const { t } = useTranslation();
+  const { label: t, name } = useDocumentText();
   const descriptive = subjects.filter(
     (subject) => subject.descriptive && !subject.exempt && (subject.skills?.length ?? 0) > 0,
   );
@@ -312,7 +340,7 @@ function DescriptiveSkills({ subjects }: { subjects: CertificateContent["subject
       <h3 id="ag-certificate-skills-heading">{t("academicGrading.descriptive.skillsHeading")}</h3>
       {descriptive.map((subject) => (
         <table key={subject.code} className="ag-certificate__table">
-          <caption>{subject.name}</caption>
+          <caption>{name(subject.name, subject.name_ar)}</caption>
           <thead>
             <tr>
               <th scope="col">{t("academicGrading.descriptive.skillName")}</th>

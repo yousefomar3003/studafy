@@ -1615,6 +1615,8 @@ export interface ReleasedSubject {
   subject_id: string;
   subject_code: string;
   subject_name: string;
+  /** The subject's Arabic name (000263); null when it has none. */
+  subject_name_ar: string | null;
   /** When the whole period's mark sheet was approved; null while only single assessments are out. */
   approved_at: string | null;
   /**
@@ -1657,6 +1659,7 @@ export async function listReleasedStudentMarks(
       subject_id: string;
       subject_code: string;
       subject_name: string;
+      subject_name_ar: string | null;
       approved_at: Date | null;
       period_approved: boolean;
       released_at: Date;
@@ -1676,7 +1679,7 @@ export async function listReleasedStudentMarks(
     SELECT year.id AS academic_year_id, year.name AS academic_year_name,
            assessment.term_id, term.name AS term_name,
            subject.id AS subject_id, subject.code AS subject_code, subject.name AS subject_name,
-           sheet.decided_at AS approved_at, sheet.id IS NOT NULL AS period_approved,
+           subject.name_ar AS subject_name_ar, sheet.decided_at AS approved_at, sheet.id IS NOT NULL AS period_approved,
            LEAST(sheet.decided_at, release_row.decided_at) AS released_at,
            category.id AS category_id, category.name AS category_name, category.kind AS category_kind,
            assessment.id AS assessment_id, assessment.name AS assessment_name, assessment.max_marks,
@@ -1746,6 +1749,7 @@ export async function listReleasedStudentMarks(
         subject_id: row.subject_id,
         subject_code: row.subject_code,
         subject_name: row.subject_name,
+        subject_name_ar: row.subject_name_ar,
         approved_at: row.approved_at?.toISOString() ?? null,
         period_approved: row.period_approved,
         categories: [],

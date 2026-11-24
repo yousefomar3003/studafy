@@ -1,5 +1,7 @@
 import { HTTPException } from "hono/http-exception";
 
+import { cleanNameAr } from "./section-service";
+
 import type { TransactionSql } from "postgres";
 
 // ---------------------------------------------------------------------------
@@ -14,6 +16,8 @@ export interface TermRow {
   academic_year_id: string;
   code: string;
   name: string;
+  /** Arabic name (000263); null falls back to `name`. */
+  name_ar: string | null;
   sequence_number: number;
   starts_on: Date;
   ends_on: Date;
@@ -32,6 +36,7 @@ export interface CreateTermParams {
   academic_year_id: string;
   code: string;
   name: string;
+  name_ar?: string | null;
   sequence_number: number;
   starts_on: string;
   ends_on: string;
@@ -41,6 +46,8 @@ export interface CreateTermParams {
 export interface UpdateTermParams {
   code?: string;
   name?: string;
+  /** Omitted: unchanged. null or blank: cleared. */
+  name_ar?: string | null;
   sequence_number?: number;
   starts_on?: string;
   ends_on?: string;
@@ -63,7 +70,7 @@ export async function listTerms(
 
   const [rows, countResult] = await Promise.all([
     tx<TermRow[]>`
-      SELECT t.id, t.school_id, t.academic_year_id, t.code, t.name,
+      SELECT t.id, t.school_id, t.academic_year_id, t.code, t.name, t.name_ar,
              t.sequence_number, t.starts_on, t.ends_on, t.status,
              t.created_at, t.updated_at
       FROM app.terms AS t
@@ -92,7 +99,7 @@ export async function getTerm(
   termId: string,
 ): Promise<TermRow | undefined> {
   const [row] = await tx<TermRow[]>`
-    SELECT id, school_id, academic_year_id, code, name,
+    SELECT id, school_id, academic_year_id, code, name, name_ar,
            sequence_number, starts_on, ends_on, status,
            created_at, updated_at
     FROM app.terms
@@ -107,18 +114,19 @@ export async function createTerm(
   params: CreateTermParams,
 ): Promise<TermRow> {
   const [row] = await tx<TermRow[]>`
-    INSERT INTO app.terms (school_id, academic_year_id, code, name, sequence_number, starts_on, ends_on, status)
+    INSERT INTO app.terms (school_id, academic_year_id, code, name, name_ar, sequence_number, starts_on, ends_on, status)
     VALUES (
       ${schoolId},
       ${params.academic_year_id},
       ${params.code},
       ${params.name},
+      ${cleanNameAr(params.name_ar)},
       ${params.sequence_number},
       ${params.starts_on}::date,
       ${params.ends_on}::date,
       ${params.status ?? "planned"}::app.academic_period_status
     )
-    RETURNING id, school_id, academic_year_id, code, name,
+    RETURNING id, school_id, academic_year_id, code, name, name_ar,
               sequence_number, starts_on, ends_on, status,
               created_at, updated_at
   `;
@@ -141,13 +149,15 @@ export async function updateTerm(
     UPDATE app.terms
     SET code = COALESCE(${params.code ?? null}, code),
         name = COALESCE(${params.name ?? null}, name),
+        name_ar = CASE WHEN ${params.name_ar !== undefined}
+          THEN ${cleanNameAr(params.name_ar)}::text ELSE name_ar END,
         sequence_number = COALESCE(${params.sequence_number ?? null}::smallint, sequence_number),
         starts_on = COALESCE(${params.starts_on ? params.starts_on : null}::date, starts_on),
         ends_on = COALESCE(${params.ends_on ? params.ends_on : null}::date, ends_on),
         status = COALESCE(${params.status ?? null}::app.academic_period_status, status),
         updated_at = CURRENT_TIMESTAMP
     WHERE id = ${termId} AND school_id = ${schoolId}
-    RETURNING id, school_id, academic_year_id, code, name,
+    RETURNING id, school_id, academic_year_id, code, name, name_ar,
               sequence_number, starts_on, ends_on, status,
               created_at, updated_at
   `;

@@ -541,7 +541,20 @@ const studentQuery: SectionQuery<RawStudentRow> = ({ tx, schoolId, terms }, mode
           FROM q CROSS JOIN c
           CROSS JOIN LATERAL (
             SELECT * FROM app.students x
-            WHERE x.id = c.id AND x.school_id = ${schoolId}::uuid AND x.search_tsv @@ q.query
+            WHERE x.id = c.id AND x.school_id = ${schoolId}::uuid
+              AND (
+                x.search_tsv @@ q.query
+                -- The Arabic name (000263), matched on the fly like app.search_scoped_ids does.
+                OR (
+                  (x.first_name_ar IS NOT NULL OR x.last_name_ar IS NOT NULL)
+                  AND to_tsvector(
+                    'simple',
+                    app.search_document(
+                      concat_ws(' ', x.first_name_ar, x.middle_name_ar, x.last_name_ar)
+                    )
+                  ) @@ q.query
+                )
+              )
             OFFSET 0
           ) s
           ORDER BY rank DESC, s.last_name, s.id
@@ -553,13 +566,29 @@ const studentQuery: SectionQuery<RawStudentRow> = ({ tx, schoolId, terms }, mode
       `
     : tx<(RawStudentRow & Counted)[]>`
         SELECT s.id, s.first_name, s.last_name, s.preferred_name, s.admission_number,
-               s.status::text, word_similarity(q.needle, s.search_name) AS rank,
+               s.status::text,
+               GREATEST(
+                 word_similarity(q.needle, s.search_name),
+                 word_similarity(
+                   q.needle,
+                   app.student_search_name_ar(s.first_name_ar, s.middle_name_ar, s.last_name_ar)
+                 )
+               ) AS rank,
                count(*) OVER ()::int AS total_count
         FROM app.search_normalize(${terms.fuzzy}) AS q(needle)
         CROSS JOIN LATERAL app.search_scoped_fuzzy_ids('students', q.needle) AS c(id)
         CROSS JOIN LATERAL (
           SELECT * FROM app.students x
-          WHERE x.id = c.id AND x.school_id = ${schoolId}::uuid AND q.needle <% x.search_name
+          WHERE x.id = c.id AND x.school_id = ${schoolId}::uuid
+            AND (
+              q.needle <% x.search_name
+              OR (
+                (x.first_name_ar IS NOT NULL OR x.last_name_ar IS NOT NULL)
+                AND q.needle <% app.student_search_name_ar(
+                  x.first_name_ar, x.middle_name_ar, x.last_name_ar
+                )
+              )
+            )
           OFFSET 0
         ) s
         ORDER BY rank DESC, s.last_name, s.id
