@@ -79,8 +79,13 @@ const postMock = mock((path: string, _init?: unknown) => {
   return Promise.resolve({ data: undefined });
 });
 
+const patchMock = mock((_path: string, _init?: unknown) =>
+  Promise.resolve({ data: SCHOLARSHIP as unknown }),
+);
+const deleteMock = mock((_path: string, _init?: unknown) => Promise.resolve({ data: undefined }));
+
 mock.module("../../../lib/api", () => ({
-  api: { GET: getMock, POST: postMock, PATCH: mock(() => Promise.resolve({ data: undefined })) },
+  api: { GET: getMock, POST: postMock, PATCH: patchMock, DELETE: deleteMock },
 }));
 
 const loadPage = async (): Promise<ComponentType> => (await import("./ScholarshipsPage")).default;
@@ -132,6 +137,8 @@ afterEach(() => {
   cleanup();
   getMock.mockClear();
   postMock.mockClear();
+  patchMock.mockClear();
+  deleteMock.mockClear();
 });
 
 describe("ScholarshipsPage", () => {
@@ -176,6 +183,33 @@ describe("ScholarshipsPage", () => {
     expect(within(row).queryByRole("button", { name: "Approve" })).toBeNull();
     expect(screen.getByRole("button", { name: "Award to a student" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "New scholarship" })).toBeTruthy();
+  });
+
+  test("finance edits a scholarship's name and deletes one nobody holds", async () => {
+    await renderAs("FINANCE");
+    fireEvent.click(await screen.findByRole("button", { name: "Edit Sibling discount" }));
+    const edit = await screen.findByRole("dialog", { name: "Edit scholarship" });
+    fireEvent.change(within(edit).getByLabelText("Name", { exact: false }), {
+      target: { value: "Siblings" },
+    });
+    fireEvent.click(within(edit).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(patchMock).toHaveBeenCalledTimes(1));
+    expect(patchMock.mock.calls[0]).toEqual([
+      "/api/finance/scholarships/{scholarshipId}",
+      {
+        params: { path: { scholarshipId: "scholarship-1" } },
+        body: { name: "Siblings", description: "" },
+      },
+    ]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete Sibling discount" }));
+    const confirm = await screen.findByRole("dialog", { name: "Delete Sibling discount?" });
+    fireEvent.click(within(confirm).getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(deleteMock).toHaveBeenCalledTimes(1));
+    expect(deleteMock.mock.calls[0]).toEqual([
+      "/api/finance/scholarships/{scholarshipId}",
+      { params: { path: { scholarshipId: "scholarship-1" } } },
+    ]);
   });
 
   test("finance creates a scholarship and requests it for the students picked in the form", async () => {

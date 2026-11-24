@@ -1,14 +1,16 @@
 import { PERMISSIONS } from "@studafy/constants";
-import { Button, DataGrid, Select, useToast } from "@studafy/ui";
+import { Button, DataGrid, Modal, Select, useToast } from "@studafy/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
+import { apiErrorDescription } from "../../../lib/api-error";
 import { usePermissions } from "../../../lib/auth";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 import { useSearchParamFlag } from "../../../lib/use-search-param-flag";
 
 import { AwardScholarshipModal } from "./AwardScholarshipModal";
 import { DecideAwardModal } from "./DecideAwardModal";
+import { ScholarshipEditModal } from "./ScholarshipEditModal";
 import { ScholarshipFormModal } from "./ScholarshipFormModal";
 import {
   AWARDS_PAGE_SIZE,
@@ -16,6 +18,7 @@ import {
   fetchAwardsPage,
   fetchScholarships,
   SCHOLARSHIPS_KEY,
+  useDeleteScholarship,
   useSetScholarshipActive,
 } from "./scholarships-api";
 import { SiblingDiscountPanel } from "./SiblingDiscountPanel";
@@ -48,6 +51,12 @@ export default function ScholarshipsPage() {
   const canManage = permissions.has(PERMISSIONS.BILLING_UPDATE);
   const canDecide = permissions.has(PERMISSIONS.BILLING_APPROVE_SCHOLARSHIP);
   const setActive = useSetScholarshipActive();
+  const deleteScholarship = useDeleteScholarship();
+  const [editing, setEditing] = useState<Scholarship | null>(null);
+  const [deleting, setDeleting] = useState<Scholarship | null>(null);
+  // Students hold it: the API would refuse, so the dialog explains instead of offering Delete. A
+  // pending or revoked award also blocks it; the API says so for those.
+  const deleteBlocked = (deleting?.approved_award_count ?? 0) > 0;
 
   // The admin lands on what needs them: the approval queue.
   const [status, setStatus] = useState<AwardStatus | "">(canDecide ? "pending_approval" : "");
@@ -83,6 +92,27 @@ export default function ScholarshipsPage() {
       label: statusLabel(value),
     })),
   ];
+
+  function confirmDelete() {
+    if (!deleting) return;
+    deleteScholarship.mutate(deleting.id, {
+      onSuccess: () => {
+        show({
+          variant: "success",
+          title: t("financeReports.adjustments.scholarships.deletedToast"),
+        });
+        setDeleting(null);
+      },
+      onError: (error) => {
+        show({
+          variant: "error",
+          title: t("financeReports.adjustments.scholarships.deleteError"),
+          description: apiErrorDescription(error, t),
+        });
+        setDeleting(null);
+      },
+    });
+  }
 
   function toggleActive(row: Scholarship) {
     setActive.mutate(
@@ -209,18 +239,40 @@ export default function ScholarshipsPage() {
       header: t("financeReports.adjustments.common.actions"),
       renderCell: (row) =>
         canManage ? (
-          <Button
-            type="button"
-            variant="tertiary"
-            disabled={setActive.isPending}
-            onClick={() => toggleActive(row)}
-          >
-            {t(
-              row.is_active
-                ? "financeReports.adjustments.scholarships.deactivate"
-                : "financeReports.adjustments.scholarships.activate",
-            )}
-          </Button>
+          <div className="adjustments-list__row-actions">
+            <Button
+              type="button"
+              variant="tertiary"
+              aria-label={t("financeReports.adjustments.scholarships.editLabel", {
+                name: row.name,
+              })}
+              onClick={() => setEditing(row)}
+            >
+              {t("financeReports.adjustments.scholarships.edit")}
+            </Button>
+            <Button
+              type="button"
+              variant="tertiary"
+              disabled={setActive.isPending}
+              onClick={() => toggleActive(row)}
+            >
+              {t(
+                row.is_active
+                  ? "financeReports.adjustments.scholarships.deactivate"
+                  : "financeReports.adjustments.scholarships.activate",
+              )}
+            </Button>
+            <Button
+              type="button"
+              variant="tertiary"
+              aria-label={t("financeReports.adjustments.scholarships.deleteLabel", {
+                name: row.name,
+              })}
+              onClick={() => setDeleting(row)}
+            >
+              {t("financeReports.adjustments.scholarships.delete")}
+            </Button>
+          </div>
         ) : null,
     },
   ];
@@ -304,6 +356,42 @@ export default function ScholarshipsPage() {
       />
 
       {formOpen ? <ScholarshipFormModal open onClose={() => setFormOpen(false)} /> : null}
+      {editing ? (
+        <ScholarshipEditModal
+          key={editing.id}
+          scholarship={editing}
+          onClose={() => setEditing(null)}
+        />
+      ) : null}
+      <Modal
+        open={deleting !== null}
+        onClose={() => setDeleting(null)}
+        title={t("financeReports.adjustments.scholarships.deleteTitle", { name: deleting?.name })}
+      >
+        <Modal.Body>
+          <p>
+            {deleteBlocked
+              ? t("financeReports.adjustments.scholarships.deleteBlocked", { name: deleting?.name })
+              : t("financeReports.adjustments.scholarships.deleteBody")}
+          </p>
+        </Modal.Body>
+        <Modal.Footer>
+          {deleteBlocked ? (
+            <Button type="button" onClick={() => setDeleting(null)}>
+              {t("financeReports.adjustments.scholarships.close")}
+            </Button>
+          ) : (
+            <>
+              <Button type="button" variant="tertiary" onClick={() => setDeleting(null)}>
+                {t("financeReports.adjustments.common.cancel")}
+              </Button>
+              <Button type="button" loading={deleteScholarship.isPending} onClick={confirmDelete}>
+                {t("financeReports.adjustments.scholarships.delete")}
+              </Button>
+            </>
+          )}
+        </Modal.Footer>
+      </Modal>
       {awardOpen ? (
         <AwardScholarshipModal
           open

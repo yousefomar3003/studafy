@@ -280,6 +280,46 @@ export async function updateScholarship(
   return (await findScholarship(tx, schoolId, scholarshipId))!;
 }
 
+/**
+ * Delete a scholarship nobody was ever awarded. Once a student holds (or held) an award its
+ * invoices and history point at it, so it is refused and the school deactivates it instead.
+ */
+export async function deleteScholarship(
+  tx: TransactionSql,
+  schoolId: string,
+  scholarshipId: string,
+): Promise<void> {
+  const existing = await findScholarship(tx, schoolId, scholarshipId);
+  if (!existing) {
+    throw new CodedHttpException(404, ERROR_CODES.SCHOLARSHIP_NOT_FOUND, "Scholarship not found");
+  }
+
+  const [awards] = await tx<{ count: number }[]>`
+    SELECT count(*)::int AS count
+    FROM app.scholarship_awards
+    WHERE school_id = ${schoolId}::uuid AND scholarship_id = ${scholarshipId}::uuid
+  `;
+  if ((awards?.count ?? 0) > 0) {
+    throw new CodedHttpException(
+      409,
+      ERROR_CODES.RESOURCE_IN_USE,
+      "This scholarship has been awarded to students, so it can't be deleted. Deactivate it instead.",
+    );
+  }
+
+  await tx`
+    DELETE FROM app.scholarships
+    WHERE school_id = ${schoolId}::uuid AND id = ${scholarshipId}::uuid
+  `;
+
+  await emitAuditLog(tx, {
+    action: "delete",
+    targetTable: "scholarships",
+    targetId: scholarshipId,
+    oldValues: { name: existing.name, description: existing.description },
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Awards
 // ---------------------------------------------------------------------------

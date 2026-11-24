@@ -1,7 +1,7 @@
-import { ApiError } from "@studafy/api-client";
 import { Button, Modal, Table, useToast } from "@studafy/ui";
 import { useState } from "react";
 
+import { apiErrorDescription } from "../../../lib/api-error";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 import { AddCourseModal } from "../classes/AddCourseModal";
 import { useCourses, useSubjects } from "../school/queries";
@@ -45,6 +45,13 @@ export default function SubjectsCoursesPage() {
     coursesBySubject.set(course.subject_id, list);
   }
 
+  // An archived subject that still has courses is as far as removing goes: the API would only
+  // archive it again. Its dialog says so instead of offering Remove.
+  const removeBlocked =
+    removing?.kind === "subject" &&
+    removing.item.status === "archived" &&
+    (coursesBySubject.get(removing.item.id)?.length ?? 0) > 0;
+
   function confirmRemove() {
     if (!removing) return;
     const onSuccess = () => {
@@ -55,7 +62,7 @@ export default function SubjectsCoursesPage() {
       show({
         variant: "error",
         title: t("principal.catalog.remove.failed"),
-        description: error instanceof ApiError ? (error.detail ?? error.title) : undefined,
+        description: apiErrorDescription(error, t),
       });
       setRemoving(null);
     };
@@ -76,16 +83,14 @@ export default function SubjectsCoursesPage() {
       >
         {t("principal.catalog.edit")}
       </Button>
-      {target.item.status !== "archived" ? (
-        <Button
-          type="button"
-          variant="tertiary"
-          aria-label={t("principal.catalog.removeLabel", { name: target.item.name })}
-          onClick={() => setRemoving(target)}
-        >
-          {t("principal.catalog.remove.action")}
-        </Button>
-      ) : null}
+      <Button
+        type="button"
+        variant="tertiary"
+        aria-label={t("principal.catalog.removeLabel", { name: target.item.name })}
+        onClick={() => setRemoving(target)}
+      >
+        {t("principal.catalog.remove.action")}
+      </Button>
     </div>
   );
 
@@ -169,22 +174,32 @@ export default function SubjectsCoursesPage() {
       >
         <Modal.Body>
           <p>
-            {removing?.kind === "subject"
-              ? t("principal.catalog.remove.subjectBody")
-              : t("principal.catalog.remove.courseBody")}
+            {removeBlocked
+              ? t("principal.catalog.remove.blockedSubject", { name: removing?.item.name })
+              : removing?.kind === "subject"
+                ? t("principal.catalog.remove.subjectBody")
+                : t("principal.catalog.remove.courseBody")}
           </p>
         </Modal.Body>
         <Modal.Footer>
-          <Button type="button" variant="tertiary" onClick={() => setRemoving(null)}>
-            {t("principal.common.cancel")}
-          </Button>
-          <Button
-            type="button"
-            loading={deleteSubject.isPending || deleteCourse.isPending}
-            onClick={confirmRemove}
-          >
-            {t("principal.catalog.remove.action")}
-          </Button>
+          {removeBlocked ? (
+            <Button type="button" onClick={() => setRemoving(null)}>
+              {t("principal.catalog.remove.close")}
+            </Button>
+          ) : (
+            <>
+              <Button type="button" variant="tertiary" onClick={() => setRemoving(null)}>
+                {t("principal.common.cancel")}
+              </Button>
+              <Button
+                type="button"
+                loading={deleteSubject.isPending || deleteCourse.isPending}
+                onClick={confirmRemove}
+              >
+                {t("principal.catalog.remove.action")}
+              </Button>
+            </>
+          )}
         </Modal.Footer>
       </Modal>
     </>

@@ -100,6 +100,8 @@ export const ERROR_CODES = {
   CONFLICT_DUPLICATE_ENTRY: "CONFLICT_DUPLICATE_ENTRY",
   CONFLICT_STATE_MISMATCH: "CONFLICT_STATE_MISMATCH",
   CONFLICT_IDEMPOTENCY_KEY_MISMATCH: "CONFLICT_IDEMPOTENCY_KEY_MISMATCH",
+  // A delete refused because other records still point at the row (a database foreign key).
+  RESOURCE_IN_USE: "RESOURCE_IN_USE",
 
   // User management — duplicate email or invalid role assignment within a school.
   USER_EMAIL_DUPLICATE: "USER_EMAIL_DUPLICATE",

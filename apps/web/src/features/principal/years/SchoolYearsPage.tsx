@@ -1,7 +1,7 @@
-import { ApiError } from "@studafy/api-client";
 import { Button, Checkbox, Modal, Table, useToast } from "@studafy/ui";
 import { useState } from "react";
 
+import { apiErrorDescription } from "../../../lib/api-error";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 import { pickCurrentYear, useAcademicYears, useTerms } from "../school/queries";
 
@@ -20,8 +20,19 @@ const TERM_COLUMN_COUNT = 6;
 
 type PendingDelete = { kind: "year"; year: AcademicYear } | { kind: "term"; term: Term };
 
-function apiErrorDescription(error: unknown): string | undefined {
-  return error instanceof ApiError ? (error.detail ?? error.title) : undefined;
+/**
+ * Why a year or term cannot be deleted, known before asking the API: only a planned one can. The
+ * delete dialog shows this instead of a Delete button. `null` when it may be deleted (the API can
+ * still refuse one that something else uses, and says why).
+ */
+function blockedReason(target: PendingDelete): string | null {
+  if (target.kind === "term") {
+    return target.term.status === "planned" ? null : "principal.years.delete.blockedTerm";
+  }
+  if (target.year.status === "planned") return null;
+  return target.year.status === "active"
+    ? "principal.years.delete.blockedYearActive"
+    : "principal.years.delete.blockedYearClosed";
 }
 
 /** A `YYYY-MM-DD` value as a local calendar date, so no time zone can move it a day. */
@@ -35,8 +46,8 @@ function parseIsoDate(value: string): Date {
  * School years & terms (`/portal/principal/years`), gated on `timetable:manage` (ORG_ADMIN,
  * PRINCIPAL): every academic year with its terms, adding and correcting them, and starting a new
  * year. Starting one (rollover) closes the current year and marks every enrolment in it completed,
- * so it sits behind its own confirmation. Only a planned year or term can be deleted; the API says
- * why when one cannot.
+ * so it sits behind its own confirmation. Every row offers Edit and Delete; only a planned year or
+ * term can be deleted, and the delete dialog says why when one cannot.
  */
 export default function SchoolYearsPage() {
   const { t } = useTranslation();
@@ -66,6 +77,8 @@ export default function SchoolYearsPage() {
       { dateStyle: "medium" },
     )}`;
 
+  const deleteBlocked = pendingDelete ? blockedReason(pendingDelete) : null;
+
   function confirmDelete() {
     if (!pendingDelete) return;
     const onSuccess = () => {
@@ -79,7 +92,7 @@ export default function SchoolYearsPage() {
       show({
         variant: "error",
         title: t("principal.years.delete.failed"),
-        description: apiErrorDescription(error),
+        description: apiErrorDescription(error, t),
       });
       setPendingDelete(null);
     };
@@ -113,7 +126,7 @@ export default function SchoolYearsPage() {
         show({
           variant: "error",
           title: t("principal.years.rollover.failed"),
-          description: apiErrorDescription(error),
+          description: apiErrorDescription(error, t),
         }),
     });
   }
@@ -183,29 +196,27 @@ export default function SchoolYearsPage() {
                       {t("principal.years.edit")}
                     </Button>
                     {year.status === "planned" ? (
-                      <>
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          aria-label={t("principal.years.rollover.startLabel", {
-                            name: year.name,
-                          })}
-                          onClick={() => openRollover(year)}
-                        >
-                          {t("principal.years.rollover.start")}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="tertiary"
-                          aria-label={t("principal.years.yearList.deleteLabel", {
-                            name: year.name,
-                          })}
-                          onClick={() => setPendingDelete({ kind: "year", year })}
-                        >
-                          {t("principal.years.delete.action")}
-                        </Button>
-                      </>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        aria-label={t("principal.years.rollover.startLabel", {
+                          name: year.name,
+                        })}
+                        onClick={() => openRollover(year)}
+                      >
+                        {t("principal.years.rollover.start")}
+                      </Button>
                     ) : null}
+                    <Button
+                      type="button"
+                      variant="tertiary"
+                      aria-label={t("principal.years.yearList.deleteLabel", {
+                        name: year.name,
+                      })}
+                      onClick={() => setPendingDelete({ kind: "year", year })}
+                    >
+                      {t("principal.years.delete.action")}
+                    </Button>
                   </div>
                 </Table.Cell>
               </Table.Row>
@@ -281,16 +292,14 @@ export default function SchoolYearsPage() {
                     >
                       {t("principal.years.edit")}
                     </Button>
-                    {term.status === "planned" ? (
-                      <Button
-                        type="button"
-                        variant="tertiary"
-                        aria-label={t("principal.years.termList.deleteLabel", { name: term.name })}
-                        onClick={() => setPendingDelete({ kind: "term", term })}
-                      >
-                        {t("principal.years.delete.action")}
-                      </Button>
-                    ) : null}
+                    <Button
+                      type="button"
+                      variant="tertiary"
+                      aria-label={t("principal.years.termList.deleteLabel", { name: term.name })}
+                      onClick={() => setPendingDelete({ kind: "term", term })}
+                    >
+                      {t("principal.years.delete.action")}
+                    </Button>
                   </div>
                 </Table.Cell>
               </Table.Row>
@@ -309,15 +318,23 @@ export default function SchoolYearsPage() {
         })}
       >
         <Modal.Body>
-          <p>{t("principal.years.delete.body")}</p>
+          <p>{t(deleteBlocked ?? "principal.years.delete.body")}</p>
         </Modal.Body>
         <Modal.Footer>
-          <Button type="button" variant="tertiary" onClick={() => setPendingDelete(null)}>
-            {t("principal.common.cancel")}
-          </Button>
-          <Button type="button" loading={deleting} onClick={confirmDelete}>
-            {t("principal.years.delete.action")}
-          </Button>
+          {deleteBlocked ? (
+            <Button type="button" onClick={() => setPendingDelete(null)}>
+              {t("principal.years.delete.close")}
+            </Button>
+          ) : (
+            <>
+              <Button type="button" variant="tertiary" onClick={() => setPendingDelete(null)}>
+                {t("principal.common.cancel")}
+              </Button>
+              <Button type="button" loading={deleting} onClick={confirmDelete}>
+                {t("principal.years.delete.action")}
+              </Button>
+            </>
+          )}
         </Modal.Footer>
       </Modal>
 

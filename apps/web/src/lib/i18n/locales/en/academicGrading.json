@@ -27,7 +27,8 @@
     "view": "View",
     "remove": "Remove",
     "reason": "Reason",
-    "reasonRequired": "Give a reason."
+    "reasonRequired": "Give a reason.",
+    "close": "Close"
   },
   "status": {
     "draft": "Draft",

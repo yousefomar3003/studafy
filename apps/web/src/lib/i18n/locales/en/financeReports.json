@@ -204,7 +204,23 @@
           "toast": "Scholarship revoked",
           "error": "Couldn't revoke the award"
         }
-      }
+      },
+      "edit": "Edit",
+      "editLabel": "Edit {{name}}",
+      "editTitle": "Edit scholarship",
+      "editNote": "The discount itself can't change once set. To offer a different discount, create a new scholarship.",
+      "descriptionLabel": "Description",
+      "save": "Save",
+      "savedToast": "Scholarship saved",
+      "saveError": "Couldn't save the scholarship",
+      "delete": "Delete",
+      "deleteLabel": "Delete {{name}}",
+      "deleteTitle": "Delete {{name}}?",
+      "deleteBody": "Deleting it can't be undone.",
+      "deleteBlocked": "{{name}} has been awarded to students, so it can't be deleted. Deactivate it instead so it can't be awarded again.",
+      "deletedToast": "Scholarship deleted",
+      "deleteError": "Couldn't delete the scholarship",
+      "close": "Close"
     },
     "siblingDiscount": {
       "title": "Sibling discount",

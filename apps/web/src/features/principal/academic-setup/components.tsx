@@ -466,7 +466,10 @@ export function ReasonModal({
   );
 }
 
-/** A yes/no confirmation for a consequential action. */
+/**
+ * A yes/no confirmation for a consequential action. With `blockedReason`, the action cannot happen
+ * right now: the dialog explains why and offers only Close.
+ */
 export function ConfirmModal({
   open,
   title,
@@ -477,6 +480,7 @@ export function ConfirmModal({
   onConfirm,
   children,
   confirmDisabled,
+  blockedReason,
 }: {
   open: boolean;
   title: string;
@@ -487,8 +491,23 @@ export function ConfirmModal({
   onConfirm: () => void;
   children?: ReactNode;
   confirmDisabled?: boolean;
+  blockedReason?: string;
 }) {
   const { t } = useTranslation();
+  if (blockedReason) {
+    return (
+      <Modal open={open} onClose={onCancel} title={title}>
+        <Modal.Body>
+          <p>{blockedReason}</p>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button type="button" onClick={onCancel}>
+            {t("academicGrading.common.close")}
+          </Button>
+        </Modal.Footer>
+      </Modal>
+    );
+  }
   return (
     <Modal open={open} onClose={onCancel} title={title} description={description}>
       {children ? <Modal.Body>{children}</Modal.Body> : null}

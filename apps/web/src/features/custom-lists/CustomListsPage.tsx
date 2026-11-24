@@ -43,6 +43,26 @@ export default function CustomListsPage() {
   const canManage = permissions.has(PERMISSIONS.CUSTOM_LIST_MANAGE);
   const [includeArchived, setIncludeArchived] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [deleting, setDeleting] = useState<{ id: string; name: string; rows: number } | null>(null);
+  const { show } = useToast();
+  const queryClient = useQueryClient();
+  const remove = useMutation({
+    mutationFn: (listId: string) =>
+      api.DELETE("/api/custom-lists/{listId}", { params: { path: { listId } } }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: customListsKey });
+      show({ variant: "success", title: t("customLists.settings.deleted") });
+      setDeleting(null);
+    },
+    onError: (caught) => {
+      show({
+        variant: "error",
+        title: t("customLists.settings.deleteError"),
+        description: errorDetail(caught),
+      });
+      setDeleting(null);
+    },
+  });
   const query = useQuery({
     queryKey: customListsQueryKey(includeArchived),
     queryFn: () => fetchCustomLists(includeArchived),
@@ -87,6 +107,7 @@ export default function CustomListsPage() {
               <th scope="col">{t("customLists.index.columns.name")}</th>
               <th scope="col">{t("customLists.index.columns.audience")}</th>
               <th scope="col">{t("customLists.index.columns.rows")}</th>
+              {canManage ? <th scope="col">{t("customLists.index.columns.actions")}</th> : null}
             </tr>
           </thead>
           <tbody>
@@ -103,6 +124,37 @@ export default function CustomListsPage() {
                 </td>
                 <td>{t(`customLists.audience.${list.audience}`)}</td>
                 <td>{t("customLists.index.rowCount", { count: list.row_count })}</td>
+                {canManage ? (
+                  <td>
+                    <div className="custom-lists__row-actions">
+                      <LinkButton
+                        href={`${listHref(list.id)}?settings=1`}
+                        variant="tertiary"
+                        aria-label={t("customLists.index.editLabel", {
+                          name: listName(list, i18n.language),
+                        })}
+                      >
+                        {t("customLists.index.edit")}
+                      </LinkButton>
+                      <Button
+                        type="button"
+                        variant="tertiary"
+                        aria-label={t("customLists.index.deleteLabel", {
+                          name: listName(list, i18n.language),
+                        })}
+                        onClick={() =>
+                          setDeleting({
+                            id: list.id,
+                            name: listName(list, i18n.language),
+                            rows: list.row_count,
+                          })
+                        }
+                      >
+                        {t("customLists.index.delete")}
+                      </Button>
+                    </div>
+                  </td>
+                ) : null}
               </tr>
             ))}
           </tbody>
@@ -110,6 +162,27 @@ export default function CustomListsPage() {
       )}
 
       {canManage ? <NewListModal open={creating} onClose={() => setCreating(false)} /> : null}
+      <Modal
+        open={deleting !== null}
+        onClose={() => setDeleting(null)}
+        title={t("customLists.index.deleteTitle", { name: deleting?.name })}
+      >
+        <Modal.Body>
+          <p>{t("customLists.settings.deleteConfirmBody", { count: deleting?.rows ?? 0 })}</p>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button type="button" variant="tertiary" onClick={() => setDeleting(null)}>
+            {t("customLists.common.cancel")}
+          </Button>
+          <Button
+            type="button"
+            loading={remove.isPending}
+            onClick={() => deleting && remove.mutate(deleting.id)}
+          >
+            {t("customLists.settings.deleteConfirm")}
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </>
   );
 }
