@@ -158,6 +158,10 @@ export const ERROR_CODES = {
   PREDICTED_GRADES_DISABLED: "PREDICTED_GRADES_DISABLED",
   // Subject coordinators (000260): the user already coordinates the subject that year.
   SUBJECT_COORDINATOR_DUPLICATE: "SUBJECT_COORDINATOR_DUPLICATE",
+  // Learning outcomes (000267): the code is taken for the subject and grade level, or the outcome
+  // is used by achievement or plans and can only be archived.
+  LEARNING_OUTCOME_DUPLICATE: "LEARNING_OUTCOME_DUPLICATE",
+  LEARNING_OUTCOME_IN_USE: "LEARNING_OUTCOME_IN_USE",
 
   // Enrollment — student-class binding.
   ENROLLMENT_DUPLICATE: "ENROLLMENT_DUPLICATE",

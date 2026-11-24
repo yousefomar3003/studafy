@@ -1260,6 +1260,20 @@ const descriptiveSkillSchema = z
   })
   .openapi("DescriptiveSkillResult");
 
+/** Learning outcome achievement as finalized (000267). */
+const outcomeAchievementResultSchema = z
+  .object({
+    outcome_id: uuidSchema,
+    code: z.string(),
+    text: z.string(),
+    text_ar: z.string().nullable(),
+    strand: z.string().nullable(),
+    level: z.number().int(),
+    label: z.string().nullable(),
+    label_ar: z.string().nullable(),
+  })
+  .openapi("OutcomeAchievementResult");
+
 const storedSubjectResultSchema = z
   .object({
     subject_id: uuidSchema,
@@ -1316,6 +1330,10 @@ const storedSubjectResultSchema = z
     }),
     skills: z.array(descriptiveSkillSchema).openapi({
       description: "Descriptive subjects: each skill and its descriptor. Empty otherwise.",
+    }),
+    outcomes: z.array(outcomeAchievementResultSchema).openapi({
+      description:
+        "Learning outcome achievement as finalized, in catalogue order. Empty unless the school shows outcomes on report cards (and on results finalized before 000267).",
     }),
   })
   .openapi("FinalizedSubjectResult");
@@ -1702,6 +1720,25 @@ export const certificateContentSchema = z
                 .openapi("CertificateContentSkill"),
             )
             .optional(),
+          outcomes: z
+            .array(
+              z
+                .object({
+                  code: z.string(),
+                  text: z.string(),
+                  text_ar: z.string().nullable(),
+                  strand: z.string().nullable(),
+                  level: z.number().int(),
+                  label: z.string().nullable(),
+                  label_ar: z.string().nullable(),
+                })
+                .openapi("CertificateContentOutcome"),
+            )
+            .optional()
+            .openapi({
+              description:
+                "Learning outcome achievement (000267). Absent when the school does not show it, and on older documents.",
+            }),
         })
         .openapi("CertificateContentSubject"),
     ),

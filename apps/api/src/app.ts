@@ -24,6 +24,7 @@ import {
   accountDeletionGuard,
   legalAcceptanceGuard,
 } from "./middleware";
+import { academicPlanRoutes, learningOutcomeRoutes } from "./modules/academic-planning";
 import {
   academicYearRoutes,
   termRoutes,
@@ -1221,6 +1222,9 @@ export function createApp({
     app.route("/", gradingCurriculumTemplateRoutes(database));
     // Graduation requirements: the credits, subjects, GPA and exams a diploma needs (000258).
     app.route("/", graduationRequirementRoutes(database));
+    // Learning outcomes and their achievement; lesson and term plans with review (000267).
+    app.route("/", learningOutcomeRoutes(database));
+    app.route("/", academicPlanRoutes(database));
   }
 
   // Gradebook configuration (ST-112). Weighted assessment categories per gradebook and

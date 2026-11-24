@@ -123,6 +123,8 @@
   "CERTIFICATE_NOT_FOUND": "Certificate not found.",
   "PREDICTED_GRADES_DISABLED": "Predicted grades are not switched on for this grade this year.",
   "SUBJECT_COORDINATOR_DUPLICATE": "This person already coordinates this subject this year.",
+  "LEARNING_OUTCOME_DUPLICATE": "A learning outcome with this code already exists for this subject and grade.",
+  "LEARNING_OUTCOME_IN_USE": "This learning outcome is used by achievement or plans; archive it instead.",
   "ENROLLMENT_DUPLICATE": "This student is already enrolled in this class.",
   "ENROLLMENT_NOT_ACTIVE": "This enrollment is not active.",
   "TIMETABLE_TEACHER_CONFLICT": "This teacher is already assigned to another class at this time",

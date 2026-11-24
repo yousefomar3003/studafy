@@ -64,6 +64,19 @@ export interface CertificateContent {
       term_name: string | null;
       descriptor_label: string | null;
     }[];
+    /**
+     * Learning outcome achievement as finalized (000267): present only when the school shows
+     * outcomes on report cards and the student has some. Absent on documents issued before.
+     */
+    outcomes?: {
+      code: string;
+      text: string;
+      text_ar: string | null;
+      strand: string | null;
+      level: number;
+      label: string | null;
+      label_ar: string | null;
+    }[];
   }[];
   overall: {
     average_percentage: number | null;
@@ -286,6 +299,19 @@ function renderContent(
                 category_name: skill.category_name,
                 term_name: terms.find((t) => t.id === skill.term_id)?.name ?? null,
                 descriptor_label: skill.descriptor_label,
+              })),
+            }
+          : {}),
+        ...(subject.outcomes.length > 0
+          ? {
+              outcomes: subject.outcomes.map((outcome) => ({
+                code: outcome.code,
+                text: outcome.text,
+                text_ar: outcome.text_ar,
+                strand: outcome.strand,
+                level: outcome.level,
+                label: outcome.label,
+                label_ar: outcome.label_ar,
               })),
             }
           : {}),

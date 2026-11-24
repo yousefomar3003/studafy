@@ -3,6 +3,10 @@ import { calculateOverallResult, calculateSubjectResult } from "@studafy/grading
 
 import { CodedHttpException } from "../../coded-http-exception";
 import { emitAuditLog } from "../../middleware/auditEmitter";
+import {
+  readOutcomeSnapshot,
+  snapshotOutcomeAchievements,
+} from "../academic-planning/report-snapshot";
 
 import { requireYear } from "./access";
 import { attachClassRanks } from "./class-rank-service";
@@ -33,6 +37,7 @@ import type {
   SubjectConfigRow,
 } from "./engine-config";
 import type { ReportNotes } from "./report-card-service";
+import type { OutcomeAchievementView } from "../academic-planning/report-snapshot";
 import type {
   FailReason,
   MarkInput,
@@ -552,6 +557,7 @@ export async function finalizeSection(
   `;
   await storeComputation(tx, schoolId, finalization!.id, computation.students);
   await snapshotReportNotes(tx, schoolId, finalization!);
+  await snapshotOutcomeAchievements(tx, schoolId, finalization!);
   await emitAuditLog(tx, {
     action: "insert",
     targetTable: "result_finalizations",
@@ -789,6 +795,7 @@ export async function correctFinalization(
   `;
   await storeComputation(tx, schoolId, next!.id, recomputed);
   await snapshotReportNotes(tx, schoolId, next!);
+  await snapshotOutcomeAchievements(tx, schoolId, next!);
   await emitAuditLog(tx, {
     action: "update",
     targetTable: "result_finalizations",
@@ -832,6 +839,8 @@ export interface StoredSubjectResult {
   average_points: number | null;
   /** Descriptive subjects: every skill and the descriptor it was given. */
   skills: DescriptiveSkill[];
+  /** Learning outcome achievement as finalized (000267); empty when the school does not show it. */
+  outcomes: OutcomeAchievementView[];
 }
 
 export interface DescriptiveSkill {
@@ -998,6 +1007,7 @@ export async function readFinalizationResults(
       ${subjectFilter}
   `;
   const report = await readReportNotes(tx, schoolId, finalizationId, filter.studentId);
+  const outcomeSnapshot = await readOutcomeSnapshot(tx, schoolId, finalizationId, filter.studentId);
   return overall.map((row) => ({
     report: report.notes.get(row.student_id) ?? null,
     class_rank: null,
@@ -1045,6 +1055,7 @@ export async function readFinalizationResults(
         is_descriptive: subject.breakdown.descriptive === true,
         average_points: subject.breakdown.descriptor?.averagePoints ?? null,
         skills: descriptiveSkills(subject.breakdown),
+        outcomes: outcomeSnapshot.get(`${row.student_id}|${subject.subject_id}`) ?? [],
       }))
       .sort((a, b) => a.subject_name.localeCompare(b.subject_name)),
   }));

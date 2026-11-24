@@ -184,6 +184,26 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/grading/graduation-requirement-sets",
   "PUT /api/grading/graduation-requirement-sets/{setId}",
   "DELETE /api/grading/graduation-requirement-sets/{setId}",
+  // Learning outcomes and lesson/term plans (000267): academicConfig:manage for the catalogue and
+  // settings, grade:update for achievement, lesson:* for teachers' plans, academicConfig:read for
+  // reviews (narrowed to the coordinator or leadership); each write is audited in the service.
+  "PUT /api/grading/planning-settings",
+  "POST /api/grading/learning-outcomes",
+  "POST /api/grading/learning-outcomes/import",
+  "PATCH /api/grading/learning-outcomes/{outcomeId}",
+  "DELETE /api/grading/learning-outcomes/{outcomeId}",
+  "PUT /api/grading/sections/{sectionId}/subjects/{subjectId}/outcome-achievements",
+  "POST /api/grading/sections/{sectionId}/subjects/{subjectId}/term-plans",
+  "PUT /api/grading/term-plans/{planId}",
+  "DELETE /api/grading/term-plans/{planId}",
+  "POST /api/grading/term-plans/{planId}/submit",
+  "POST /api/grading/term-plans/{planId}/review",
+  "POST /api/grading/sections/{sectionId}/subjects/{subjectId}/lesson-plans",
+  "PUT /api/grading/lesson-plans/{planId}",
+  "DELETE /api/grading/lesson-plans/{planId}",
+  "POST /api/grading/lesson-plans/{planId}/submit",
+  "POST /api/grading/lesson-plans/{planId}/review",
+  "PUT /api/grading/lesson-plans/{planId}/reflection",
   // Transcripts (000207): issue, reissue and revoke behind academicCertificate:issue.
   "POST /api/grading/students/{studentId}/transcripts",
   "POST /api/grading/transcripts/{transcriptId}/reissue",
