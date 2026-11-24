@@ -8,6 +8,7 @@ import '../../../design/tokens/app_spacing_tokens.dart';
 import '../application/coordinator_providers.dart';
 import '../domain/coordinator.dart';
 import '../domain/mark_sheet.dart';
+import '../../remedial_plans/presentation/section_remedial_plans_screen.dart';
 import 'coordinator_mark_sheet_screen.dart';
 import 'widgets/mark_sheet_common.dart';
 
@@ -107,6 +108,15 @@ class CoordinatorSubjectsScreen extends ConsumerWidget {
                             ),
                           ),
                         ),
+                        onOpenRemedial: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => SectionRemedialPlansScreen(
+                              sectionId: section.sectionId,
+                              subjectId: subject.subjectId,
+                              title: subject.subjectName,
+                            ),
+                          ),
+                        ),
                       ),
                 ],
               ],
@@ -151,11 +161,15 @@ class _SectionCard extends StatelessWidget {
     required this.subject,
     required this.section,
     required this.onOpen,
+    required this.onOpenRemedial,
   });
 
   final CoordinatedSubject subject;
   final CoordinatedSection section;
   final VoidCallback onOpen;
+
+  /// The section's remedial plans for the subject, to follow up (000268).
+  final VoidCallback onOpenRemedial;
 
   @override
   Widget build(BuildContext context) {
@@ -245,6 +259,14 @@ class _SectionCard extends StatelessWidget {
                         ],
                       ),
                     ],
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: TextButton.icon(
+                        onPressed: onOpenRemedial,
+                        icon: const Icon(Icons.support_outlined, size: 18),
+                        label: Text('remedial.coordinatorOpen'.tr()),
+                      ),
+                    ),
                   ],
                 ),
               ),
