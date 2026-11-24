@@ -245,6 +245,8 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/grading/transcripts/{transcriptId}/revoke",
   // Report card notes (000209): each write records its old and new values in the service.
   "PUT /api/grading/report-card-settings",
+  // Document language (000263): the service records old and new values.
+  "PUT /api/grading/document-language-settings",
   "PUT /api/grading/sections/{sectionId}/report-notes",
   "PUT /api/grading/sections/{sectionId}/subjects/{subjectId}/report-comments",
   // External exams and test scores (000255): leadership behind academicConfig:manage; each write

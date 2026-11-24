@@ -6,9 +6,15 @@ import { CodedHttpException } from "../../coded-http-exception";
 import { emitAuditLog } from "../../middleware/auditEmitter";
 
 import { attachClassRanks, documentClassRank } from "./class-rank-service";
+import {
+  documentLanguageFor,
+  documentStudentNamesAr,
+  optionalText,
+} from "./document-language-service";
 import { readFinalizationResults, requireFinalization } from "./results-service";
 
 import type { DocumentClassRank } from "./class-rank-service";
+import type { DocumentLanguage } from "./document-language-service";
 import type { ReportNotes } from "./report-card-service";
 import type { FinalizationRow, StoredStudentResult } from "./results-service";
 import type { ResultDisplay } from "@studafy/grading-engine";
@@ -30,15 +36,32 @@ export interface CertificateContent {
   kind: CertificateKind;
   serial_number: string;
   issued_at: string;
-  school: { id: string; name: string };
-  academic_year: { id: string; code: string; name: string };
-  term: { id: string; name: string } | null;
-  student: { id: string; first_name: string; last_name: string; admission_number: string };
+  /**
+   * The language the school issued the document in (000263): English, Arabic or both. Absent when
+   * the school left it to each reader's language, and on documents issued before.
+   */
+  language?: DocumentLanguage;
+  /** `name_ar` fields (000263): the Arabic names at issue; absent when there was none. */
+  school: { id: string; name: string; name_ar?: string };
+  academic_year: { id: string; code: string; name: string; name_ar?: string };
+  term: { id: string; name: string; name_ar?: string } | null;
+  student: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    first_name_ar?: string;
+    middle_name_ar?: string;
+    last_name_ar?: string;
+    admission_number: string;
+  };
   grade_level_name: string;
+  grade_level_name_ar?: string;
   section_name: string;
+  section_name_ar?: string;
   subjects: {
     code: string;
     name: string;
+    name_ar?: string;
     requirement: string;
     marks_obtained: number | null;
     max_marks: number;
@@ -53,7 +76,12 @@ export interface CertificateContent {
     credits?: number;
     course_level?: string;
     weighted_gpa_points?: number;
-    terms: { term_id: string | null; term_name: string | null; percentage: number | null }[];
+    terms: {
+      term_id: string | null;
+      term_name: string | null;
+      term_name_ar?: string;
+      percentage: number | null;
+    }[];
     /** The subject teacher's comment. Absent on certificates issued before report card notes. */
     comment?: string;
     /** Graded with descriptors instead of marks (absent on certificates issued before). */
@@ -183,13 +211,20 @@ export function blockingReasons(result: {
 
 interface RenderContext {
   school_name: string;
+  school_name_ar: string | null;
   year_code: string;
   year_name: string;
+  year_name_ar: string | null;
   section_name: string;
+  section_name_ar: string | null;
   grade_level_name: string;
+  grade_level_name_ar: string | null;
   term_name: string | null;
+  term_name_ar: string | null;
   issuer_name: string | null;
-  terms: { id: string; name: string }[];
+  terms: { id: string; name: string; name_ar: string | null }[];
+  /** The language the school issues this kind of document in; null leaves it to the reader. */
+  language: DocumentLanguage | null;
 }
 
 /** What every certificate of one finalization shares: names of the school, year, section, term, issuer. */
@@ -199,9 +234,12 @@ async function loadRenderContext(
   userId: string,
   finalization: FinalizationRow,
 ): Promise<RenderContext> {
-  const [context] = await tx<Omit<RenderContext, "terms">[]>`
-    SELECT school.name AS school_name, year.code AS year_code, year.name AS year_name,
-           section.name AS section_name, grade.name AS grade_level_name, term.name AS term_name,
+  const [context] = await tx<Omit<RenderContext, "terms" | "language">[]>`
+    SELECT school.name AS school_name, school.name_ar AS school_name_ar, year.code AS year_code,
+           year.name AS year_name, year.name_ar AS year_name_ar, section.name AS section_name,
+           section.name_ar AS section_name_ar, grade.name AS grade_level_name,
+           grade.name_ar AS grade_level_name_ar, term.name AS term_name,
+           term.name_ar AS term_name_ar,
            (SELECT display_name FROM app.users WHERE id = ${userId}::uuid AND school_id = ${schoolId}::uuid) AS issuer_name
     FROM app.result_finalizations AS finalization
     JOIN app.schools AS school ON school.id = finalization.school_id
@@ -211,11 +249,16 @@ async function loadRenderContext(
     LEFT JOIN app.terms AS term ON term.id = finalization.term_id AND term.school_id = finalization.school_id
     WHERE finalization.id = ${finalization.id}::uuid AND finalization.school_id = ${schoolId}::uuid
   `;
-  const terms = await tx<{ id: string; name: string }[]>`
-    SELECT id, name FROM app.terms
+  const terms = await tx<{ id: string; name: string; name_ar: string | null }[]>`
+    SELECT id, name, name_ar FROM app.terms
     WHERE school_id = ${schoolId}::uuid AND academic_year_id = ${finalization.academic_year_id}::uuid
   `;
-  return { ...context!, terms };
+  const language = await documentLanguageFor(
+    tx,
+    schoolId,
+    finalization.term_id === null ? "certificate" : "report_card",
+  );
+  return { ...context!, terms, language };
 }
 
 /** The class rank an issued document keeps, as an optional field (absent without one). */
@@ -240,26 +283,42 @@ function renderContent(
     kind,
     serial_number: serial,
     issued_at: new Date().toISOString(),
-    school: { id: schoolId, name: context.school_name },
+    ...(context.language ? { language: context.language } : {}),
+    school: {
+      id: schoolId,
+      name: context.school_name,
+      ...optionalText("name_ar", context.school_name_ar),
+    },
     academic_year: {
       id: finalization.academic_year_id,
       code: context.year_code,
       name: context.year_name,
+      ...optionalText("name_ar", context.year_name_ar),
     },
-    term: finalization.term_id ? { id: finalization.term_id, name: context.term_name ?? "" } : null,
+    term: finalization.term_id
+      ? {
+          id: finalization.term_id,
+          name: context.term_name ?? "",
+          ...optionalText("name_ar", context.term_name_ar),
+        }
+      : null,
     student: {
       id: result.student_id,
       first_name: result.first_name,
       last_name: result.last_name,
+      ...documentStudentNamesAr(result),
       admission_number: result.admission_number,
     },
     grade_level_name: context.grade_level_name,
+    ...optionalText("grade_level_name_ar", context.grade_level_name_ar),
     section_name: context.section_name,
+    ...optionalText("section_name_ar", context.section_name_ar),
     subjects: result.subjects
       .filter((subject) => subject.include_on_certificate)
       .map((subject) => ({
         code: subject.subject_code,
         name: subject.subject_name,
+        ...optionalText("name_ar", subject.subject_name_ar),
         requirement: subject.requirement,
         marks_obtained: subject.marks_obtained,
         max_marks: subject.max_marks,
@@ -272,11 +331,15 @@ function renderContent(
         ...(subject.weighted_gpa_points !== null
           ? { weighted_gpa_points: subject.weighted_gpa_points }
           : {}),
-        terms: subject.terms.map((term) => ({
-          term_id: term.term_id,
-          term_name: terms.find((t) => t.id === term.term_id)?.name ?? null,
-          percentage: term.percentage,
-        })),
+        terms: subject.terms.map((term) => {
+          const named = terms.find((t) => t.id === term.term_id);
+          return {
+            term_id: term.term_id,
+            term_name: named?.name ?? null,
+            ...optionalText("term_name_ar", named?.name_ar),
+            percentage: term.percentage,
+          };
+        }),
         ...(subject.comment ? { comment: subject.comment } : {}),
         ...(subject.is_descriptive
           ? {

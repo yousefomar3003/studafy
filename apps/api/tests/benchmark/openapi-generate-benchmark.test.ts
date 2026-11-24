@@ -564,6 +564,7 @@ const EXPECTED_PATHS = [
   "/api/grading/graduation-requirements/report",
   "/api/grading/mark-sheets/{sheetId}/decision",
   "/api/grading/my-assignments",
+  "/api/grading/document-language-settings",
   "/api/grading/report-card-settings",
   "/api/grading/scales/{scaleId}",
   "/api/grading/sections/{sectionId}/report-notes",

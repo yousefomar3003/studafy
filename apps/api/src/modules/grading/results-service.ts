@@ -807,6 +807,8 @@ export interface StoredSubjectResult {
   subject_id: string;
   subject_code: string;
   subject_name: string;
+  /** The subject's Arabic name (000263), read live; null when the school has none. */
+  subject_name_ar: string | null;
   status: "complete" | "incomplete" | "exempt";
   percentage: number | null;
   marks_obtained: number | null;
@@ -875,6 +877,10 @@ export interface StoredStudentResult {
   student_id: string;
   first_name: string;
   last_name: string;
+  /** The student's Arabic names (000263); null when the school keeps none. */
+  first_name_ar: string | null;
+  middle_name_ar: string | null;
+  last_name_ar: string | null;
   admission_number: string;
   status: "complete" | "incomplete";
   average_percentage: number | null;
@@ -938,6 +944,9 @@ export async function readFinalizationResults(
       student_id: string;
       first_name: string;
       last_name: string;
+      first_name_ar: string | null;
+      middle_name_ar: string | null;
+      last_name_ar: string | null;
       admission_number: string;
       status: "complete" | "incomplete";
       average_percentage: string | null;
@@ -955,6 +964,7 @@ export async function readFinalizationResults(
     }[]
   >`
     SELECT overall.student_id, student.first_name, student.last_name, student.admission_number,
+           student.first_name_ar, student.middle_name_ar, student.last_name_ar,
            overall.status, overall.average_percentage, overall.total_obtained, overall.total_max,
            overall.grade_label, overall.subjects_failed, overall.academic_status,
            overall.result_format, overall.result_scale_max, overall.result_value,
@@ -998,12 +1008,19 @@ export async function readFinalizationResults(
       ${subjectFilter}
   `;
   const report = await readReportNotes(tx, schoolId, finalizationId, filter.studentId);
+  const namesAr = await subjectNamesAr(
+    tx,
+    subjects.map((subject) => subject.subject_id),
+  );
   return overall.map((row) => ({
     report: report.notes.get(row.student_id) ?? null,
     class_rank: null,
     student_id: row.student_id,
     first_name: row.first_name,
     last_name: row.last_name,
+    first_name_ar: row.first_name_ar,
+    middle_name_ar: row.middle_name_ar,
+    last_name_ar: row.last_name_ar,
     admission_number: row.admission_number,
     status: row.status,
     average_percentage: n(row.average_percentage),
@@ -1023,6 +1040,7 @@ export async function readFinalizationResults(
         // Names come from the snapshot: what the subject was called when the result was made.
         subject_code: subject.config_snapshot.subject.code,
         subject_name: subject.config_snapshot.subject.name,
+        subject_name_ar: namesAr.get(subject.subject_id) ?? null,
         status: subject.status,
         percentage: n(subject.percentage),
         marks_obtained: n(subject.marks_obtained),
@@ -1048,6 +1066,22 @@ export async function readFinalizationResults(
       }))
       .sort((a, b) => a.subject_name.localeCompare(b.subject_name)),
   }));
+}
+
+/**
+ * The Arabic names (000263) of the given subjects, through app.subject_names_ar: students and
+ * parents may not read the app.subjects row behind a result they can read (000037).
+ */
+export async function subjectNamesAr(
+  tx: TransactionSql,
+  subjectIds: readonly string[],
+): Promise<Map<string, string>> {
+  const ids = [...new Set(subjectIds)];
+  if (ids.length === 0) return new Map();
+  const rows = await tx<{ subject_id: string; name_ar: string }[]>`
+    SELECT subject_id, name_ar FROM app.subject_names_ar(${ids}::uuid[])
+  `;
+  return new Map(rows.map((row) => [row.subject_id, row.name_ar]));
 }
 
 export async function requireFinalization(

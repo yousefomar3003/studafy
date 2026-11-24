@@ -1,5 +1,6 @@
 export { gradingConfigRoutes } from "./routes/config-routes";
 export { gradingCurriculumTemplateRoutes } from "./routes/curriculum-template-routes";
+export { gradingDocumentLanguageRoutes } from "./routes/document-language-routes";
 export { gradingMarksRoutes } from "./routes/marks-routes";
 export { gradingPredictedGradesRoutes } from "./routes/predicted-grades-routes";
 export { gradingReportCardRoutes } from "./routes/report-card-routes";
