@@ -170,3 +170,45 @@ export type {
   MinistryExportTemplateDefinition,
   MinistryExportValueMapEntry,
 } from "./ministry-export";
+export {
+  EQUIVALENCY_CONVERSION_MODES,
+  EQUIVALENCY_EXAMPLES,
+  EQUIVALENCY_GPA_BASES,
+  EQUIVALENCY_LIMITS,
+  EQUIVALENCY_PART_TYPES,
+  EQUIVALENCY_SOURCE_SYSTEMS,
+  convertEquivalencyValue,
+  estimateTawjihiEquivalency,
+  validateEquivalencyParts,
+} from "./equivalency";
+export type {
+  EquivalencyBand,
+  EquivalencyConversion,
+  EquivalencyConversionMode,
+  EquivalencyDiplomaInput,
+  EquivalencyEstimate,
+  EquivalencyExample,
+  EquivalencyExamplePart,
+  EquivalencyExamResultInput,
+  EquivalencyGpaBasis,
+  EquivalencyGradePercentage,
+  EquivalencyIssue,
+  EquivalencyIssueCode,
+  EquivalencyPartDefinition,
+  EquivalencyPartResult,
+  EquivalencyPartStatus,
+  EquivalencyPartType,
+  EquivalencySourceSystem,
+  EquivalencyStatus,
+  EquivalencyStudentInput,
+  EquivalencySubjectStep,
+} from "./equivalency";
+export { MULTI_YEAR_LIMITS, calculateMultiYearResult, validateMultiYearYears } from "./multi-year";
+export type {
+  MultiYearResult,
+  MultiYearStatus,
+  MultiYearSubjectInput,
+  MultiYearSubjectResult,
+  MultiYearYearInput,
+  MultiYearYearStatus,
+} from "./multi-year";
