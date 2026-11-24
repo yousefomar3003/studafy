@@ -102,7 +102,7 @@ const roomRefSchema = z
 const periodShape = {
   id: uuidSchema,
   academic_year_id: uuidSchema,
-  term: idNameSchema.nullable(),
+  term: z.object({ id: uuidSchema, name: z.string() }).openapi("ExamPeriodTerm").nullable(),
   name: z.string(),
   kind: examPeriodKindSchema,
   starts_on: dateSchema,
@@ -161,7 +161,10 @@ export const examSlotSchema = z
     exam_date: dateSchema,
     starts_at: timeOutSchema,
     ends_at: timeOutSchema,
-    assessment: idNameSchema.nullable(),
+    assessment: z
+      .object({ id: uuidSchema, name: z.string() })
+      .openapi("ExamSlotAssessment")
+      .nullable(),
     notes: z.string().nullable(),
     rooms: z.array(examSlotRoomSchema),
     candidates: z.number().int().openapi({ description: "Students who sit the exam." }),
@@ -282,7 +285,7 @@ export const examClashSchema = z
     severity: z.enum(["error", "warning"]).openapi("ExamClashSeverity"),
     slot_ids: z.array(uuidSchema),
     room_ids: z.array(uuidSchema),
-    teacher: idNameSchema.nullable(),
+    teacher: z.object({ id: uuidSchema, name: z.string() }).openapi("ExamClashTeacher").nullable(),
     students: z.array(idNameSchema),
     seat_number: z.number().int().nullable(),
     seated: z.number().int().nullable(),
@@ -307,7 +310,16 @@ export const studentExamSlotSchema = z
     exam_date: dateSchema,
     starts_at: timeOutSchema,
     ends_at: timeOutSchema,
-    room: roomRefSchema.nullable(),
+    room: z
+      .object({
+        id: uuidSchema,
+        code: z.string(),
+        name: z.string(),
+        building: z.string().nullable(),
+        floor: z.string().nullable(),
+      })
+      .openapi("StudentExamRoom")
+      .nullable(),
     seat_number: z.number().int().nullable(),
   })
   .openapi("StudentExamSlot");
