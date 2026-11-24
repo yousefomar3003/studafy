@@ -228,6 +228,7 @@ const SAT_RESULT = {
     archived: false,
   },
   subject: null,
+  entry_id: null,
   sat_on: "2026-10-04",
   total_score: 1480,
   note: null,
@@ -252,6 +253,24 @@ const SAT_RESULT = {
   recorded_by_user_id: "principal-1",
   created_at: "2026-10-20T10:00:00.000Z",
   updated_at: "2026-10-20T10:00:00.000Z",
+};
+
+const SAT_ENTRY = {
+  id: "entry-sat",
+  exam: { id: "exam-sat", code: "SAT", name: "SAT" },
+  session: {
+    id: "session-sat",
+    series: "October 2026",
+    entry_deadline: null,
+    starts_on: "2026-10-04",
+    ends_on: null,
+    results_date: null,
+  },
+  candidate_number: "40112",
+  status: "entered",
+  subjects: [],
+  entered_at: "2026-09-01T00:00:00.000Z",
+  withdrawn_at: null,
 };
 
 const PREDICTED = {
@@ -424,6 +443,9 @@ const getMock = mock((path: string, _init?: RequestInit) => {
   }
   if (path === "/api/grading/students/{studentId}/external-exam-results") {
     return Promise.resolve<unknown>({ data: { results: [SAT_RESULT] } });
+  }
+  if (path === "/api/grading/students/{studentId}/external-exam-entries") {
+    return Promise.resolve<unknown>({ data: { entries: [SAT_ENTRY] } });
   }
   if (path === "/api/grading/transcripts/{transcriptId}") {
     return Promise.resolve<unknown>({ data: transcriptDocument ?? TRANSCRIPT });
@@ -682,6 +704,17 @@ describe("Principal > Students", () => {
     const [path, init] = deleteMock.mock.calls[0] as [string, RequestInit];
     expect(path).toBe("/api/grading/external-exam-results/{resultId}");
     expect(init.params?.path).toEqual({ resultId: "ext-result-1" });
+  });
+
+  test("a result can be linked to the student's entry for that exam", async () => {
+    await renderAsPrincipal("/portal/principal/students/student-1");
+
+    const panel = await screen.findByRole("region", { name: "Test scores" });
+    fireEvent.click(await within(panel).findByRole("button", { name: "Edit the SAT result" }));
+    const entry = await screen.findByRole("combobox", { name: "Exam entry" });
+    fireEvent.click(entry);
+    expect(await screen.findByRole("option", { name: "October 2026 · 40112" })).toBeTruthy();
+    expect(screen.getByRole("option", { name: "Not linked to an entry" })).toBeTruthy();
   });
 
   test("the student page shows the graduation requirements checklist", async () => {

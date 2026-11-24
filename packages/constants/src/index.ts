@@ -11,6 +11,7 @@ export {
   AI_EXAM_SUBMIT_GRACE_SECONDS,
   AI_EXAM_WEAK_TOPIC_THRESHOLD,
 } from "./ai-exam";
+export { AI_EMBEDDING_DIMENSIONS, aiEmbeddingModelId } from "./ai-embeddings";
 export { dsrExportArchiveKey, dsrExportPrefix } from "./dsr-exports";
 export { DOMAIN_EVENTS, ERPNEXT_DOC_EVENT_MAP } from "./events";
 export type { DomainEvent } from "./events";

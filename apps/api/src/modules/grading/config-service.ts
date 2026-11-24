@@ -2,6 +2,7 @@ import { ERROR_CODES } from "@studafy/constants";
 import {
   hasErrors,
   summarizeWeights,
+  validateDiplomaConfig,
   validateGradeScale,
   validateRankSettings,
   validateSubjectConfig,
@@ -16,6 +17,7 @@ import {
   normalizeDescriptiveInput,
   replaceDescriptors,
 } from "./descriptor-service";
+import { defaultDiplomaConfigJson, toEngineDiplomaConfig } from "./diploma-config";
 import {
   configWeighting,
   effectiveSubjects,
@@ -36,6 +38,7 @@ import {
 
 import type { GradingConfigStatus, YearRow } from "./access";
 import type { DescriptorInput } from "./descriptor-service";
+import type { DiplomaConfigJson } from "./diploma-config";
 import type {
   AssessmentRow,
   CategoryRow,
@@ -89,6 +92,11 @@ export interface ProgramInput {
   rank_basis?: RankBasis;
   rank_scope?: RankScope;
   rank_visibility?: RankVisibility;
+  /**
+   * points_total only: the diploma rules. Omitted keeps the saved ones (the IB defaults for a grade
+   * switching to points_total); null resets them to the IB defaults.
+   */
+  diploma_config?: DiplomaConfigJson | null;
   /** Replaces the grade's descriptor scale (highest first) when given. */
   descriptors?: DescriptorInput[];
 }
@@ -596,7 +604,7 @@ export async function listPrograms(
            program.result_format, program.result_scale_max::float8 AS result_scale_max,
            program.predicted_grades_enabled, program.predicted_grades_visibility,
            program.rank_enabled, program.rank_basis, program.rank_scope, program.rank_visibility,
-           program.updated_at
+           program.diploma_config, program.updated_at
     FROM app.grade_programs AS program
     JOIN app.grade_levels AS grade
       ON grade.id = program.grade_level_id AND grade.school_id = program.school_id
@@ -605,8 +613,8 @@ export async function listPrograms(
   `;
 }
 
-/** Highest maximum a grade may show its result out of, per format (mirrors 000206). */
-const RESULT_SCALE_LIMITS = { out_of: 1000, gpa: 10 } as const;
+/** Highest maximum a grade may show its result out of, per format (mirrors 000206, 000263). */
+const RESULT_SCALE_LIMITS = { out_of: 1000, gpa: 10, points_total: 1000 } as const;
 
 /**
  * The result format a program saves: the request's choice merged onto the saved one. Switching to
@@ -633,10 +641,37 @@ function resultFormatValues(
       ERROR_CODES.VALIDATION_FAILED,
       format === "gpa"
         ? `Give the GPA's maximum (for example 4 or 5), up to ${limit}`
-        : `Give the maximum the result is out of (for example 20), up to ${limit}`,
+        : format === "points_total"
+          ? `Give the total's maximum (45 for the IB Diploma), up to ${limit}`
+          : `Give the maximum the result is out of (for example 20), up to ${limit}`,
     );
   }
   return { result_format: format, result_scale_max: max };
+}
+
+/**
+ * The diploma rules a program saves: only a points_total grade has them. The request's rules, else
+ * the saved ones, else the IB defaults; null in the request resets to the defaults. Refused when the
+ * engine finds an error in them.
+ */
+function diplomaConfigValue(
+  input: ProgramInput,
+  existing: Pick<ProgramRow, "diploma_config"> | undefined,
+  format: { result_format: ResultFormatKind; result_scale_max: number | null },
+): DiplomaConfigJson | null {
+  if (format.result_format !== "points_total") return null;
+  const config =
+    input.diploma_config === undefined
+      ? (existing?.diploma_config ?? defaultDiplomaConfigJson())
+      : (input.diploma_config ?? defaultDiplomaConfigJson());
+  const issues = validateDiplomaConfig(
+    toEngineDiplomaConfig(config),
+    format.result_scale_max ?? 0,
+  ).filter((issue) => issue.severity === "error");
+  if (issues.length > 0) {
+    throw new CodedHttpException(400, ERROR_CODES.VALIDATION_FAILED, issues[0]!.message);
+  }
+  return config;
 }
 
 type RankSettings = Pick<
@@ -690,7 +725,7 @@ export async function upsertProgram(
            average_rounding_decimals, average_rounding_mode,
            result_format, result_scale_max::float8 AS result_scale_max,
            predicted_grades_enabled, predicted_grades_visibility,
-           rank_enabled, rank_basis, rank_scope, rank_visibility
+           rank_enabled, rank_basis, rank_scope, rank_visibility, diploma_config
     FROM app.grade_programs
     WHERE school_id = ${schoolId}::uuid AND academic_year_id = ${yearId}::uuid
       AND grade_level_id = ${gradeLevelId}::uuid
@@ -731,6 +766,7 @@ export async function upsertProgram(
       input.predicted_grades_enabled ?? existing?.predicted_grades_enabled ?? false,
     predicted_grades_visibility:
       input.predicted_grades_visibility ?? existing?.predicted_grades_visibility ?? "staff",
+    diploma_config: diplomaConfigValue(input, existing, format),
   };
 
   if (existing) {
@@ -749,6 +785,7 @@ export async function upsertProgram(
         rank_basis = ${values.rank_basis},
         rank_scope = ${values.rank_scope},
         rank_visibility = ${values.rank_visibility},
+        diploma_config = ${values.diploma_config === null ? null : tx.json(values.diploma_config as never)},
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ${existing.id}::uuid AND school_id = ${schoolId}::uuid
     `;
@@ -759,14 +796,15 @@ export async function upsertProgram(
         max_failed_subjects_for_supplementary, mark_approval_required,
         average_rounding_decimals, average_rounding_mode, result_format, result_scale_max,
         predicted_grades_enabled, predicted_grades_visibility,
-        rank_enabled, rank_basis, rank_scope, rank_visibility
+        rank_enabled, rank_basis, rank_scope, rank_visibility, diploma_config
       ) VALUES (
         ${schoolId}::uuid, ${yearId}::uuid, ${gradeLevelId}::uuid, ${values.grade_scale_id}::uuid,
         ${values.max_failed_subjects_for_supplementary}, ${values.mark_approval_required},
         ${values.average_rounding_decimals}, ${values.average_rounding_mode},
         ${values.result_format}, ${values.result_scale_max},
         ${values.predicted_grades_enabled}, ${values.predicted_grades_visibility},
-        ${values.rank_enabled}, ${values.rank_basis}, ${values.rank_scope}, ${values.rank_visibility}
+        ${values.rank_enabled}, ${values.rank_basis}, ${values.rank_scope}, ${values.rank_visibility},
+        ${values.diploma_config === null ? null : tx.json(values.diploma_config as never)}
       )
     `;
   }
@@ -2302,6 +2340,32 @@ function gpaIssues(context: YearConfigContext, program: ProgramRow): PublishIssu
   return issues;
 }
 
+/**
+ * An IB Diploma grade totals its subjects' band points: a counted subject on a scale where a band
+ * has no points could never give a total.
+ */
+function diplomaPointsIssues(context: YearConfigContext, program: ProgramRow): PublishIssue[] {
+  const issues: PublishIssue[] = [];
+  for (const config of context.configs) {
+    if (config.grade_level_id !== program.grade_level_id || config.is_excluded) continue;
+    const detail = context.details.get(config.id);
+    if (!detail || !detail.config.include_in_average) continue;
+    if (detail.config.grading_method === "descriptive") continue;
+    if (detail.scale.length === 0 || detail.scale.some((band) => band.gpaPoints === null)) {
+      issues.push({
+        severity: "warning",
+        code: "DIPLOMA_POINTS_MISSING",
+        message: `${program.grade_level_name}: ${detail.config.subject_name} is graded on a scale without points for every band, so its students' diploma total can't be worked out.`,
+        grade_level_id: program.grade_level_id,
+        section_id: detail.config.section_id ?? undefined,
+        subject_id: detail.config.subject_id,
+        config_id: detail.config.id,
+      });
+    }
+  }
+  return issues;
+}
+
 /** Everything that must hold before a year's configuration can be published. */
 export async function collectPublishIssues(
   tx: TransactionSql,
@@ -2356,6 +2420,9 @@ export async function collectPublishIssues(
       });
     }
     if (program.result_format === "gpa") issues.push(...gpaIssues(context, program));
+    if (program.result_format === "points_total") {
+      issues.push(...diplomaPointsIssues(context, program));
+    }
     if (sections.length === 0) {
       issues.push({
         severity: "warning",

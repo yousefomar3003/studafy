@@ -36,7 +36,7 @@ const sectionRoute = createRoute({
   operationId: "getSectionPredictedGrades",
   summary: "Predicted grades for a section's subject",
   description:
-    "Every student taking the subject, with their predicted grade for a term (term_id) or the year (no term_id), and the labels the subject's grade scale allows. The subject's teachers in the section and school leadership.",
+    "Every student taking the subject, with their predicted grade for a term (term_id) or the year (no term_id), and the labels the subject's grade scale allows. The subject's teachers in the section and school leadership; the subject's coordinator reads them too (editable false).",
   security,
   request: { params: sectionSubjectParamSchema, query: predictedGradesQuerySchema },
   responses: standardResponses(

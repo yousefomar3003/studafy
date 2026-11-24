@@ -8,6 +8,7 @@ import '../../shell/application/shell_providers.dart';
 import '../../shell/domain/shell_role.dart';
 import '../application/work_and_grades_providers.dart';
 import '../domain/work_and_grades.dart';
+import '../../exam_weeks/presentation/exam_timetable_screen.dart';
 import 'assignments_screen.dart';
 import 'grades_screen.dart';
 
@@ -79,7 +80,10 @@ class _WorkAndGradesScreenState extends ConsumerState<WorkAndGradesScreen> {
                   child: selection.section == WorkAndGradesSection.grades
                       ? const Padding(
                           padding: EdgeInsetsDirectional.only(start: AppSpacing.space4),
-                          child: AcademicResultsButton(),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [ExamTimetableButton(), AcademicResultsButton()],
+                          ),
                         )
                       : const SizedBox.shrink(),
                 ),

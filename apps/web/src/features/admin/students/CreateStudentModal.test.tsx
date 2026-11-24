@@ -147,6 +147,24 @@ afterEach(() => {
 });
 
 describe("CreateStudentModal", () => {
+  test("sends the Arabic name typed right to left, and leaves blank parts out", async () => {
+    renderModal(await loadModal(), false);
+    fillRequiredFields();
+    const arabic = screen.getByRole("group", { name: "Arabic name" });
+    const first = within(arabic).getByRole("textbox", { name: "Arabic first name" });
+    expect(first.getAttribute("dir")).toBe("rtl");
+    fireEvent.change(first, { target: { value: " أمارة " } });
+    fireEvent.change(within(arabic).getByRole("textbox", { name: "Arabic family name" }), {
+      target: { value: "تشين" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create student" }));
+
+    await waitFor(() => expect(postMock).toHaveBeenCalledTimes(1));
+    const body = postedBody();
+    expect(body).toMatchObject({ first_name_ar: "أمارة", last_name_ar: "تشين" });
+    expect(body.middle_name_ar).toBeUndefined();
+  });
+
   test("creates a student with the guardians staff picked, in an existing family", async () => {
     renderModal(await loadModal(), true);
     fillRequiredFields();

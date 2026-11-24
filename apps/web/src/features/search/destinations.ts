@@ -283,6 +283,10 @@ export const SEARCH_DESTINATIONS: readonly SearchDestination[] = [
     variantOf: "build-timetable",
   }),
   entry("principal-classes", "page", "/portal/principal/classes", PRINCIPAL),
+  entry("exam-weeks", "page", "/portal/principal/exam-weeks", {
+    requiredPermission: P.TIMETABLE_MANAGE,
+    ...SCHOOL,
+  }),
   entry("grades-sections", "page", "/portal/principal/sections", {
     requiredPermission: P.TIMETABLE_MANAGE,
     ...SCHOOL,
@@ -309,7 +313,15 @@ export const SEARCH_DESTINATIONS: readonly SearchDestination[] = [
   entry("academic-sections", "page", `${SETUP}/sections`, ACADEMIC),
   entry("academic-scales", "page", `${SETUP}/scales`, ACADEMIC),
   entry("academic-external-exams", "page", `${SETUP}/external-exams`, ACADEMIC),
+  entry("academic-exam-entries", "page", `${SETUP}/exam-entries`, {
+    ...ACADEMIC,
+    alsoRequires: [P.ACADEMIC_CONFIG_MANAGE],
+  }),
   entry("academic-graduation", "page", `${SETUP}/graduation-requirements`, ACADEMIC),
+  entry("academic-outcomes", "page", `${SETUP}/learning-outcomes`, ACADEMIC),
+  entry("academic-plans", "page", `${SETUP}/plans`, ACADEMIC),
+  entry("academic-multi-year", "page", `${SETUP}/multi-year-results`, ACADEMIC),
+  entry("academic-equivalency", "page", `${SETUP}/tawjihi-equivalency`, ACADEMIC),
   entry("academic-approvals", "page", `${SETUP}/approvals`, {
     ...ACADEMIC,
     alsoRequires: [P.APPROVAL_REVIEW],
@@ -321,6 +333,17 @@ export const SEARCH_DESTINATIONS: readonly SearchDestination[] = [
   entry("academic-top-students", "page", `${SETUP}/top-students`, {
     ...ACADEMIC,
     alsoRequires: [P.RESULT_FINALIZE],
+  }),
+  entry("academic-coordinators", "page", `${SETUP}/coordinators`, {
+    ...ACADEMIC,
+  }),
+  entry("academic-ministry-export", "page", `${SETUP}/ministry-export`, {
+    ...ACADEMIC,
+    alsoRequires: [P.RESULT_FINALIZE],
+  }),
+  entry("academic-remedial-plans", "page", `${SETUP}/remedial-plans`, {
+    ...ACADEMIC,
+    alsoRequiresAny: [P.ACADEMIC_CONFIG_MANAGE, P.RESULT_FINALIZE],
   }),
   entry("academic-report-cards", "page", `${SETUP}/report-cards`, {
     ...ACADEMIC,

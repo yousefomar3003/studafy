@@ -10,10 +10,18 @@ import { ApprovalsTab } from "./ApprovalsTab";
 import { CertificateView } from "./CertificateView";
 import { YearStatusBadge } from "./components";
 import { SETUP_BASE } from "./context";
+import { CoordinatorsTab } from "./CoordinatorsTab";
+import { EquivalencyTab } from "./EquivalencyTab";
+import { ExamEntriesTab } from "./ExamEntriesTab";
 import { ExternalExamsTab } from "./ExternalExamsTab";
 import { GraduationRequirementsTab } from "./GraduationRequirementsTab";
+import { LearningOutcomesTab } from "./LearningOutcomesTab";
+import { MinistryExportTab } from "./MinistryExportTab";
+import { MultiYearTab } from "./MultiYearTab";
 import { OverviewTab } from "./OverviewTab";
+import { PlansTab } from "./PlansTab";
 import { useGradingOverview } from "./queries";
+import { RemedialPlansTab } from "./RemedialPlansTab";
 import { ReportCardsTab } from "./ReportCardsTab";
 import { ResultsTab } from "./ResultsTab";
 import { ScalesTab } from "./ScalesTab";
@@ -38,10 +46,22 @@ const TABS: readonly TabDef[] = [
   { path: "sections", key: "sections", show: () => true },
   { path: "scales", key: "scales", show: () => true },
   { path: "external-exams", key: "externalExams", show: () => true },
+  { path: "exam-entries", key: "examEntries", show: (ctx) => ctx.can.manage },
   { path: "graduation-requirements", key: "graduation", show: () => true },
+  { path: "multi-year-results", key: "multiYear", show: () => true },
+  { path: "tawjihi-equivalency", key: "equivalency", show: () => true },
+  { path: "coordinators", key: "coordinators", show: () => true },
+  {
+    path: "remedial-plans",
+    key: "remedialPlans",
+    show: (ctx) => ctx.can.manage || ctx.can.finalize,
+  },
+  { path: "learning-outcomes", key: "outcomes", show: () => true },
+  { path: "plans", key: "plans", show: () => true },
   { path: "approvals", key: "approvals", show: (ctx) => ctx.can.review },
   { path: "results", key: "results", show: (ctx) => ctx.can.finalize || ctx.can.certify },
   { path: "top-students", key: "topStudents", show: (ctx) => ctx.can.finalize },
+  { path: "ministry-export", key: "ministryExport", show: (ctx) => ctx.can.finalize },
   {
     path: "report-cards",
     key: "reportCards",
@@ -59,11 +79,23 @@ const TABS: readonly TabDef[] = [
  * - sections — what each section inherits, overrides or excludes, its teachers and electives;
  * - scales — the year's grading scales;
  * - external exams — the school's SAT, IELTS, IGCSE finals... (not tied to the year);
+ * - exam entries — sessions of those exams and the students entered for them: candidate numbers,
+ *   withdrawals and the list for the exam board (leadership);
  * - graduation requirements — the credits, subjects, GPA and exams a diploma needs, a check
  *   against a student and the students of a grade not on track (not tied to the year);
+ * - multi-year results — a result weighted across grade levels (grade 11 40% + grade 12 60%);
+ * - tawjihi equivalency — the school's rules for ESTIMATING a Tawjihi-equivalent percentage from
+ *   IGCSE / A Level, IB or American records, and a grade's estimates with a CSV export;
+ * - coordinators — who coordinates which subject this year, and for which grades;
+ * - remedial plans — the year's plans for struggling students (written by teachers in the app) by
+ *   grade, subject, status and overdue review, with follow-up notes (leadership);
+ * - learning outcomes — the outcomes catalogue, the achievement scale and plan due dates;
+ * - plans — lesson and term plan coverage per term, and the plans awaiting review;
  * - approvals — submitted mark sheets and teacher-proposed assessments;
  * - results — preview, finalize, correct, and certificates; `certificates/:id` prints one.
  * - top students — a grade's best places by class rank for a term or the year (leadership).
+ * - ministry export — templates in a ministry's columns and codes, and a preview and download of
+ *   the year's finalized results in that format (leadership).
  * - report cards — which sections report cards show, and the comments, conduct ratings and
  *   principal's comments written before a term or year is finalized.
  *
@@ -161,13 +193,27 @@ export default function AcademicSetupPage() {
           <Route path="sections" element={<SectionsTab ctx={ctx} />} />
           <Route path="scales" element={<ScalesTab ctx={ctx} />} />
           <Route path="external-exams" element={<ExternalExamsTab ctx={ctx} />} />
+          {ctx.can.manage ? (
+            <Route path="exam-entries" element={<ExamEntriesTab ctx={ctx} />} />
+          ) : null}
           <Route path="graduation-requirements" element={<GraduationRequirementsTab ctx={ctx} />} />
+          <Route path="multi-year-results" element={<MultiYearTab ctx={ctx} />} />
+          <Route path="tawjihi-equivalency" element={<EquivalencyTab ctx={ctx} />} />
+          <Route path="coordinators" element={<CoordinatorsTab ctx={ctx} />} />
+          {ctx.can.manage || ctx.can.finalize ? (
+            <Route path="remedial-plans" element={<RemedialPlansTab ctx={ctx} />} />
+          ) : null}
+          <Route path="learning-outcomes" element={<LearningOutcomesTab ctx={ctx} />} />
+          <Route path="plans" element={<PlansTab ctx={ctx} />} />
           {ctx.can.review ? <Route path="approvals" element={<ApprovalsTab ctx={ctx} />} /> : null}
           {ctx.can.finalize || ctx.can.certify ? (
             <Route path="results" element={<ResultsTab ctx={ctx} />} />
           ) : null}
           {ctx.can.finalize ? (
             <Route path="top-students" element={<TopStudentsTab ctx={ctx} />} />
+          ) : null}
+          {ctx.can.finalize ? (
+            <Route path="ministry-export" element={<MinistryExportTab ctx={ctx} />} />
           ) : null}
           {ctx.can.manage || ctx.can.reportNotes ? (
             <Route path="report-cards" element={<ReportCardsTab ctx={ctx} />} />

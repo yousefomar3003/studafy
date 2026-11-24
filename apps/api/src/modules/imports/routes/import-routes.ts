@@ -621,12 +621,13 @@ const updateStudentImportSettingsRoute = createRoute({
 const CSV_TEMPLATE =
   "admission_number,first_name,middle_name,last_name,date_of_birth,status,grade,section,family," +
   "parent_name,parent_relationship,parent_phone,parent_email," +
-  "parent2_name,parent2_relationship,parent2_phone,parent2_email,email,preferred_name\n" +
+  "parent2_name,parent2_relationship,parent2_phone,parent2_email,email,preferred_name," +
+  "first_name_ar,middle_name_ar,last_name_ar\n" +
   "ADM-001,Ali,Omar,Hassan,2016-03-15,enrolled,Grade 1,A,F1," +
-  "Mona Hassan,mother,+965 5000 1234,,Omar Hassan,father,+965 5000 5678,,,\n" +
-  "ADM-002,Sara,Omar,Hassan,2018-09-02,enrolled,Grade 1,B,F1,,,,,,,,,,\n" +
+  "Mona Hassan,mother,+965 5000 1234,,Omar Hassan,father,+965 5000 5678,,,,علي,عمر,حسن\n" +
+  "ADM-002,Sara,Omar,Hassan,2018-09-02,enrolled,Grade 1,B,F1,,,,,,,,,,,سارة,عمر,حسن\n" +
   "ADM-003,Lina,,Khaled,2015-11-20,enrolled,Grade 2,A,F2," +
-  "Rana Khaled,mother,+965 5000 9012,rana@example.com,,,,,,\n";
+  "Rana Khaled,mother,+965 5000 9012,rana@example.com,,,,,,,,,\n";
 
 // ---------------------------------------------------------------------------
 // Route factory

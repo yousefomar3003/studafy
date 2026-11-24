@@ -539,7 +539,7 @@ export async function deleteGraduationSet(
 // Students: what a check reads
 // ---------------------------------------------------------------------------
 
-interface StudentStanding {
+export interface StudentStanding {
   gradeLevel: { id: string; name: string } | null;
   /** The start of the year the student's grade level is from: when a set applies from a year. */
   referenceStartsOn: Date | null;
@@ -602,7 +602,7 @@ async function loadPlacements(
  * academic year (two in one year, a change of section, keep the later), oldest year first, with the
  * subjects' coefficients and rounding from the snapshots their results were computed with.
  */
-async function loadStandings(
+export async function loadStandings(
   tx: TransactionSql,
   schoolId: string,
   studentIds: readonly string[],
@@ -797,7 +797,7 @@ async function requireStudent(tx: TransactionSql, schoolId: string, studentId: s
  * Whether the caller sees the student only as the student or a linked parent: they then see only
  * the sets shown to students and parents. Staff (leadership, the student's teachers) see them all.
  */
-async function readsAsFamily(tx: TransactionSql, studentId: string): Promise<boolean> {
+export async function readsAsFamily(tx: TransactionSql, studentId: string): Promise<boolean> {
   const [row] = await tx<{ related: boolean; privileged: boolean; teacher: boolean }[]>`
     SELECT app.is_related_to_student(${studentId}::uuid) AS related,
            app.is_privileged_over_student(${studentId}::uuid) AS privileged,

@@ -1,6 +1,8 @@
 import { calculateDescriptiveResult } from "./descriptive";
+import { DEFAULT_DIPLOMA_CONFIG, calculateDiplomaResult } from "./diploma";
 import { atLeast, matchBand, roundTo } from "./rounding";
 
+import type { DiplomaCoreInput, DiplomaResult } from "./diploma";
 import type {
   AssessmentOutcome,
   CategoryOutcome,
@@ -445,10 +447,14 @@ function creditTotals(considered: readonly SubjectOutcomeForOverall[]): {
  *  - credits: attempted and earned over every complete, non-exempt subject that carries credits,
  *    counted in the average or not (see {@link creditTotals}). The coefficient (`averageWeight`)
  *    still weights the average and GPA; credits are reported, not used to weight.
+ *  - diploma: a `points_total` result (the IB Diploma total) adds the diploma outcome worked out
+ *    from the subjects counted in the average and the student's core grades (`core`; nothing
+ *    recorded when absent). Its total is the result's display value. See `diploma.ts`.
  */
 export function calculateOverallResult(
   subjects: readonly SubjectOutcomeForOverall[],
   policy: OverallPolicy,
+  core?: DiplomaCoreInput,
 ): OverallResult {
   const considered = subjects.filter((subject) => !subject.exempt);
   // A descriptive subject has no percentage, so it never counts in the average or the totals.
@@ -464,6 +470,7 @@ export function calculateOverallResult(
     .filter((subject) => subject.requirement !== "optional")
     .filter((subject) => subject.result?.passed === false)
     .map((subject) => subject.subjectId);
+  const diploma = diplomaFor(counted, policy, core);
 
   if (incompleteSubjectIds.length > 0) {
     return {
@@ -479,6 +486,7 @@ export function calculateOverallResult(
       failedSubjectIds,
       incompleteSubjectIds,
       academicStatus: "incomplete",
+      ...(diploma ? { diploma } : {}),
     };
   }
 
@@ -507,7 +515,7 @@ export function calculateOverallResult(
   const band = average !== null && policy.scale ? matchBand(average, policy.scale) : null;
 
   const failed = failedSubjectIds.length;
-  const display = resultDisplay(counted, average, policy);
+  const display = resultDisplay(counted, average, policy, diploma);
   return {
     status: "complete",
     averagePercentage: average,
@@ -526,7 +534,27 @@ export function calculateOverallResult(
         : failed <= policy.maxFailedSubjectsForSupplementary
           ? "supplementary"
           : "retained",
+    ...(diploma ? { diploma } : {}),
   };
+}
+
+/** The diploma outcome of a `points_total` result; undefined for every other format. */
+function diplomaFor(
+  counted: readonly SubjectOutcomeForOverall[],
+  policy: OverallPolicy,
+  core: DiplomaCoreInput | undefined,
+): DiplomaResult | undefined {
+  if (policy.resultFormat?.format !== "points_total") return undefined;
+  return calculateDiplomaResult(
+    counted.map((subject) => ({
+      subjectId: subject.subjectId,
+      points: subject.result?.status === "complete" ? (subject.result.gpaPoints ?? null) : null,
+      level: subject.courseLevel ?? null,
+    })),
+    core ?? { tok: null, ee: null, casComplete: null },
+    policy.diploma ?? DEFAULT_DIPLOMA_CONFIG,
+    policy.resultFormat.max,
+  );
 }
 
 /**
@@ -538,13 +566,18 @@ export function calculateOverallResult(
  *                counted in the average. A counted subject whose grade band carries no GPA points
  *                makes the GPA null rather than an average of the rest; the publish check warns
  *                about such a scale before results exist.
+ *  - points_total the diploma total (`diploma.total`); null while it is pending.
  */
 export function resultDisplay(
   counted: readonly SubjectOutcomeForOverall[],
   average: number | null,
   policy: OverallPolicy,
+  diploma?: DiplomaResult,
 ): ResultDisplay {
   const format = policy.resultFormat ?? { format: "percentage", max: 100 };
+  if (format.format === "points_total") {
+    return { format: "points_total", value: diploma?.total ?? null, max: format.max };
+  }
   if (format.format === "percentage") {
     return { format: "percentage", value: average, max: 100 };
   }

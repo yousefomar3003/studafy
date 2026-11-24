@@ -83,6 +83,28 @@ enum MarkStatus {
   }
 }
 
+/// How the caller reads a mark sheet (`access`): as school leadership, one of the section's
+/// teachers, or the subject's coordinator (000261), who only reads.
+enum MarkSheetAccess {
+  leadership,
+  teacher,
+  coordinator,
+
+  /// A wire value newer than this build. Treated as read-only.
+  unknown;
+
+  /// An absent field is an older server, where only teachers and leadership read a sheet.
+  static MarkSheetAccess fromWire(Object? value) => switch (value) {
+    'leadership' => leadership,
+    'teacher' || null => teacher,
+    'coordinator' => coordinator,
+    _ => unknown,
+  };
+
+  /// Never writes: no mark entry, submission or release.
+  bool get isReadOnly => this == coordinator || this == unknown;
+}
+
 /// One section + subject the signed-in teacher grades, from `GET /api/grading/my-assignments`.
 class GradingAssignment {
   const GradingAssignment({
@@ -540,6 +562,7 @@ class MarkSheet {
     required this.periods,
     required this.students,
     this.descriptors = const [],
+    this.access = MarkSheetAccess.teacher,
   });
 
   factory MarkSheet.fromJson(Map<String, Object?> json) {
@@ -556,6 +579,7 @@ class MarkSheet {
       subjectCode: subject['code'] as String? ?? '',
       subjectName: subject['name'] as String? ?? '',
       yearStatus: json['year_status'] as String? ?? 'active',
+      access: MarkSheetAccess.fromWire(json['access']),
       canEditMarks: json['can_edit_marks'] as bool? ?? false,
       canAddAssessments: json['can_add_assessments'] as bool? ?? false,
       config: MarkSheetConfig.fromJson(_map(json['config'])),
@@ -593,7 +617,10 @@ class MarkSheet {
   /// The year's grading configuration lifecycle: `draft`, `active`, `finalized`, `archived`.
   final String yearStatus;
 
-  /// False outside an active year — every mark is read-only.
+  /// How the signed-in user reads this sheet; a coordinator's is read-only.
+  final MarkSheetAccess access;
+
+  /// False outside an active year, or for a coordinator — every mark is read-only.
   final bool canEditMarks;
   final bool canAddAssessments;
   final MarkSheetConfig config;

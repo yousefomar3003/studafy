@@ -1,0 +1,1 @@
+export { ministryExportRoutes } from "./routes";

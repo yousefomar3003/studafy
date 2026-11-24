@@ -32,7 +32,8 @@ export const sectionPredictedGradesSchema = z
     }),
     visibility: predictedGradesVisibilitySchema,
     editable: z.boolean().openapi({
-      description: "Enabled, and the year's grading is neither finalized nor archived.",
+      description:
+        "Enabled, the year's grading is neither finalized nor archived, and the caller is not reading as the subject's coordinator (coordinators read only).",
     }),
     labels: z.array(z.string()).openapi({
       description:

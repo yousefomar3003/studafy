@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted
+Superseded by [ADR-024](0024-semantic-retrieval.md) (2026-11-24): production embeds with a real
+model through OpenRouter, and the semantic leg reads only chunks of that model.
 
 ## Context
 

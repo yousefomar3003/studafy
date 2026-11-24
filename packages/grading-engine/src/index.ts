@@ -33,6 +33,33 @@ export type {
   CumulativeYearInput,
 } from "./cumulative";
 export { calculateRanks, rankValue, topRanked, validateRankSettings } from "./rank";
+export {
+  CORE_GRADES,
+  DEFAULT_DIPLOMA_CONFIG,
+  DEFAULT_DIPLOMA_CORE_MATRIX,
+  DEFAULT_DIPLOMA_MAX,
+  DIPLOMA_CONDITION_TYPES,
+  DIPLOMA_LIMITS,
+  calculateDiplomaResult,
+  corePoints,
+  isCoreGrade,
+  validateDiplomaConfig,
+} from "./diploma";
+export type {
+  CoreComponent,
+  CoreGrade,
+  DiplomaCondition,
+  DiplomaConditionType,
+  DiplomaConfig,
+  DiplomaCoreInput,
+  DiplomaFailingCode,
+  DiplomaFailingCondition,
+  DiplomaMatrixCell,
+  DiplomaPendingReason,
+  DiplomaResult,
+  DiplomaStatus,
+  DiplomaSubjectInput,
+} from "./diploma";
 export type { RankBasis, RankCandidate, RankOutcome, RankScope, RankedStudent } from "./rank";
 export {
   calculateDescriptiveResult,
@@ -40,6 +67,13 @@ export {
   nearestDescriptor,
   validateDescriptiveConfig,
 } from "./descriptive";
+export {
+  EXAM_ENTRY_LIMITS,
+  EXAM_ENTRY_STATUSES,
+  canChangeExamEntryStatus,
+  nextCandidateNumbers,
+} from "./exam-entries";
+export type { CandidateNumberPlan, ExamEntryStatus } from "./exam-entries";
 export {
   EXTERNAL_EXAM_LIMITS,
   EXTERNAL_EXAM_PRESETS,
@@ -101,3 +135,80 @@ export type {
   GraduationSubjectInput,
   GraduationYearInput,
 } from "./graduation";
+export {
+  MINISTRY_EXPORT_ANNUAL_TERM,
+  MINISTRY_EXPORT_ENCODINGS,
+  MINISTRY_EXPORT_EXAMPLES,
+  MINISTRY_EXPORT_EXAMPLE_KEYS,
+  MINISTRY_EXPORT_FIELDS,
+  MINISTRY_EXPORT_FILE_FORMATS,
+  MINISTRY_EXPORT_LIMITS,
+  MINISTRY_EXPORT_NUMERIC_FIELDS,
+  MINISTRY_EXPORT_OVERALL_STATUSES,
+  MINISTRY_EXPORT_ROW_KINDS,
+  MINISTRY_EXPORT_SUBJECT_FIELDS,
+  MINISTRY_EXPORT_SUBJECT_STATUSES,
+  applyValueMap,
+  buildMinistryExport,
+  formatExportNumber,
+  ministryExportExample,
+  validateMinistryExportTemplate,
+} from "./ministry-export";
+export type {
+  MinistryExportColumnDefinition,
+  MinistryExportContext,
+  MinistryExportEncoding,
+  MinistryExportExample,
+  MinistryExportExampleKey,
+  MinistryExportField,
+  MinistryExportFileFormat,
+  MinistryExportIssue,
+  MinistryExportIssueCode,
+  MinistryExportOutput,
+  MinistryExportRowKind,
+  MinistryExportSourceRow,
+  MinistryExportTemplateDefinition,
+  MinistryExportValueMapEntry,
+} from "./ministry-export";
+export {
+  EQUIVALENCY_CONVERSION_MODES,
+  EQUIVALENCY_EXAMPLES,
+  EQUIVALENCY_GPA_BASES,
+  EQUIVALENCY_LIMITS,
+  EQUIVALENCY_PART_TYPES,
+  EQUIVALENCY_SOURCE_SYSTEMS,
+  convertEquivalencyValue,
+  estimateTawjihiEquivalency,
+  validateEquivalencyParts,
+} from "./equivalency";
+export type {
+  EquivalencyBand,
+  EquivalencyConversion,
+  EquivalencyConversionMode,
+  EquivalencyDiplomaInput,
+  EquivalencyEstimate,
+  EquivalencyExample,
+  EquivalencyExamplePart,
+  EquivalencyExamResultInput,
+  EquivalencyGpaBasis,
+  EquivalencyGradePercentage,
+  EquivalencyIssue,
+  EquivalencyIssueCode,
+  EquivalencyPartDefinition,
+  EquivalencyPartResult,
+  EquivalencyPartStatus,
+  EquivalencyPartType,
+  EquivalencySourceSystem,
+  EquivalencyStatus,
+  EquivalencyStudentInput,
+  EquivalencySubjectStep,
+} from "./equivalency";
+export { MULTI_YEAR_LIMITS, calculateMultiYearResult, validateMultiYearYears } from "./multi-year";
+export type {
+  MultiYearResult,
+  MultiYearStatus,
+  MultiYearSubjectInput,
+  MultiYearSubjectResult,
+  MultiYearYearInput,
+  MultiYearYearStatus,
+} from "./multi-year";

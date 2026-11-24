@@ -20,6 +20,7 @@ import {
   TextArea,
 } from "./components";
 import { setupHref } from "./context";
+import { DiplomaCorePanel, DiplomaSummary } from "./diploma";
 import { isProblem, problemMessage } from "./errors";
 import {
   useCorrectResults,
@@ -159,6 +160,7 @@ function SectionResults({
       ) : (
         <PreviewPanel ctx={ctx} sectionId={sectionId} termId={termId} label={sectionLabel} />
       )}
+      <DiplomaCorePanel ctx={ctx} sectionId={sectionId} />
 
       <section className="ag-block" aria-labelledby="ag-history-heading">
         <h2 id="ag-history-heading">{t("academicGrading.results.historyHeading")}</h2>
@@ -358,6 +360,8 @@ function StudentResultsTable({
   const { t } = useTranslation();
   // Stored results carry a class rank when the grade ranks; a preview never does.
   const showRank = students.some((student) => "class_rank" in student && student.class_rank);
+  // IB Diploma grades (points_total) carry the diploma outcome.
+  const showDiploma = students.some((student) => student.diploma);
   return (
     <Table caption={t("academicGrading.results.studentsCaption")} hideCaption>
       <Table.Header>
@@ -368,13 +372,19 @@ function StudentResultsTable({
           {showRank ? (
             <Table.HeaderCell>{t("academicGrading.rank.column")}</Table.HeaderCell>
           ) : null}
+          {showDiploma ? (
+            <Table.HeaderCell>{t("academicGrading.diploma.column")}</Table.HeaderCell>
+          ) : null}
           <Table.HeaderCell>{t("academicGrading.results.columns.total")}</Table.HeaderCell>
           <Table.HeaderCell>{t("academicGrading.results.columns.grade")}</Table.HeaderCell>
           <Table.HeaderCell>{t("academicGrading.results.columns.failed")}</Table.HeaderCell>
           <Table.HeaderCell>{t("academicGrading.results.columns.outcome")}</Table.HeaderCell>
         </Table.Row>
       </Table.Header>
-      <Table.Body columnCount={showRank ? 8 : 7} empty={t("academicGrading.results.noStudents")}>
+      <Table.Body
+        columnCount={7 + (showRank ? 1 : 0) + (showDiploma ? 1 : 0)}
+        empty={t("academicGrading.results.noStudents")}
+      >
         {students.map((student) => {
           const missing = student.subjects.filter((subject) => subject.status === "incomplete");
           return (
@@ -420,6 +430,11 @@ function StudentResultsTable({
               {showRank ? (
                 <Table.Cell>
                   <ClassRankLabel rank={"class_rank" in student ? student.class_rank : null} />
+                </Table.Cell>
+              ) : null}
+              {showDiploma ? (
+                <Table.Cell>
+                  <DiplomaSummary diploma={student.diploma} />
                 </Table.Cell>
               ) : null}
               <Table.Cell>

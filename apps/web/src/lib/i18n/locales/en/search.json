@@ -295,6 +295,11 @@
       "where": "Principal › Classes",
       "keywords": "classes, courses, class list, class teachers, rosters, subjects taught"
     },
+    "exam-weeks": {
+      "title": "Exam weeks",
+      "where": "Principal › Exam weeks",
+      "keywords": "exam timetable, exam schedule, exam period, finals, midterms, exam rooms, seating plan, seat numbers, invigilators, invigilation, door sheets"
+    },
     "grades-sections": {
       "title": "Grades & sections",
       "where": "Principal › Grades & sections",
@@ -325,10 +330,20 @@
       "where": "Principal › Academic setup › External exams",
       "keywords": "external exams, test scores, sat, act, ap, ielts, toefl, igcse, a level, ib diploma, tawjihi, thanaweya amma, state test, national exams"
     },
+    "academic-exam-entries": {
+      "title": "Exam entries",
+      "where": "Principal › Academic setup › Exam entries",
+      "keywords": "exam entries, enter students, exam board, candidate numbers, entry list, withdraw, igcse entries, a level entries, exam session, entry deadline"
+    },
     "academic-graduation": {
       "title": "Graduation requirements",
       "where": "Principal › Academic setup › Graduation requirements",
       "keywords": "graduation requirements, diploma, credits, credit hours, gpa, on track, not on track, required subjects, graduation checklist"
+    },
+    "academic-remedial-plans": {
+      "title": "Remedial plans",
+      "where": "Principal › Academic setup › Remedial plans",
+      "keywords": "remedial plans, struggling students, support plans, below pass, failing, intervention, catch up, overdue reviews, follow up"
     },
     "academic-approvals": {
       "title": "Mark sheet approvals",
@@ -344,6 +359,11 @@
       "title": "Top students",
       "where": "Principal › Academic setup › Top students",
       "keywords": "top students, class rank, rank, percentile, honor roll, best students, valedictorian, top of the class"
+    },
+    "academic-ministry-export": {
+      "title": "Ministry results export",
+      "where": "Principal › Academic setup › Ministry export",
+      "keywords": "ministry export, ministry of education, moe, noor, esis, results export, national id, export results, csv, excel, xlsx, subject codes, government report"
     },
     "academic-report-cards": {
       "title": "Report card comments",
@@ -624,6 +644,31 @@
       "title": "Student AI earnings",
       "where": "Finance › Student AI earnings",
       "keywords": "student ai, revenue share, owed to studafy, paid to studafy, credit, payout, earnings, margin"
+    },
+    "academic-coordinators": {
+      "title": "Subject coordinators",
+      "where": "Principal › Academic setup › Coordinators",
+      "keywords": "subject coordinator, coordinator, head of department, hod, department head, subject lead, ib coordinator, assign coordinator, منسق"
+    },
+    "academic-outcomes": {
+      "title": "Learning outcomes",
+      "where": "Principal › Academic setup › Learning outcomes",
+      "keywords": "learning outcomes, outcomes, standards, curriculum outcomes, achievement scale, achievement levels, import outcomes, csv, strands, outcome achievement on report cards"
+    },
+    "academic-plans": {
+      "title": "Lesson plans",
+      "where": "Principal › Academic setup › Lesson plans",
+      "keywords": "lesson plans, term plans, unit plans, weekly plans, plan review, approve plans, return plans, plan coverage, submitted on time, outcomes covered"
+    },
+    "academic-equivalency": {
+      "title": "Tawjihi equivalency (estimate)",
+      "where": "Principal › Academic setup › Tawjihi equivalency",
+      "keywords": "tawjihi equivalency, equivalence, igcse equivalency, a level equivalency, ib equivalency, american diploma, gpa to percentage, sat, ministry equivalency, estimate"
+    },
+    "academic-multi-year": {
+      "title": "Multi-year results",
+      "where": "Principal › Academic setup › Multi-year results",
+      "keywords": "multi-year results, two-year tawjihi, grade 11 and grade 12, weighted result, cumulative result, years weighting"
     }
   }
 }

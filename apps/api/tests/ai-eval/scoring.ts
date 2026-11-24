@@ -17,11 +17,14 @@ import type { GroundingVerdict } from "../../src/modules/ai/ask/refusal";
 import type { HybridSearchHit } from "../../src/modules/ai/retrieval/search";
 
 function tokenize(text: string): string[] {
-  return text
-    .toLowerCase()
-    .replace(/[^\w\s]/g, " ")
-    .split(/\s+/)
-    .filter((t) => t.length > 1);
+  return (
+    text
+      .toLowerCase()
+      // Letters and digits of any script, so Arabic answers are scored too.
+      .replace(/[^\p{L}\p{N}\s]/gu, " ")
+      .split(/\s+/)
+      .filter((t) => t.length > 1)
+  );
 }
 
 function overlapRatio(source: string, target: string): number {

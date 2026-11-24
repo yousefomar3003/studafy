@@ -375,6 +375,7 @@ describe("published docs", () => {
       "academic-setup",
       "build-timetable",
       "take-attendance",
+      "exam-weeks",
       "workflows",
       "create-invoice-batch",
       "record-payment",

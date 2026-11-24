@@ -27,6 +27,7 @@ function hit(over: Partial<HybridSearchHit> = {}): HybridSearchHit {
     rrfScore: 0.033,
     semanticRank: 1,
     keywordRank: 1,
+    semanticSimilarity: 0.7,
     ...over,
   };
 }

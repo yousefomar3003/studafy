@@ -93,10 +93,19 @@ export function useCreateSection() {
 export function useRenameSection() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ sectionId, name }: { sectionId: string; name: string }) => {
+    mutationFn: async ({
+      sectionId,
+      name,
+      name_ar,
+    }: {
+      sectionId: string;
+      name: string;
+      /** The Arabic name; null clears it, undefined leaves it. */
+      name_ar?: string | null;
+    }) => {
       const { data } = await api.PATCH("/api/academics/sections/{sectionId}", {
         params: { path: { sectionId } },
-        body: { name },
+        body: name_ar === undefined ? { name } : { name, name_ar },
       });
       if (!data) throw new Error("Section update returned no data.");
       return data;

@@ -214,7 +214,12 @@
       "dateOfBirth": "تاريخ الميلاد",
       "admissionNumber": "رقم القبول",
       "admissionDate": "تاريخ القبول",
-      "status": "الحالة"
+      "status": "الحالة",
+      "arabicNames": "الاسم بالعربية",
+      "arabicNamesHelper": "اختياري. يظهر في الشهادات وكشوف الدرجات العربية وثنائية اللغة، وفي التطبيق باللغة العربية.",
+      "firstNameAr": "الاسم الأول بالعربية",
+      "middleNameAr": "اسم الأب بالعربية",
+      "lastNameAr": "اسم العائلة بالعربية"
     },
     "create": {
       "title": "طالب جديد",
@@ -300,7 +305,10 @@
         "parent2_email": "بريد ولي الأمر 2",
         "parent2_name": "اسم ولي الأمر 2",
         "parent2_relationship": "صلة القرابة 2",
-        "parent2_phone": "هاتف ولي الأمر 2"
+        "parent2_phone": "هاتف ولي الأمر 2",
+        "first_name_ar": "الاسم الأول بالعربية",
+        "middle_name_ar": "اسم الأب بالعربية",
+        "last_name_ar": "اسم العائلة بالعربية"
       },
       "hints": {
         "admission_number": "المعرّف الفريد للطالب في مدرستك.",

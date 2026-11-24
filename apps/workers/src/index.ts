@@ -27,6 +27,7 @@ import { scheduleAbandonedImportSweepJob } from "./queues/imports";
 import {
   scheduleAccountDeletionSweepJob,
   scheduleAiMessageRetentionSweepJob,
+  scheduleChunkReembedSweepJob,
   scheduleIpAddressRetentionSweepJob,
   scheduleStuckUploadScanSweepJob,
   scheduleAbandonedMaterialSweepJob,
@@ -348,6 +349,12 @@ const aiMessageRetentionRedis = createRedisConnection(env);
 void scheduleAiMessageRetentionSweepJob(aiMessageRetentionRedis).then(() =>
   aiMessageRetentionRedis.disconnect(),
 );
+
+// Chunk re-embed scheduler (ADR-024): idempotently register the half-hourly re-embed of material
+// chunks whose vectors are not from the live embedding model. Without AI_EMBEDDING_MODEL each run
+// returns at once ("no embedding model configured").
+const chunkReembedRedis = createRedisConnection(env);
+void scheduleChunkReembedSweepJob(chunkReembedRedis).then(() => chunkReembedRedis.disconnect());
 
 // IP address retention scheduler (docs/modules/account-deletion.md "IP addresses"): idempotently
 // register the daily 03:45 removal of IP addresses older than 90 days from session rows and security

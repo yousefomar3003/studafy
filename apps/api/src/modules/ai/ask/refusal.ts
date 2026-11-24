@@ -1,30 +1,26 @@
-import { AI_ASK_MIN_RELEVANCE_SCORE } from "../config";
+import { AI_ASK_MIN_SEMANTIC_SIMILARITY } from "../config";
 
 import type { HybridSearchHit, RetrievalMode } from "../retrieval/search";
 
 /**
- * Grounding refusal for Ask AI (ST-165).
+ * Grounding refusal for Ask AI (ST-165, ADR-024).
  *
  * The ask route refuses to answer when retrieval cannot establish that the student's question is
  * grounded in the school's own corpus, because answering from noise would make up an answer that
- * looks sourced. The verdict is deliberately conservative and AND-ed:
+ * looks sourced. A question is grounded when either:
  *
- *   - the best hit's fused RRF score must clear {@link AI_ASK_MIN_RELEVANCE_SCORE}, AND
- *   - that same hit must have matched the keyword leg (`keywordRank !== null`).
+ *   - some hit matched the keyword leg (`keywordRank !== null`): `websearch_to_tsquery` ANDs the
+ *     question's content words, so every one of them appears in that chunk; or
+ *   - hybrid mode only: some hit is at least {@link AI_ASK_MIN_SEMANTIC_SIMILARITY} similar to the
+ *     question by a real embedding model -- the arm that answers a question asked in other words
+ *     ("التمثيل الضوئي" for a book that says "البناء الضوئي"), a dialect, or the other language.
  *
- * The keyword-leg arm is load-bearing, not a nicety. The only embedder in this repository is a
- * deterministic mock (see `retrieval/embeddings.ts`), so a semantic-only hit means only the mock's
- * cosine distance said "nearby" — which cannot carry a relevance verdict on its own. The keyword
- * leg is real PostgreSQL full-text search: a hit it found genuinely mentions the question's words.
- *
- * Lexical mode (ADR-020 — production today): retrieval runs the keyword leg alone, so the best
- * hit's RRF score is exactly `1 / (60 + 1)` ≈ 0.0164 whenever anything matched — below the hybrid
- * floor by construction, since that floor was sized for two fused legs. There the RRF arm is
- * dropped and the verdict is the keyword arm alone: the best hit matched `websearch_to_tsquery`,
- * which ANDs the question's content words, so every one of them appears in that chunk.
+ * Lexical mode (ADR-020; also any request whose question embedding failed) has only the keyword
+ * arm. The semantic arm trusts the similarity because the semantic leg compares the question only
+ * with chunks embedded by the same model (`HybridSearchInput.embeddingModel`), never with the mock.
  *
  * When the verdict refuses, the caller sends the refusal path's payload, which carries the nearest
- * topics the retrieval did find — the materials that were closest to the question, so the student
+ * topics the retrieval did find -- the materials that were closest to the question, so the student
  * is handed a concrete next step instead of a dead end.
  */
 
@@ -72,11 +68,14 @@ export function assessGrounding(
   hits: readonly HybridSearchHit[],
   mode: RetrievalMode = "hybrid",
 ): GroundingVerdict {
-  const best = hits[0];
-  const grounded =
-    best !== undefined &&
-    best.keywordRank !== null &&
-    (mode === "lexical" || best.rrfScore >= AI_ASK_MIN_RELEVANCE_SCORE);
+  const keywordMatch = hits.some((hit) => hit.keywordRank !== null);
+  const semanticMatch =
+    mode === "hybrid" &&
+    hits.some(
+      (hit) =>
+        hit.semanticSimilarity !== null && hit.semanticSimilarity >= AI_ASK_MIN_SEMANTIC_SIMILARITY,
+    );
+  const grounded = keywordMatch || semanticMatch;
 
   return { grounded, topics: grounded ? [] : nearestTopics(hits) };
 }

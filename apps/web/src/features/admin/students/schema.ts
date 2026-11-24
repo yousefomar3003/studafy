@@ -43,7 +43,22 @@ function optionalTrimmed(max: number, message: string) {
     .transform((value) => (value ? value : undefined));
 }
 
+/**
+ * An Arabic name on the edit form: blank is sent as `null`, which clears it (the API keeps an
+ * omitted field and clears a null one). On the create form a blank one is simply left out.
+ */
+function clearableTrimmed(max: number, message: string) {
+  return z
+    .string()
+    .trim()
+    .max(max, message)
+    .transform((value) => (value ? value : null));
+}
+
 export const createStudentSchema = z.object({
+  first_name_ar: optionalTrimmed(100, "adminPeople.validation.maxLength100"),
+  middle_name_ar: optionalTrimmed(100, "adminPeople.validation.maxLength100"),
+  last_name_ar: optionalTrimmed(100, "adminPeople.validation.maxLength100"),
   first_name: z
     .string()
     .trim()
@@ -89,10 +104,13 @@ export const editStudentSchema = z.object({
     .max(200, "adminPeople.validation.maxLength200"),
   middle_name: optionalTrimmed(200, "adminPeople.validation.maxLength200"),
   preferred_name: optionalTrimmed(200, "adminPeople.validation.maxLength200"),
+  first_name_ar: clearableTrimmed(100, "adminPeople.validation.maxLength100"),
+  middle_name_ar: clearableTrimmed(100, "adminPeople.validation.maxLength100"),
+  last_name_ar: clearableTrimmed(100, "adminPeople.validation.maxLength100"),
   date_of_birth: optionalTrimmed(10, "adminPeople.validation.dateInvalid"),
   status: statusEnum,
 });
-export type EditStudentValues = z.infer<typeof editStudentSchema>;
+export type EditStudentValues = z.input<typeof editStudentSchema>;
 
 export const editAdmissionSchema = z.object({
   admission_number: z

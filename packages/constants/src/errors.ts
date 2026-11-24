@@ -158,6 +158,18 @@ export const ERROR_CODES = {
   CERTIFICATE_NOT_FOUND: "CERTIFICATE_NOT_FOUND",
   // Predicted grades (000254): the grade's program for the year has them switched off.
   PREDICTED_GRADES_DISABLED: "PREDICTED_GRADES_DISABLED",
+  // Subject coordinators (000261): the user already coordinates the subject that year.
+  SUBJECT_COORDINATOR_DUPLICATE: "SUBJECT_COORDINATOR_DUPLICATE",
+  // IB Diploma total (000263): the grade's result is not the points total this year.
+  DIPLOMA_TOTAL_DISABLED: "DIPLOMA_TOTAL_DISABLED",
+  // Remedial plans (000269): the student already has an active plan in the subject for that period;
+  // the plan is achieved or closed and can no longer be changed.
+  REMEDIAL_PLAN_DUPLICATE: "REMEDIAL_PLAN_DUPLICATE",
+  REMEDIAL_PLAN_CLOSED: "REMEDIAL_PLAN_CLOSED",
+  // Learning outcomes (000268): the code is taken for the subject and grade level, or the outcome
+  // is used by achievement or plans and can only be archived.
+  LEARNING_OUTCOME_DUPLICATE: "LEARNING_OUTCOME_DUPLICATE",
+  LEARNING_OUTCOME_IN_USE: "LEARNING_OUTCOME_IN_USE",
 
   // Enrollment — student-class binding.
   ENROLLMENT_DUPLICATE: "ENROLLMENT_DUPLICATE",

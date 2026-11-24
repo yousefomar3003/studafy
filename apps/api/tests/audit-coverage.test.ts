@@ -245,6 +245,8 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/grading/transcripts/{transcriptId}/revoke",
   // Report card notes (000209): each write records its old and new values in the service.
   "PUT /api/grading/report-card-settings",
+  // Document language (000264): the service records old and new values.
+  "PUT /api/grading/document-language-settings",
   "PUT /api/grading/sections/{sectionId}/report-notes",
   "PUT /api/grading/sections/{sectionId}/subjects/{subjectId}/report-comments",
   // External exams and test scores (000255): leadership behind academicConfig:manage; each write
@@ -257,13 +259,84 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/grading/students/{studentId}/external-exam-results",
   "PUT /api/grading/external-exam-results/{resultId}",
   "DELETE /api/grading/external-exam-results/{resultId}",
+  // Exam entries (000262): leadership behind academicConfig:manage; each write records its old
+  // and new values in the service.
+  "POST /api/grading/external-exam-sessions",
+  "PUT /api/grading/external-exam-sessions/{sessionId}",
+  "DELETE /api/grading/external-exam-sessions/{sessionId}",
+  "POST /api/grading/external-exam-sessions/{sessionId}/entries",
+  "POST /api/grading/external-exam-sessions/{sessionId}/entries/status",
+  "POST /api/grading/external-exam-sessions/{sessionId}/candidate-numbers",
+  "PUT /api/grading/external-exam-entries/{entryId}",
+  "DELETE /api/grading/external-exam-entries/{entryId}",
   // Predicted grades (000254): the service records each student's old and new label and note.
   "PUT /api/grading/sections/{sectionId}/subjects/{subjectId}/predicted-grades",
+  // Subject coordinators (000261): the service records each assignment and its grade levels.
+  "POST /api/grading/years/{yearId}/subject-coordinators",
+  "PATCH /api/grading/subject-coordinators/{coordinatorId}",
+  "DELETE /api/grading/subject-coordinators/{coordinatorId}",
+  // IB Diploma core grades (000263): the service records each student's old and new grades.
+  "PUT /api/grading/sections/{sectionId}/diploma-core",
   // Graduation requirements (000258): leadership behind academicConfig:manage; each write records
   // its old and new values in the service.
   "POST /api/grading/graduation-requirement-sets",
   "PUT /api/grading/graduation-requirement-sets/{setId}",
   "DELETE /api/grading/graduation-requirement-sets/{setId}",
+  // Ministry results export (000265): template writes record old and new values in the service; a
+  // download records an export (and a reveal when sensitive national IDs are opened). The preview
+  // writes nothing and declares what its download audits.
+  "POST /api/grading/ministry-export-templates",
+  "PUT /api/grading/ministry-export-templates/{templateId}",
+  "DELETE /api/grading/ministry-export-templates/{templateId}",
+  "POST /api/grading/ministry-exports/preview",
+  "POST /api/grading/ministry-exports/download",
+  // Exam weeks (000266) and rooms: leadership behind timetable:manage; each write records its
+  // old and new values in the service.
+  "POST /api/academics/rooms",
+  "PATCH /api/academics/rooms/{roomId}",
+  "POST /api/academics/exam-periods",
+  "PUT /api/academics/exam-periods/{periodId}",
+  "DELETE /api/academics/exam-periods/{periodId}",
+  "POST /api/academics/exam-periods/{periodId}/slots",
+  "PUT /api/academics/exam-slots/{slotId}",
+  "DELETE /api/academics/exam-slots/{slotId}",
+  "POST /api/academics/exam-slots/{slotId}/seating",
+  "PUT /api/academics/exam-slots/{slotId}/seats/{studentId}",
+  "PUT /api/academics/exam-slots/{slotId}/invigilators",
+  // Remedial plans (000269): writes behind grade:update or result:finalize (the setting behind
+  // academicConfig:manage); each records its old and new values in the service.
+  "POST /api/grading/remedial-plans",
+  "PATCH /api/grading/remedial-plans/{planId}",
+  "POST /api/grading/remedial-plans/{planId}/notes",
+  "PUT /api/grading/remedial-plan-settings",
+  // Learning outcomes and lesson/term plans (000268): academicConfig:manage for the catalogue and
+  // settings, grade:update for achievement, lesson:* for teachers' plans, academicConfig:read for
+  // reviews (narrowed to the coordinator or leadership); each write is audited in the service.
+  "PUT /api/grading/planning-settings",
+  "POST /api/grading/learning-outcomes",
+  "POST /api/grading/learning-outcomes/import",
+  "PATCH /api/grading/learning-outcomes/{outcomeId}",
+  "DELETE /api/grading/learning-outcomes/{outcomeId}",
+  "PUT /api/grading/sections/{sectionId}/subjects/{subjectId}/outcome-achievements",
+  "POST /api/grading/sections/{sectionId}/subjects/{subjectId}/term-plans",
+  "PUT /api/grading/term-plans/{planId}",
+  "DELETE /api/grading/term-plans/{planId}",
+  "POST /api/grading/term-plans/{planId}/submit",
+  "POST /api/grading/term-plans/{planId}/review",
+  "POST /api/grading/sections/{sectionId}/subjects/{subjectId}/lesson-plans",
+  "PUT /api/grading/lesson-plans/{planId}",
+  "DELETE /api/grading/lesson-plans/{planId}",
+  "POST /api/grading/lesson-plans/{planId}/submit",
+  "POST /api/grading/lesson-plans/{planId}/review",
+  "PUT /api/grading/lesson-plans/{planId}/reflection",
+  // Tawjihi equivalency and multi-year results (000267): leadership behind academicConfig:manage;
+  // each write records its old and new values in the service.
+  "POST /api/grading/equivalency-rule-sets",
+  "PUT /api/grading/equivalency-rule-sets/{setId}",
+  "DELETE /api/grading/equivalency-rule-sets/{setId}",
+  "POST /api/grading/multi-year-result-configs",
+  "PUT /api/grading/multi-year-result-configs/{configId}",
+  "DELETE /api/grading/multi-year-result-configs/{configId}",
   // Timetable (ST-101). Version lifecycle + slot CRUD with conflict detection.
   "POST /api/academics/timetable-versions",
   "PATCH /api/academics/timetable-versions/{versionId}",

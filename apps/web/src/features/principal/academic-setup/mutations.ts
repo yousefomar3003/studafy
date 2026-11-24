@@ -15,7 +15,9 @@ import type {
   GradeScaleBody,
   GradingStatus,
   ResultFinalization,
+  SaveDiplomaCoreBody,
   SaveSubjectConfigResult,
+  SectionDiplomaCore,
   UpdateSubjectConfigBody,
 } from "./queries";
 import type { components } from "@studafy/api-client";
@@ -141,6 +143,25 @@ export function useSaveGradeProgram() {
         body,
       });
       return required<GradeProgram>(data, "Grade program");
+    },
+  );
+}
+
+/** Final or predicted IB Diploma core grades for a section's students (000263). */
+export function useSaveDiplomaCore() {
+  return useGradingMutation(
+    async ({
+      sectionId,
+      body,
+    }: {
+      sectionId: string;
+      body: SaveDiplomaCoreBody;
+    }): Promise<SectionDiplomaCore> => {
+      const { data } = await api.PUT("/api/grading/sections/{sectionId}/diploma-core", {
+        params: { path: { sectionId } },
+        body,
+      });
+      return required<SectionDiplomaCore>(data, "Diploma core grades");
     },
   );
 }

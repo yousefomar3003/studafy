@@ -29,6 +29,11 @@ export interface GoldenCase {
   relevantChunkIds: string[];
   /** Whether the grounding assessment should refuse. */
   shouldRefuse: boolean;
+  /**
+   * A question asked in other words than its chunk's, so no keyword search can retrieve it
+   * (ADR-024). Scored everywhere, but left out of the lexical floor, which ratchets keyword search.
+   */
+  requiresSemantic?: boolean;
 }
 
 const MATERIAL = "00000000-0000-4000-8000-000000000100";
@@ -36,7 +41,13 @@ const MATERIAL = "00000000-0000-4000-8000-000000000100";
 function hit(
   id: string,
   content: string,
-  opts: { rrfScore?: number; semanticRank?: number | null; keywordRank?: number | null } = {},
+  opts: {
+    rrfScore?: number;
+    semanticRank?: number | null;
+    keywordRank?: number | null;
+    /** Defaults to a clear match (0.7) for a semantic hit and null for a keyword-only one. */
+    semanticSimilarity?: number | null;
+  } = {},
 ): HybridSearchHit {
   return {
     chunkId: id,
@@ -48,6 +59,12 @@ function hit(
     rrfScore: opts.rrfScore ?? 0.05,
     semanticRank: opts.semanticRank === undefined ? 1 : opts.semanticRank,
     keywordRank: opts.keywordRank === undefined ? 1 : opts.keywordRank,
+    semanticSimilarity:
+      opts.semanticSimilarity !== undefined
+        ? opts.semanticSimilarity
+        : opts.semanticRank === null
+          ? null
+          : 0.7,
   };
 }
 
@@ -234,6 +251,25 @@ export const GOLDEN_SET: GoldenCase[] = [
     shouldRefuse: false,
   },
 
+  {
+    // Asked in other words: "التمثيل الضوئي" for a book that says "البناء الضوئي". No keyword
+    // matches; the meaning match grounds it (ADR-024).
+    id: "grounded-reworded-semantic",
+    query: "ما هو التمثيل الضوئي؟",
+    hits: [
+      hit("c1", "البناء الضوئي عملية تقوم بها النباتات الخضراء لصنع غذائها باستخدام ضوء الشمس.", {
+        rrfScore: 1 / 61,
+        semanticRank: 1,
+        keywordRank: null,
+        semanticSimilarity: 0.72,
+      }),
+    ],
+    answer: "البناء الضوئي عملية تقوم بها النباتات الخضراء لصنع غذائها باستخدام ضوء الشمس [1].",
+    relevantChunkIds: ["c1"],
+    shouldRefuse: false,
+    requiresSemantic: true,
+  },
+
   // ── Refusal cases ─────────────────────────────────────────────────────────
 
   {
@@ -244,11 +280,13 @@ export const GOLDEN_SET: GoldenCase[] = [
         rrfScore: 0.035,
         semanticRank: 1,
         keywordRank: null,
+        semanticSimilarity: 0.46,
       }),
       hit("c2", "Energy can be neither created nor destroyed in an isolated system.", {
         rrfScore: 0.03,
         semanticRank: 2,
         keywordRank: null,
+        semanticSimilarity: 0.43,
       }),
     ],
     answer: "",
@@ -256,18 +294,21 @@ export const GOLDEN_SET: GoldenCase[] = [
     shouldRefuse: true,
   },
   {
+    // Neighbouring text, no keyword match, and a meaning match just under the floor (ADR-024).
     id: "refusal-below-threshold",
     query: "What is the capital of France?",
     hits: [
-      hit("c1", "Paris is the largest city in France and a major European capital.", {
+      hit("c1", "Lyon is known for its cuisine and its silk-weaving history.", {
         rrfScore: 0.015,
         semanticRank: 1,
-        keywordRank: 3,
+        keywordRank: null,
+        semanticSimilarity: 0.49,
       }),
-      hit("c2", "France is a country in Western Europe with a rich cultural history.", {
+      hit("c2", "The Loire valley is famous for its castles and vineyards.", {
         rrfScore: 0.012,
         semanticRank: 2,
-        keywordRank: 4,
+        keywordRank: null,
+        semanticSimilarity: 0.45,
       }),
     ],
     answer: "",
@@ -281,12 +322,12 @@ export const GOLDEN_SET: GoldenCase[] = [
       hit(
         "c1",
         "DNA contains the genetic instructions for the development and function of living organisms.",
-        { rrfScore: 0.018, semanticRank: 1, keywordRank: null },
+        { rrfScore: 0.018, semanticRank: 1, keywordRank: null, semanticSimilarity: 0.47 },
       ),
       hit(
         "c2",
         "Proteins are large biomolecules consisting of one or more long chains of amino acid residues.",
-        { rrfScore: 0.014, semanticRank: 2, keywordRank: null },
+        { rrfScore: 0.014, semanticRank: 2, keywordRank: null, semanticSimilarity: 0.44 },
       ),
     ],
     answer: "",
@@ -300,12 +341,12 @@ export const GOLDEN_SET: GoldenCase[] = [
       hit(
         "c1",
         "Tectonic plates float on the semi-fluid asthenosphere beneath the Earth's crust.",
-        { rrfScore: 0.019, semanticRank: 1, keywordRank: null },
+        { rrfScore: 0.019, semanticRank: 1, keywordRank: null, semanticSimilarity: 0.48 },
       ),
       hit(
         "c2",
         "Earthquakes occur when tectonic plates shift and release energy along fault lines.",
-        { rrfScore: 0.016, semanticRank: 2, keywordRank: null },
+        { rrfScore: 0.016, semanticRank: 2, keywordRank: null, semanticSimilarity: 0.46 },
       ),
     ],
     answer: "",

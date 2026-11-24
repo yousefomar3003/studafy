@@ -44,6 +44,9 @@ kill_timeout = "60s"
   CLAMAV_PORT = "3310"
   AI_LLM_PROVIDER = "openai-compatible"
   AI_LLM_BASE_URL = "https://openrouter.ai/api/v1"
+  # Semantic retrieval (ADR-024): questions (api) and material chunks (workers) are embedded with
+  # this model on the same OpenRouter host and key. Both apps must name the same model.
+  AI_EMBEDDING_MODEL = "google/gemini-embedding-001"
   # Resend sends only from a domain verified with it, and the verified one is send.studafy.com
   # (resend._domainkey.send and the send.send return path in Vercel DNS). From studafy.com every
   # email was refused. A sending subdomain also keeps bulk mail off the root domain's reputation.

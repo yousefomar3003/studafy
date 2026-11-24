@@ -7,6 +7,7 @@ import { emitAuditLog } from "../../middleware/auditEmitter";
 
 import {
   assertCanGradeSectionSubject,
+  assertCanReadSectionSubject,
   assertConfigEditable,
   assertMarksOpen,
   isSchoolLeadership,
@@ -27,7 +28,7 @@ import {
   toMarkInputs,
 } from "./engine-config";
 
-import type { GradingConfigStatus } from "./access";
+import type { GradingConfigStatus, SectionSubjectAccess } from "./access";
 import type { DescriptorView } from "./descriptor-service";
 import type {
   EffectiveSubject,
@@ -100,6 +101,8 @@ export interface MarkSheetView {
   config_id: string;
   source: string;
   year_status: GradingConfigStatus;
+  /** How the caller reads the sheet; a coordinator's is read-only (000261). */
+  access: SectionSubjectAccess;
   can_edit_marks: boolean;
   can_add_assessments: boolean;
   config: {
@@ -206,7 +209,7 @@ async function loadSheets(
 }
 
 /** The periods a config has marks in: each term with term assessments, plus annual if any. */
-function periodsOf(engine: SubjectGradingConfig): (string | null)[] {
+export function periodsOf(engine: SubjectGradingConfig): (string | null)[] {
   const periods = new Set<string | null>();
   for (const assessment of engine.assessments) periods.add(assessment.termId);
   return [...periods].sort((a, b) => {
@@ -433,21 +436,40 @@ interface SheetContext {
   roster: RosterStudent[];
   source: string;
   leadership: boolean;
+  access: SectionSubjectAccess;
 }
 
+/**
+ * The section subject's rules and roster, after the access check: `write` (the default) for its
+ * teachers and leadership; `read` lets the subject's coordinator in as well (000261).
+ */
 async function sheetContext(
   tx: TransactionSql,
   schoolId: string,
   sectionId: string,
   subjectId: string,
+  mode: "read" | "write" = "write",
 ): Promise<SheetContext> {
   const section = await requireSectionRow(tx, schoolId, sectionId);
-  const { leadership } = await assertCanGradeSectionSubject(tx, sectionId, subjectId);
+  const access =
+    mode === "read"
+      ? (await assertCanReadSectionSubject(tx, sectionId, subjectId)).access
+      : (await assertCanGradeSectionSubject(tx, sectionId, subjectId)).leadership
+        ? "leadership"
+        : "teacher";
   const subject = await requireEffectiveSubject(tx, schoolId, section, subjectId);
   const loaded = await loadConfigDetail(tx, schoolId, subject.config_id);
   const engine = toEngineConfig(loaded, { sectionId });
   const roster = await loadRoster(tx, schoolId, section, subjectId, subject.requirement);
-  return { section, loaded, engine, roster, source: subject.source, leadership };
+  return {
+    section,
+    loaded,
+    engine,
+    roster,
+    source: subject.source,
+    leadership: access === "leadership",
+    access,
+  };
 }
 
 function releaseView(release: AssessmentReleaseRow | undefined, sheet: MarkSheetRow | undefined) {
@@ -488,9 +510,10 @@ export async function getMarkSheet(
   sectionId: string,
   subjectId: string,
 ): Promise<MarkSheetView> {
-  const context = await sheetContext(tx, schoolId, sectionId, subjectId);
+  const context = await sheetContext(tx, schoolId, sectionId, subjectId, "read");
   const { section, loaded, engine, roster } = context;
   const year = await requireYear(tx, schoolId, section.academic_year_id);
+  const writable = context.access !== "coordinator";
   const assessmentIds = engine.assessments.map((assessment) => assessment.id);
   const visibleAssessments = loaded.assessments.filter(
     (assessment) => assessment.section_id === null || assessment.section_id === sectionId,
@@ -521,8 +544,10 @@ export async function getMarkSheet(
     config_id: loaded.config.id,
     source: context.source,
     year_status: year.grading_config_status,
-    can_edit_marks: year.grading_config_status === "active",
+    access: context.access,
+    can_edit_marks: writable && year.grading_config_status === "active",
     can_add_assessments:
+      writable &&
       year.grading_config_status === "active" &&
       (context.leadership || loaded.config.teachers_can_add_assessments),
     config: {
@@ -1590,6 +1615,8 @@ export interface ReleasedSubject {
   subject_id: string;
   subject_code: string;
   subject_name: string;
+  /** The subject's Arabic name (000264); null when it has none. */
+  subject_name_ar: string | null;
   /** When the whole period's mark sheet was approved; null while only single assessments are out. */
   approved_at: string | null;
   /**
@@ -1632,6 +1659,7 @@ export async function listReleasedStudentMarks(
       subject_id: string;
       subject_code: string;
       subject_name: string;
+      subject_name_ar: string | null;
       approved_at: Date | null;
       period_approved: boolean;
       released_at: Date;
@@ -1651,7 +1679,7 @@ export async function listReleasedStudentMarks(
     SELECT year.id AS academic_year_id, year.name AS academic_year_name,
            assessment.term_id, term.name AS term_name,
            subject.id AS subject_id, subject.code AS subject_code, subject.name AS subject_name,
-           sheet.decided_at AS approved_at, sheet.id IS NOT NULL AS period_approved,
+           subject.name_ar AS subject_name_ar, sheet.decided_at AS approved_at, sheet.id IS NOT NULL AS period_approved,
            LEAST(sheet.decided_at, release_row.decided_at) AS released_at,
            category.id AS category_id, category.name AS category_name, category.kind AS category_kind,
            assessment.id AS assessment_id, assessment.name AS assessment_name, assessment.max_marks,
@@ -1721,6 +1749,7 @@ export async function listReleasedStudentMarks(
         subject_id: row.subject_id,
         subject_code: row.subject_code,
         subject_name: row.subject_name,
+        subject_name_ar: row.subject_name_ar,
         approved_at: row.approved_at?.toISOString() ?? null,
         period_approved: row.period_approved,
         categories: [],

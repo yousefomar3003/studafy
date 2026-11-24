@@ -2,10 +2,14 @@ import { ERROR_CODES } from "@studafy/constants";
 
 import { CodedHttpException } from "../../coded-http-exception";
 
+import { programDiplomaConfig } from "./diploma-config";
+
+import type { DiplomaConfigJson } from "./diploma-config";
 import type {
   CategoryAggregation,
   CategoryKind,
   CategoryScope,
+  DiplomaConfig,
   EngineDescriptor,
   GradeBand,
   MarkInput,
@@ -140,6 +144,11 @@ export interface ProgramRow {
   rank_basis: RankBasis;
   rank_scope: RankScope;
   rank_visibility: RankVisibility;
+  /**
+   * IB Diploma rules (000263): set while the result format is points_total, null otherwise. Copied
+   * into the result snapshot (`program.diploma`) at finalization.
+   */
+  diploma_config: DiplomaConfigJson | null;
   updated_at: Date;
 }
 
@@ -219,6 +228,8 @@ export interface ConfigSnapshot {
     scale: GradeBand[] | null;
     /** Absent on snapshots taken before result formats existed: those are percentages. */
     result_format?: ResultFormat;
+    /** A points_total grade's diploma rules when finalized (000263); absent otherwise. */
+    diploma?: DiplomaConfig;
   };
 }
 
@@ -404,7 +415,7 @@ export async function requireProgram(
            program.result_format, program.result_scale_max::float8 AS result_scale_max,
            program.predicted_grades_enabled, program.predicted_grades_visibility,
            program.rank_enabled, program.rank_basis, program.rank_scope, program.rank_visibility,
-           program.updated_at
+           program.diploma_config, program.updated_at
     FROM app.grade_programs AS program
     JOIN app.grade_levels AS grade
       ON grade.id = program.grade_level_id AND grade.school_id = program.school_id
@@ -432,7 +443,7 @@ const PROGRAM_COLUMNS = `
   program.result_format, program.result_scale_max::float8 AS result_scale_max,
   program.predicted_grades_enabled, program.predicted_grades_visibility,
   program.rank_enabled, program.rank_basis, program.rank_scope, program.rank_visibility,
-  program.updated_at`;
+  program.diploma_config, program.updated_at`;
 
 /** A config with its categories, assessments, term weights, the year's terms and its scale. */
 export async function loadConfigDetail(
@@ -754,6 +765,7 @@ export function programPolicy(program: ProgramRow, scale: GradeBand[]): OverallP
     maxFailedSubjectsForSupplementary: program.max_failed_subjects_for_supplementary,
     scale: scale.length > 0 ? scale : null,
     resultFormat: programResultFormat(program),
+    ...(program.result_format === "points_total" ? { diploma: programDiplomaConfig(program) } : {}),
   };
 }
 
@@ -796,6 +808,9 @@ export function buildSnapshot(
       },
       scale: programScale.length > 0 ? programScale : null,
       result_format: programResultFormat(program),
+      ...(program.result_format === "points_total"
+        ? { diploma: programDiplomaConfig(program) }
+        : {}),
     },
   };
 }

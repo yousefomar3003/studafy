@@ -41,11 +41,13 @@ export function SectionModal({
   const saving = section ? rename : create;
   const [gradeId, setGradeId] = useState("");
   const [name, setName] = useState("");
+  const [nameAr, setNameAr] = useState("");
 
   useEffect(() => {
     if (!open) return;
     setGradeId(section?.grade_level_id ?? "");
     setName(section?.name ?? "");
+    setNameAr(section?.name_ar ?? "");
   }, [open, section]);
 
   const canSubmit = name.trim() !== "" && (section !== null || gradeId !== "");
@@ -68,11 +70,20 @@ export function SectionModal({
         description: apiErrorDescription(error),
       });
 
+    const arabic = nameAr.trim() || null;
     if (section) {
-      rename.mutate({ sectionId: section.id, name: name.trim() }, { onSuccess, onError });
+      rename.mutate(
+        { sectionId: section.id, name: name.trim(), name_ar: arabic },
+        { onSuccess, onError },
+      );
     } else {
       create.mutate(
-        { academic_year_id: academicYearId, grade_level_id: gradeId, name: name.trim() },
+        {
+          academic_year_id: academicYearId,
+          grade_level_id: gradeId,
+          name: name.trim(),
+          ...(arabic ? { name_ar: arabic } : {}),
+        },
         { onSuccess, onError },
       );
     }
@@ -108,6 +119,15 @@ export function SectionModal({
             maxLength={MAX_NAME_LENGTH}
             placeholder={t("principal.sections.sectionModal.namePlaceholder")}
             onChange={(event) => setName(event.target.value)}
+          />
+          <Input
+            label={t("principal.sections.nameAr")}
+            helperText={t("principal.sections.nameArHelper")}
+            value={nameAr}
+            maxLength={MAX_NAME_LENGTH}
+            dir="rtl"
+            lang="ar"
+            onChange={(event) => setNameAr(event.target.value)}
           />
         </div>
       </Modal.Body>

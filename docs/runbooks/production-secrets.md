@@ -68,9 +68,10 @@ Already filled in; listed so the provider registrations below can be checked aga
 | `GOOGLE_OAUTH_REDIRECT_URI`    | `https://api.studafy.com/api/auth/oauth/google/callback`                                         |
 | `MICROSOFT_OAUTH_REDIRECT_URI` | `https://api.studafy.com/api/auth/oauth/microsoft/callback`                                      |
 
-The same files set the AI provider: `AI_LLM_PROVIDER=openai-compatible` against Together AI
-(`AI_LLM_BASE_URL=https://api.together.xyz/v1`), with `Qwen/Qwen3.5-9B` for both model tiers and
-`AI_LLM_ENABLED=true` on the api. To run with AI off instead, set `AI_LLM_ENABLED=false` there
+The same files set the AI provider: `AI_LLM_PROVIDER=openai-compatible` against OpenRouter
+(`AI_LLM_BASE_URL=https://openrouter.ai/api/v1`), with `google/gemma-4-31b-it` for both model tiers
+and `AI_LLM_ENABLED=true` on the api. Both apps also set `AI_EMBEDDING_MODEL=google/gemini-embedding-001`
+for semantic retrieval (ADR-024); it uses the same `AI_LLM_API_KEY`, so it needs no secret of its own. To run with AI off instead, set `AI_LLM_ENABLED=false` there
 **and** remove `AI_LLM_API_KEY` — the api refuses a key while AI is off. See
 `docs/runbooks/anthropic-provider-config.md`.
 

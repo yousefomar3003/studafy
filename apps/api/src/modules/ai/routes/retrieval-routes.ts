@@ -8,7 +8,7 @@ import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
 import { requireFeature } from "../../features/middleware";
 import { AI_FEATURE_ROUTE, aiTokenBudget, getAiQuota } from "../gate/token-budget";
-import { estimateQueryTokens } from "../retrieval/embeddings";
+import { embedForSearch, estimateQueryTokens } from "../retrieval/embeddings";
 import {
   createDeterministicCrossEncoderReranker,
   RERANK_CANDIDATE_POOL,
@@ -221,13 +221,15 @@ export function aiRetrievalRoutes(deps: {
     // bounded by the flag cache TTL. Without a flags service (no db/redis) the stage stays off.
     const rerankEnabled = flags ? await flags.get("ai.rerank", { schoolId: auth.schoolId }) : false;
 
-    const queryVector = embedder ? embedder.embed(body.query) : null;
+    const searchVector = await embedForSearch(embedder, body.query, (error) =>
+      c.get("log")?.warn({ err: error }, "query embedding failed; searching by keyword only"),
+    );
     const tokensUsed = estimateQueryTokens(body.query);
 
     const result: HybridSearchResult = await withTenantTx(database, tenantFrom(c), async (tx) => {
       const search = await hybridSearch(tx, {
         query: body.query,
-        queryVector,
+        ...searchVector,
         // The re-ranker needs the full fused top-N to choose from; without it, respect the caller's
         // limit as before.
         limit: rerankEnabled ? RERANK_CANDIDATE_POOL : clampLimit(body.limit),

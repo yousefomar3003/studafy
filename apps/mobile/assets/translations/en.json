@@ -1839,6 +1839,152 @@
       "readOnly": "This year is closed, so predicted grades can no longer change.",
       "invalid": "A grade isn't on this subject's grading scale.",
       "noStudents": "No students take this subject in this section."
+    },
+    "coordinator": {
+      "open": "Coordinator",
+      "openSubtitle": "Every section of {subjects}: mark sheets, averages and marks",
+      "title": "Subjects I coordinate",
+      "error": "Couldn't load the subjects you coordinate.",
+      "empty": "You don't coordinate a subject this year. Your school assigns coordinators in Academic setup.",
+      "readOnlyNote": "You can see these sections’ marks and results; only their teachers enter marks.",
+      "allGrades": "Every grade that takes it",
+      "grades": "Grades: {grades}",
+      "noSections": "No section takes this subject yet.",
+      "noTeacher": "No teacher assigned",
+      "students": "{count} students · {complete} complete",
+      "average": "Current average: {percentage}%",
+      "noAverage": "No marks yet",
+      "finalAverage": "{period} final average: {percentage}%",
+      "sheet": {
+        "readOnly": "Read only — you coordinate this subject",
+        "outOf": "Out of {max}",
+        "noStudents": "No students take this subject in this section.",
+        "status": {
+          "absent": "Absent",
+          "excused": "Excused",
+          "notApplicable": "Not applicable",
+          "graded": "Graded"
+        }
+      }
+    },
+    "diploma": {
+      "entry": "IB Diploma core",
+      "entrySubtitle": "TOK, Extended Essay and CAS",
+      "title": "IB Diploma core",
+      "help": "Theory of Knowledge and Extended Essay grades (A–E) and CAS for each student. Final grades are used when results are finalized; predicted ones give the predicted total.",
+      "kind": {
+        "finalGrades": "Final",
+        "predicted": "Predicted"
+      },
+      "tok": "TOK",
+      "ee": "Extended Essay",
+      "cas": "CAS",
+      "casComplete": "Complete",
+      "casIncomplete": "Not complete",
+      "none": "Not recorded",
+      "save": "Save",
+      "saved": "Core grades saved",
+      "error": "Couldn't load the core grades.",
+      "disabled": "This grade doesn't use the IB Diploma total this year.",
+      "readOnly": "This year is closed, so core grades can no longer change.",
+      "predictedOff": "Your school hasn't switched predicted grades on for this grade.",
+      "noStudents": "No students in this section."
+    },
+    "outcomes": {
+      "entry": "Learning outcomes",
+      "entrySubtitle": "Each student's achievement on the subject's outcomes",
+      "title": "Learning outcomes",
+      "help": "Give each student a level on each outcome, for the year or a term. Report cards show it when your school switches it on.",
+      "period": "Period",
+      "wholeYear": "Whole year",
+      "outcome": "Outcome",
+      "none": "No level",
+      "save": "Save",
+      "saved": "Achievement saved",
+      "error": "Couldn't load the learning outcomes.",
+      "noSection": "This class isn't linked to a grade section, so it has no learning outcomes.",
+      "noOutcomes": "Your school hasn't added learning outcomes for this subject and grade yet.",
+      "noStudents": "No students take this subject in this section.",
+      "readOnly": "Read only: the year is closed, or you don't teach this class.",
+      "finalized": "These results are finalized, so achievement can no longer change."
+    },
+    "plans": {
+      "entry": "Lesson plans",
+      "entrySubtitle": "Term and daily lesson plans, submitted for review",
+      "title": "Lesson plans",
+      "lessonPlans": "Lessons",
+      "termPlans": "Term plans",
+      "lessonPlan": "Lesson plan",
+      "termPlan": "Term plan",
+      "termPlanTitle": "Term plan: {term}",
+      "new": "New",
+      "error": "Couldn't load the plans.",
+      "noSection": "This class isn't linked to a grade section, so it has no plans.",
+      "emptyLessons": "No lesson plans yet. Tap New to write one.",
+      "emptyTerms": "No term plan yet. Tap New to start one.",
+      "late": "Late",
+      "periodN": "Period {n}",
+      "term": "Term",
+      "pickTerm": "Choose the term first.",
+      "notes": "Notes",
+      "week": "Week {n}",
+      "removeWeek": "Remove week {n}",
+      "addWeek": "Add week",
+      "unit": "Unit",
+      "weekNotes": "What the week covers",
+      "outcomes": "Learning outcomes",
+      "noOutcomes": "No learning outcomes for this subject and grade yet.",
+      "date": "Lesson date",
+      "period": "Period",
+      "noPeriod": "No period",
+      "noPeriods": "The timetable has no period for this class that day.",
+      "lessonTitle": "Title",
+      "titleRequired": "Give the lesson a title.",
+      "objectives": "Objectives",
+      "activities": "Activities",
+      "resources": "Resources",
+      "materials": "Class materials",
+      "noMaterials": "No materials uploaded to this class yet.",
+      "homework": "Homework",
+      "reflection": "Reflection",
+      "reflectionHelp": "After the lesson: what worked, and what to change next time.",
+      "saveReflection": "Save reflection",
+      "reflectionSaved": "Reflection saved",
+      "saveDraft": "Save draft",
+      "submit": "Submit",
+      "saved": "Plan saved",
+      "submitted": "Plan submitted for review",
+      "delete": "Delete plan",
+      "deleted": "Plan deleted",
+      "reviewComment": "Reviewer's comment",
+      "reviewCommentBy": "Comment from {name}",
+      "status": {
+        "draft": "Draft",
+        "submitted": "Submitted",
+        "approved": "Approved",
+        "returned": "Returned",
+        "unknown": "Unknown"
+      },
+      "errors": {
+        "state": "This plan can't change now: it may already be submitted or approved.",
+        "duplicate": "This class already has a plan for that term.",
+        "invalid": "Something in the plan isn't valid. Check the date, outcomes and materials.",
+        "forbidden": "You can't do this for this plan."
+      }
+    },
+    "planReviews": {
+      "open": "Plans to review",
+      "openSubtitle": "Lesson and term plans for the subjects you coordinate",
+      "waiting": "{count} waiting for your review",
+      "title": "Plans to review",
+      "error": "Couldn't load the plans to review.",
+      "empty": "No plans are waiting for your review.",
+      "comment": "Comment for the teacher",
+      "commentRequired": "Say what to change before returning the plan.",
+      "approve": "Approve",
+      "return": "Return",
+      "approved": "Plan approved",
+      "returned": "Plan returned to the teacher"
     }
   },
   "parent": {
@@ -2521,7 +2667,9 @@
       "daysLate": "Days late",
       "daysExcused": "Absent with excuse",
       "teacherComment": "Class teacher's comment",
-      "principalComment": "Principal's comment"
+      "principalComment": "Principal's comment",
+      "outcomes": "Learning outcomes",
+      "outcomeLine": "{code} {text}: {level}"
     },
     "title": "Results",
     "entry": "Official results",
@@ -2629,6 +2777,22 @@
       "serialLabel": "Serial number",
       "finalization": "Results version {version}, finalized {date}"
     },
+    "examEntries": {
+      "title": "Exam entries",
+      "error": "Exam entries couldn't be loaded.",
+      "examSeries": "{exam} — {series}",
+      "candidateNumber": "Candidate number: {number}",
+      "noCandidateNumber": "not set yet",
+      "examsOn": "Exam on {date}",
+      "examsBetween": "Exams {from} – {to}",
+      "resultsOn": "Results on {date}",
+      "unnamedSubject": "Subject",
+      "status": {
+        "entered": "Entered",
+        "withdrawn": "Withdrawn",
+        "unknown": "Entry"
+      }
+    },
     "testScores": {
       "title": "Test scores",
       "empty": "No external exam results recorded yet.",
@@ -2661,6 +2825,93 @@
         "notRecorded": "Not recorded yet"
       },
       "missing": "Still to pass: {subjects}"
+    },
+    "equivalency": {
+      "title": "Tawjihi equivalency (estimate)",
+      "notice": "An estimate under the school's own rules, which the school confirms. It is not an official Ministry of Education conversion.",
+      "estimate": "Estimated {percentage}",
+      "status": {
+        "estimated": "Estimated",
+        "incomplete": "Missing data",
+        "notEligible": "No estimate",
+        "unknown": "Not available"
+      },
+      "partShare": "{percentage} ({share} of the estimate)",
+      "partStatus": {
+        "missing": "Missing data",
+        "skipped": "Not counted",
+        "notEligible": "No estimate"
+      },
+      "source": "From {value}",
+      "sourceOf": "From {value} / {max}",
+      "subjectStep": "{subject}: {grade} → {percentage}",
+      "notCounted": "not counted",
+      "issue": {
+        "noExamResults": "{part}: no exam results recorded yet.",
+        "tooFewSubjects": "{part}: {actual} of {required} subjects needed.",
+        "requiredSubjectMissing": "{part}: no result yet in {subject}, which must count.",
+        "unmappedGrade": "{part}: grade {grade} in {subject} has no percentage and does not count.",
+        "noDiplomaResult": "{part}: no IB Diploma result yet.",
+        "diplomaPending": "{part}: the IB Diploma result is not final yet.",
+        "diplomaNotAwarded": "{part}: the IB Diploma was not awarded.",
+        "noGpa": "{part}: no cumulative GPA yet.",
+        "noExamTotal": "{part}: no exam total recorded yet.",
+        "belowConversionTable": "{part}: {actual} is below the lowest value converted ({required}).",
+        "currentYearPending": "{part}: this year's results are not final yet, so the GPA can still change.",
+        "optionalPartSkipped": "{part} is optional and was left out.",
+        "noParts": "Nothing could be counted yet.",
+        "unknown": "Some information is missing."
+      }
+    },
+    "multiYear": {
+      "title": "Multi-year result",
+      "overall": "Overall {percentage}",
+      "status": {
+        "complete": "Complete",
+        "pending": "Pending",
+        "incomplete": "Incomplete",
+        "unknown": "Not available"
+      },
+      "yearStatus": {
+        "finalized": "Final",
+        "incomplete": "Incomplete result",
+        "pending": "Not final yet",
+        "missing": "No result"
+      },
+      "yearWeight": "{grade} ({share})",
+      "subjects": "Subjects"
+    },
+    "diploma": {
+      "title": "IB Diploma",
+      "total": "{value} / {max} points",
+      "totalPending": "Total pending",
+      "corePoints": "Core points: {points}",
+      "core": "TOK {tok} · Extended Essay {ee} · CAS {cas}",
+      "tok": "TOK",
+      "ee": "Extended Essay",
+      "casComplete": "complete",
+      "casIncomplete": "not complete",
+      "status": {
+        "awarded": "Awarded",
+        "notAwarded": "Not awarded",
+        "pending": "Pending",
+        "unknown": "—"
+      },
+      "failing": {
+        "TOO_FEW_SUBJECTS": "Only {actual} of {required} subjects",
+        "MIN_TOTAL": "Total {actual} is below {required}",
+        "CAS_INCOMPLETE": "CAS not complete",
+        "CORE_GRADE": "{component} grade {grade}",
+        "SUBJECTS_AT_OR_BELOW": "{actual} subjects at {points} points or fewer (at most {required})",
+        "LEVEL_POINTS": "{actual} points at {level} (needs {required})"
+      },
+      "pending": {
+        "subjects_incomplete": "Subject results incomplete",
+        "core_grades_missing": "TOK or Extended Essay grade missing",
+        "cas_not_recorded": "CAS not recorded"
+      },
+      "predictedTitle": "Predicted IB Diploma total",
+      "predictedHelp": "From your teachers' predicted grades. This is not a result."
     }
   },
   "features": {
@@ -2814,6 +3065,128 @@
       "downloadError": "Couldn't load the file. Check your connection and try again.",
       "retry": "Try again",
       "noPreview": "This file opens in your phone's app for it."
+    }
+  },
+  "examWeeks": {
+    "schoolTime": "Times are school time ({timezone}).",
+    "floor": "floor {floor}",
+    "kinds": {
+      "midterm": "Midterm exams",
+      "final": "Final exams",
+      "monthly": "Monthly exams",
+      "mock": "Mock exams",
+      "other": "Exams",
+      "unknown": "Exams"
+    },
+    "timetable": {
+      "title": "Exam timetable",
+      "entry": "Exam timetable",
+      "entrySubtitle": "Exam days, times, rooms and seat numbers",
+      "unavailable": "The exam timetable isn't available for this account.",
+      "error": "Couldn't load the exam timetable. Pull down to try again.",
+      "empty": "No exam timetable has been published yet.",
+      "notSeated": "Room and seat not given yet",
+      "roomAndSeat": "{room} · seat {seat}"
+    },
+    "duties": {
+      "title": "Invigilation duties",
+      "error": "Couldn't load your invigilation duties. Pull down to try again.",
+      "empty": "You have no invigilation duties.",
+      "noneUpcoming": "No invigilation duties coming up.",
+      "past": "Past duties",
+      "room": "Room: {room}",
+      "next": "Next: {exam}, {when}, {room}"
+    }
+  },
+  "remedial": {
+    "entry": "Remedial plans",
+    "entrySubtitle": "Students below the pass line and their support plans",
+    "coordinatorOpen": "Remedial plans",
+    "title": "Remedial plans",
+    "planTitle": "Remedial plan",
+    "error": "Couldn't load the remedial plans.",
+    "planError": "Couldn't load this remedial plan.",
+    "noSection": "This class isn't linked to a grade section, so it has no remedial plans.",
+    "help": "Students below the pass line on their current marks are suggested. Open a plan with the skills to target, what you'll do and when you'll review it.",
+    "followUpHelp": "Follow up this subject's remedial plans: read each plan and add notes. Only the subject's teachers open and change plans.",
+    "newPlan": "New plan",
+    "period": "Period",
+    "wholeYear": "Whole year",
+    "suggestions": "Suggested students",
+    "suggestionsHelp": "Below the pass line ({pass}) on the marks recorded so far.",
+    "noPassLine": "This subject has no pass percentage, so no students are suggested.",
+    "noSuggestions": "No student is below the pass line.",
+    "current": "Current mark {percentage}",
+    "currentProvisional": "Current mark {percentage} (some marks missing)",
+    "viewPlan": "View plan",
+    "openPlan": "Open plan",
+    "plans": "Plans this year",
+    "noPlans": "No remedial plans yet.",
+    "nextReview": "Next review {date}",
+    "overdue": "Review overdue",
+    "shared": "Shared with the family",
+    "staffOnly": "Staff only",
+    "edit": "Edit plan",
+    "addNote": "Add note",
+    "saveNote": "Save note",
+    "noteLabel": "Progress or follow-up note",
+    "internalLabel": "Staff only",
+    "internalHelp": "Never shown to the student or parents.",
+    "noReviews": "No review dates.",
+    "reviewDone": "Done",
+    "noNotes": "No notes yet.",
+    "statusChanged": "Status changed to",
+    "startWithPass": "{percentage} (pass line {pass})",
+    "status": {
+      "open": "Open",
+      "inProgress": "In progress",
+      "achieved": "Achieved",
+      "closed": "Closed",
+      "unknown": "Updated"
+    },
+    "reason": {
+      "belowPass": "Below the pass line",
+      "teacherConcern": "Teacher's concern"
+    },
+    "fields": {
+      "reason": "Reason",
+      "startPercentage": "Mark when opened",
+      "targets": "Target skills or outcomes",
+      "actions": "Actions",
+      "reviews": "Review dates",
+      "timeline": "Progress and follow-up"
+    },
+    "author": {
+      "leadership": "School leadership",
+      "teacher": "Teacher",
+      "coordinator": "Subject coordinator",
+      "family": "Staff"
+    },
+    "form": {
+      "editTitle": "Edit plan",
+      "save": "Save",
+      "required": "Required",
+      "student": "Student",
+      "status": "Status",
+      "statusNote": "Note on the status change (optional)",
+      "reasonNote": "Details (optional)",
+      "targetsHelp": "The skills or outcomes the student should reach.",
+      "actionsHelp": "What you and the student will do.",
+      "addReviewDate": "Add review date",
+      "share": "Share with the student and parents",
+      "shareHelp": "They see the plan and progress notes, never staff-only notes."
+    },
+    "family": {
+      "title": "Support plans",
+      "help": "Plans the school has shared to help in a subject, with their progress."
+    },
+    "errors": {
+      "duplicate": "This student already has an active plan in this subject for this period.",
+      "closed": "This plan is achieved or closed and can no longer change.",
+      "locked": "This year is closed, so plans can no longer change.",
+      "invalid": "Check the plan: a field is missing or not allowed.",
+      "forbidden": "You can't change this plan.",
+      "generic": "Something went wrong. Try again."
     }
   }
 }

@@ -44,6 +44,10 @@ export type ClassRank = Schemas["ClassRank"];
 export type DocumentClassRank = Schemas["DocumentClassRank"];
 export type TopStudents = Schemas["TopStudents"];
 export type RankBasis = Schemas["RankBasis"];
+export type DiplomaConfig = NonNullable<Schemas["DiplomaConfig"]>;
+export type DiplomaResult = NonNullable<Schemas["DiplomaResult"]>;
+export type SectionDiplomaCore = Schemas["SectionDiplomaCore"];
+export type SaveDiplomaCoreBody = Schemas["SaveDiplomaCoreBody"];
 
 /**
  * Reads behind the academic setup area (`/portal/principal/academic-setup`). Every key sits under
@@ -72,6 +76,7 @@ export const gradingKeys = {
   assessmentReleases: (yearId: string) => [...GRADING_KEY, "assessment-releases", yearId] as const,
   markSheet: (sectionId: string, subjectId: string) =>
     [...GRADING_KEY, "mark-sheet", sectionId, subjectId] as const,
+  diplomaCore: (sectionId: string) => [...GRADING_KEY, "diploma-core", sectionId] as const,
   preview: (sectionId: string, termId: string | null) =>
     [...GRADING_KEY, "preview", sectionId, termId ?? "annual"] as const,
   finalizations: (yearId: string, sectionId: string) =>
@@ -315,6 +320,19 @@ export function useMarkSheet(sectionId: string | undefined, subjectId: string | 
 }
 
 /** `termId` null previews the annual result. */
+/** IB Diploma core grades of a section's students (points_total grades, 000263). */
+export function useSectionDiplomaCore(sectionId: string) {
+  return useQuery({
+    queryKey: gradingKeys.diplomaCore(sectionId),
+    queryFn: async () => {
+      const { data } = await api.GET("/api/grading/sections/{sectionId}/diploma-core", {
+        params: { path: { sectionId } },
+      });
+      return required<SectionDiplomaCore>(data, "Diploma core grades");
+    },
+  });
+}
+
 export function useResultPreview(sectionId: string | undefined, termId: string | null) {
   return useQuery({
     queryKey: gradingKeys.preview(sectionId ?? "", termId),

@@ -24,6 +24,16 @@ export {
   scheduleAccountDeletionSweepJob,
 } from "./account-deletion-sweep-scheduler";
 export { AI_MESSAGE_PURGE_BATCH_SIZE, purgeExpiredAiMessages } from "./ai-message-retention-sweep";
+export {
+  CHUNK_REEMBED_BATCH_SIZE,
+  CHUNK_REEMBED_MAX_PER_RUN,
+  reembedStaleChunks,
+} from "./chunk-reembed-sweep";
+export type { ReembedStaleChunksResult } from "./chunk-reembed-sweep";
+export {
+  CHUNK_REEMBED_SWEEP_CRON_PATTERN,
+  scheduleChunkReembedSweepJob,
+} from "./chunk-reembed-sweep-scheduler";
 export type { PurgeExpiredAiMessagesResult } from "./ai-message-retention-sweep";
 export {
   AI_MESSAGE_RETENTION_SWEEP_CRON_PATTERN,

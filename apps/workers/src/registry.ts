@@ -9,6 +9,7 @@ import { createRedisConnection } from "./connection";
 import { workerPool, workerReadPool } from "./db/pool";
 import { databaseUrlFrom, loadEnv, readDatabaseUrlFrom } from "./env";
 import { workerLogger } from "./log";
+import { createOpenAiCompatibleEmbeddingProvider } from "./queues/ai-ingestion/embedding";
 import { enqueueAiIngestion } from "./queues/ai-ingestion/enqueue";
 import { createTenantSemaphore } from "./queues/ai-ingestion/semaphore";
 import { processIngestJob } from "./queues/ai-ingestion/worker";
@@ -47,6 +48,7 @@ import {
   uploadScanFailedListener,
 } from "./queues/scan";
 
+import type { EmbeddingProvider } from "./queues/ai-ingestion/embedding";
 import type { AiIngestionJobData } from "./queues/ai-ingestion/job";
 import type { TenantSemaphore } from "./queues/ai-ingestion/semaphore";
 import type { AnthropicClient } from "./queues/exam-generation/anthropic-client";
@@ -292,6 +294,30 @@ function examAnthropicClient(): AnthropicClient | null {
 }
 
 /**
+ * The live embedding provider (ADR-024), shared by ingestion and the chunk re-embed sweep. Built on
+ * first use, like the clients above; `null` unless AI_EMBEDDING_MODEL is set on the openai-compatible
+ * host, in which case chunks keep the mock vectors the semantic leg never reads.
+ */
+let embeddingProviderInstance: EmbeddingProvider | null | undefined;
+
+function embeddingProvider(): EmbeddingProvider | null {
+  if (embeddingProviderInstance === undefined) {
+    embeddingProviderInstance =
+      workerEnv.AI_EMBEDDING_MODEL &&
+      workerEnv.AI_LLM_PROVIDER === "openai-compatible" &&
+      workerEnv.AI_LLM_API_KEY &&
+      workerEnv.AI_LLM_BASE_URL
+        ? createOpenAiCompatibleEmbeddingProvider({
+            apiKey: workerEnv.AI_LLM_API_KEY,
+            baseUrl: workerEnv.AI_LLM_BASE_URL,
+            model: workerEnv.AI_EMBEDDING_MODEL,
+          })
+        : null;
+  }
+  return embeddingProviderInstance;
+}
+
+/**
  * One entry per queue in `QUEUE_NAMES` — see `docs/queue-catalog.md` for what each queue is for
  * and why it has the concurrency it does. The workers bootstrap (`src/worker.ts`) starts exactly
  * one BullMQ `Worker` per entry.
@@ -322,6 +348,7 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
           ocrLangPath: workerEnv.OCR_LANG_PATH,
           semaphore: ingestionSemaphore(),
           enqueueDerivation,
+          ...(embeddingProvider() ? { embeddingProvider: embeddingProvider()! } : {}),
         },
         token,
       );
@@ -602,6 +629,7 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
           googlePlayServiceAccount: workerEnv.GOOGLE_PLAY_SERVICE_ACCOUNT,
           recordKeyring: resolveRecordKeyring(workerEnv),
           enqueueUploadScans: enqueueUploadScanJobs,
+          ...(embeddingProvider() ? { embeddingProvider: embeddingProvider()! } : {}),
         },
         enqueueDsrJob,
       ),

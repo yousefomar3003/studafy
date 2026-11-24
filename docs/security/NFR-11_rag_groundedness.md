@@ -158,6 +158,37 @@ NFR-11 targets once they hold. The recommended next step is in ADR-020 § Conseq
 leg that does not require every word (an OR query ranked by `ts_rank_cd`) plus a gate on how much
 of the question the best chunk covers.
 
+## Live-retrieval run — 2026-11-24 (ADR-024)
+
+The same suite gained a third configuration, **live-hybrid**: the corpus re-embedded with
+`google/gemini-embedding-001` at 1536 dimensions and each question embedded by the production query
+embedder, fused by RRF and judged by the ADR-024 gate (keyword match, or similarity ≥ 0.55). It
+calls the provider, so it runs only with `AI_EVAL_EMBEDDING_API_KEY` and `AI_EVAL_EMBEDDING_MODEL`
+set; CI has no key and skips it.
+
+| Configuration     | Refusal correctness | Recall@6  | Groundedness (answered) | Answered  |
+| ----------------- | ------------------- | --------- | ----------------------- | --------- |
+| lexical (ADR-020) | 0.625               | 0.292     | 0.750                   | 6/12      |
+| mock-hybrid       | 0.750               | 0.375     | 0.458                   | 12/12     |
+| **live-hybrid**   | **0.875**           | **1.000** | **1.000**               | **12/12** |
+
+Groundedness meets the NFR-11 target; refusal correctness does not yet. The two misses are
+near-topic: "What causes volcanic eruptions?" against an earthquake chunk (similarity 0.557) and
+"What is the capital of France?" against a chunk about Lyon (0.567).
+
+**Golden set changes in this run.**
+
+- New case `grounded-reworded-semantic` ("ما هو التمثيل الضوئي؟" against a chunk that says "البناء
+  الضوئي"). It is tagged `requiresSemantic` and left out of the lexical floor, which ratchets
+  keyword search and cannot reach it by design; the floor values are unchanged.
+- `refusal-below-threshold` was **rewritten**. Its hits matched the question's keywords ("Paris is
+  … France and a major European capital"), and it refused only because of the mock-era RRF floor
+  `AI_ASK_MIN_RELEVANCE_SCORE`, which ADR-024 removed: a keyword match grounds a question, as it has
+  in lexical production since ADR-020, and that chunk does answer the question. The case now tests
+  what its name says -- a meaning match just under the similarity floor, with no keyword match.
+- The scorer's tokenizer keeps letters and digits of every script (`\p{L}\p{N}`), so Arabic answers
+  are scored instead of reading as empty.
+
 ## CI status — corrected finding
 
 An earlier draft of this pack's evidence table stated `test:ai-eval` was not wired into any CI

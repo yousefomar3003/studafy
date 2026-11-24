@@ -123,6 +123,9 @@
   "CERTIFICATE_BLOCKED": "A certificate cannot be issued because the student's results are incomplete.",
   "CERTIFICATE_NOT_FOUND": "Certificate not found.",
   "PREDICTED_GRADES_DISABLED": "Predicted grades are not switched on for this grade this year.",
+  "SUBJECT_COORDINATOR_DUPLICATE": "This person already coordinates this subject this year.",
+  "REMEDIAL_PLAN_DUPLICATE": "The student already has an active remedial plan in this subject for this period.",
+  "REMEDIAL_PLAN_CLOSED": "This remedial plan is achieved or closed and can no longer be changed.",
   "ENROLLMENT_DUPLICATE": "This student is already enrolled in this class.",
   "ENROLLMENT_NOT_ACTIVE": "This enrollment is not active.",
   "TIMETABLE_TEACHER_CONFLICT": "This teacher is already assigned to another class at this time",
@@ -165,9 +168,8 @@
   "MATERIAL_NOT_FOUND": "Material not found",
   "MATERIAL_STORAGE_CONFIRM_FAILED": "Storage confirmation failed",
   "MATERIAL_INGEST_IN_PROGRESS": "Material ingestion is already in progress",
-  "MATERIAL_CLASS_FORBIDDEN": "Only this class's teachers or the school admin can change its materials",
-  "CLASS_AI_MATERIALS_FORBIDDEN": "Only this class's teachers or school leadership can change whether its materials are used with the AI study assistant",
   "MATERIAL_CLASS_FORBIDDEN": "Only this class's teachers or school leadership can change its learning materials",
+  "CLASS_AI_MATERIALS_FORBIDDEN": "Only this class's teachers or school leadership can change whether its materials are used with the AI study assistant",
   "ATTENDANCE_SESSION_NOT_FOUND": "Attendance session not found",
   "ATTENDANCE_SESSION_DUPLICATE": "An attendance session already exists for this class, date, and period",
   "ATTENDANCE_NO_TIMETABLE_SLOT": "No approved timetable slot found for this class, date, and period",
@@ -389,5 +391,8 @@
   "ADJUSTMENT_ALREADY_REQUESTED": "A correction for this is already waiting for approval or done",
   "MANUAL_GRANT_NOT_FOUND": "No such grant in this school",
   "MANUAL_GRANT_ALREADY_REVOKED": "This grant was already revoked",
-  "MANUAL_GRANT_TIER_INVALID": "This person can't hold that tier: choose an active tier for their role (student, teacher or parent)"
+  "MANUAL_GRANT_TIER_INVALID": "This person can't hold that tier: choose an active tier for their role (student, teacher or parent)",
+  "DIPLOMA_TOTAL_DISABLED": "This grade does not use the IB Diploma total this year.",
+  "LEARNING_OUTCOME_DUPLICATE": "A learning outcome with this code already exists for this subject and grade.",
+  "LEARNING_OUTCOME_IN_USE": "This learning outcome is used by achievement or plans; archive it instead."
 }

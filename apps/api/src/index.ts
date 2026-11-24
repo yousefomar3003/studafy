@@ -19,10 +19,12 @@ import { createLogger } from "./logger";
 import {
   AI_DATA_SHARING_DISCLOSURE,
   createAnthropicProvider,
+  createOpenAiCompatibleQueryEmbedder,
   isTransientLlmFailure,
   withScriptGuard,
   type AiModelTier,
   type LlmProvider,
+  type QueryEmbedder,
 } from "./modules/ai";
 import { KeyStore } from "./modules/auth";
 import { syncFeatureCatalog } from "./modules/features";
@@ -211,6 +213,17 @@ const photoTextReader = new TesseractOcrEngine({
   ...(env.OCR_LANG_PATH !== undefined ? { langPath: env.OCR_LANG_PATH } : {}),
 });
 
+// Semantic retrieval (ADR-024): questions are embedded on the chat provider's host with the model
+// the ingestion worker embeds chunks with. env.ts has required the openai-compatible provider.
+const aiQueryEmbedder: QueryEmbedder | null =
+  env.AI_EMBEDDING_MODEL && env.AI_LLM_API_KEY && env.AI_LLM_BASE_URL
+    ? createOpenAiCompatibleQueryEmbedder({
+        apiKey: env.AI_LLM_API_KEY,
+        baseUrl: env.AI_LLM_BASE_URL,
+        model: env.AI_EMBEDDING_MODEL,
+      })
+    : null;
+
 const aiLlmModelOverrides: Partial<Record<AiModelTier, string>> = {
   ...(env.AI_LLM_SMALL_MODEL ? { small: env.AI_LLM_SMALL_MODEL } : {}),
   ...(env.AI_LLM_LARGE_MODEL ? { large: env.AI_LLM_LARGE_MODEL } : {}),
@@ -289,6 +302,7 @@ const app = createApp({
   docsEnabled: env.NODE_ENV !== "production",
   flags,
   aiLlmProvider,
+  aiQueryEmbedder,
   aiLlmModelOverrides,
   photoTextReader,
   // Folds MOBILE_MIN_SUPPORTED_VERSION_* / MOBILE_LATEST_VERSION_* into the shape

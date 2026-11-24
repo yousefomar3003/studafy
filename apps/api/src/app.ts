@@ -24,6 +24,8 @@ import {
   accountDeletionGuard,
   legalAcceptanceGuard,
 } from "./middleware";
+import { academicEquivalencyRoutes } from "./modules/academic-equivalency";
+import { academicPlanRoutes, learningOutcomeRoutes } from "./modules/academic-planning";
 import {
   academicYearRoutes,
   termRoutes,
@@ -105,6 +107,8 @@ import { bulkInviteRoutes } from "./modules/auth/invitation/bulk-invite-routes";
 import { invitationRoutes } from "./modules/auth/invitation/route";
 import { customListRoutes } from "./modules/custom-lists";
 import { disciplineRoutes, evaluationRoutes } from "./modules/discipline";
+import { examEntryRoutes } from "./modules/exam-entries";
+import { examWeekRoutes } from "./modules/exam-weeks";
 import { externalExamRoutes } from "./modules/external-exams";
 import { createFeatureService, featureRoutes, provideFeatures } from "./modules/features";
 import {
@@ -141,7 +145,10 @@ import {
 } from "./modules/grades";
 import {
   gradingConfigRoutes,
+  gradingCoordinatorRoutes,
   gradingCurriculumTemplateRoutes,
+  gradingDiplomaRoutes,
+  gradingDocumentLanguageRoutes,
   gradingMarksRoutes,
   gradingPredictedGradesRoutes,
   gradingReportCardRoutes,
@@ -166,6 +173,7 @@ import {
 } from "./modules/licensing";
 import { uploadConsistencyRoutes } from "./modules/licensing/upload-consistency-routes";
 import { messagingRoutes } from "./modules/messaging";
+import { ministryExportRoutes } from "./modules/ministry-export";
 import { mobileConfigRoutes, EMPTY_MOBILE_RELEASE_CONFIG } from "./modules/mobile";
 import { notificationRoutes, notificationPreferencesRoutes } from "./modules/notifications";
 import { platformGrantRoutes, platformRoutes, platformUserSupportRoutes } from "./modules/platform";
@@ -173,6 +181,7 @@ import { platformOpsRoutes } from "./modules/platform/ops/routes";
 import { privacyRoutes } from "./modules/privacy";
 import { realtimeTicketRoutes } from "./modules/realtime";
 import { DEVELOPMENT_RECORD_KEYRING, recordRoutes } from "./modules/records";
+import { remedialPlanRoutes } from "./modules/remedial-plans";
 import { childComparisonRoutes } from "./modules/reports";
 import {
   platformSchoolApplicationRoutes,
@@ -305,6 +314,12 @@ export interface AppOptions {
    * inject a fake.
    */
   aiLlmProvider?: LlmProvider | null;
+  /**
+   * Question embedder for semantic retrieval (ADR-024), built by src/index.ts when
+   * AI_EMBEDDING_MODEL is set. Null (the default) keeps both retrieval surfaces lexical-only
+   * (ADR-020). Never the deterministic mock outside tests: its vectors carry no meaning.
+   */
+  aiQueryEmbedder?: QueryEmbedder | null;
   /**
    * Reads the text in an Ask AI photo (POST /api/ai/photo-text). Built in src/index.ts from the OCR
    * environment (the bundled worker-script and traineddata in the image); null leaves the route
@@ -440,6 +455,7 @@ export function createApp({
   docsEnabled = false,
   flags = null,
   aiLlmProvider = null,
+  aiQueryEmbedder = null,
   photoTextReader = null,
   aiLlmModelOverrides = {},
   microsoftIdentityVerifier,
@@ -1210,14 +1226,34 @@ export function createApp({
     app.route("/", gradingTranscriptRoutes(database));
     // Report card comments, attendance and conduct (000209).
     app.route("/", gradingReportCardRoutes(database));
+    // Arabic + English documents: the language each document type is issued in (000264).
+    app.route("/", gradingDocumentLanguageRoutes(database));
     // External exams and test scores: SAT, IELTS, IGCSE finals... (000255).
     app.route("/", externalExamRoutes(database));
+    // Exam entries: sessions of those exams and the students entered for them (000262).
+    app.route("/", examEntryRoutes(database));
     // Predicted grades (000254).
     app.route("/", gradingPredictedGradesRoutes(database));
+    // Subject coordinators (000261).
+    app.route("/", gradingCoordinatorRoutes(database));
+    // IB Diploma total: core grades and the predicted total (000263).
+    app.route("/", gradingDiplomaRoutes(database));
     // Curriculum templates (IGCSE, IB, American...) applied to a year's grades.
     app.route("/", gradingCurriculumTemplateRoutes(database));
     // Graduation requirements: the credits, subjects, GPA and exams a diploma needs (000258).
     app.route("/", graduationRequirementRoutes(database));
+    // Ministry results export: configurable templates over finalized results (000265).
+    // `recordKeyring` opens a sensitive national ID for a download (ADR-019).
+    app.route("/", ministryExportRoutes(database, recordKeyring));
+    // Exam weeks: exam periods, their timetable, rooms, seating and invigilators (000266).
+    app.route("/", examWeekRoutes(database));
+    // Remedial plans for struggling students: plans, follow-up and suggestions (000269).
+    app.route("/", remedialPlanRoutes(database));
+    // Learning outcomes and their achievement; lesson and term plans with review (000268).
+    app.route("/", learningOutcomeRoutes(database));
+    app.route("/", academicPlanRoutes(database));
+    // Tawjihi equivalency estimates and multi-year results (000267).
+    app.route("/", academicEquivalencyRoutes(database));
   }
 
   // Gradebook configuration (ST-112). Weighted assessment categories per gradebook and
@@ -1496,12 +1532,9 @@ export function createApp({
   // would spend unbilled budget, so the whole surface is absent rather than un-metered.
   if (database && redis && entitlements && featureService) {
     const aiMeter = createAiTokenMeter({ redis });
-    // Retrieval is lexical-only (ADR-020, QA-15/F-06). The only embedder in the repository is the
-    // deterministic mock, whose vectors carry no meaning, so no query embedder is wired and both
-    // retrieval surfaces below run the keyword leg alone. Re-enabling the semantic leg means
-    // wiring a real provider here AND in the ingestion worker under one model id, then running the
-    // re-embed procedure — see the ADR — never passing createDeterministicQueryEmbedder() here.
-    const aiQueryEmbedder: QueryEmbedder | null = null;
+    // Retrieval embeds questions with aiQueryEmbedder when index.ts built one (ADR-024): the
+    // semantic leg then compares them with chunks the ingestion worker embedded by the same model.
+    // Without one, both retrieval surfaces below run the keyword leg alone (ADR-020).
     // A per-student AI route is the student's own: refused for anyone else in the school before
     // consent, quota or the handler run.
     app.use("/api/ai/students/:studentId/*", aiStudentSelfGate({ database }));
@@ -1551,7 +1584,7 @@ export function createApp({
     // AI data-sharing consent (ST-305): the disclosure, grant, and withdrawal. Not behind
     // requireFeature -- it never reaches the provider, and withdrawal must work without an add-on.
     app.route("/", aiConsentRoutes({ database }));
-    // Retrieval (ST-162; lexical-only per ADR-020). Mounted under the same gate so a search
+    // Retrieval (ST-162; semantic per ADR-024 when an embedder is wired, else lexical per ADR-020). Mounted under the same gate so a search
     // reserves and commits the caller's AI quota, and only when the gate's dependencies (a database
     // for entitlements, Redis for the meter) exist — the retrieval surface must never run un-metered. Cross-encoder
     // re-ranking (ST-163) rides the `ai.rerank` feature flag: off (the default), the route returns

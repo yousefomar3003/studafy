@@ -7,6 +7,7 @@ import '../../../../core/api/generated/models/published_grade.dart';
 import '../../../../core/api/generated/models/published_term_summary.dart';
 import '../../../../design/kit/kit.dart';
 import '../../../../design/tokens/app_spacing_tokens.dart';
+import '../../../exam_weeks/presentation/exam_timetable_screen.dart';
 import '../../../student/application/released_marks_providers.dart';
 import '../../../student/domain/recent_grades.dart';
 import '../../../student/presentation/academic_results_screen.dart';
@@ -70,6 +71,7 @@ class ChildGradesView extends ConsumerWidget {
         ),
         const SizedBox(height: AppSpacing.space12),
         _OfficialResultsTile(studentId: studentId, studentName: studentName),
+        ExamTimetableTile(studentId: studentId, studentName: studentName),
         const SizedBox(height: AppSpacing.space24),
         const _KindHeader(kind: GradeKind.assignment),
         const SizedBox(height: AppSpacing.space12),

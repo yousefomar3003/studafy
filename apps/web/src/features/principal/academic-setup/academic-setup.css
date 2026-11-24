@@ -738,6 +738,12 @@
   margin-block-start: var(--space-16);
 }
 
+/* A ministry export preview: as many columns as the template has, scrolled sideways. */
+.ag-table-scroll {
+  overflow-x: auto;
+  max-inline-size: 100%;
+}
+
 @media print {
   /* Print only the certificate when one is on the page, never the portal chrome around it. */
   body:has(.ag-certificate) * {
@@ -762,4 +768,55 @@
   .ag-no-print {
     display: none;
   }
+}
+
+/* Arabic + English documents (000264). An Arabic document reads right to left (dir="rtl" on the
+   article); Arabic text prefers Noto Sans Arabic, the face the server PDFs embed, when installed. */
+.ag-certificate:lang(ar),
+.ag-certificate [lang="ar"],
+.ag-certificate[data-document-language="bilingual"] {
+  font-family: "Noto Sans Arabic", var(--font-family-sans);
+}
+
+.ag-document-preview {
+  margin-block-start: var(--space-16);
+  max-block-size: 40rem;
+  overflow: auto;
+}
+
+@media print {
+  .ag-document-preview {
+    display: none;
+  }
+}
+
+/* Remedial plans (000269) */
+.ag-remedial-counts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ag-prewrap {
+  white-space: pre-wrap;
+}
+
+.ag-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ag-timeline > li {
+  padding-inline-start: var(--space-12);
+  border-inline-start: 2px solid var(--color-border);
+}
+
+/* Lesson and term plans (000268): a plan's free text keeps the teacher's line breaks. */
+.ag-pre {
+  margin-block: 0 var(--space-8);
+  white-space: pre-wrap;
 }

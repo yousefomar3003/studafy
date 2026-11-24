@@ -1,7 +1,7 @@
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in
 import { describe, expect, test } from "bun:test";
 
-import { AI_ASK_MIN_RELEVANCE_SCORE } from "../config";
+import { AI_ASK_MIN_SEMANTIC_SIMILARITY } from "../config";
 import { HYBRID_RRF_K } from "../retrieval/search";
 
 import { assessGrounding } from "./refusal";
@@ -19,36 +19,56 @@ function hit(overrides: Partial<HybridSearchHit> = {}): HybridSearchHit {
     rrfScore: 2 / (HYBRID_RRF_K + 1),
     semanticRank: 1,
     keywordRank: 1,
+    semanticSimilarity: 0.7,
     ...overrides,
   };
 }
 
-/** What the best hit of a lexical-only pass looks like: keyword rank 1, no semantic rank. */
-const lexicalBest = hit({ semanticRank: null, keywordRank: 1, rrfScore: 1 / (HYBRID_RRF_K + 1) });
+/** What the best hit of a lexical-only pass looks like: keyword rank 1, no semantic leg. */
+const lexicalBest = hit({
+  semanticRank: null,
+  semanticSimilarity: null,
+  keywordRank: 1,
+  rrfScore: 1 / (HYBRID_RRF_K + 1),
+});
+
+/** A hit the semantic leg alone found: the question's words are not in it. */
+function semanticOnly(similarity: number): HybridSearchHit {
+  return hit({
+    keywordRank: null,
+    semanticSimilarity: similarity,
+    rrfScore: 1 / (HYBRID_RRF_K + 1),
+  });
+}
 
 describe("assessGrounding", () => {
-  test("the hybrid floor is unreachable by one leg — the reason lexical mode drops it (ADR-020)", () => {
-    expect(1 / (HYBRID_RRF_K + 1)).toBeLessThan(AI_ASK_MIN_RELEVANCE_SCORE);
+  test("a keyword-matched hit is grounded in both modes", () => {
+    expect(assessGrounding([lexicalBest], "lexical")).toEqual({ grounded: true, topics: [] });
+    expect(assessGrounding([lexicalBest], "hybrid").grounded).toBe(true);
   });
 
-  test("hybrid: answers when the best hit clears the floor and matched the keyword leg", () => {
-    expect(assessGrounding([hit()], "hybrid").grounded).toBe(true);
+  test("hybrid: a question asked in other words is grounded by a close enough meaning match", () => {
+    expect(assessGrounding([semanticOnly(AI_ASK_MIN_SEMANTIC_SIMILARITY)], "hybrid").grounded).toBe(
+      true,
+    );
+    expect(assessGrounding([semanticOnly(0.74)], "hybrid").grounded).toBe(true);
   });
 
-  test("hybrid (the default): a keyword-only best hit is refused on the score floor", () => {
-    expect(assessGrounding([lexicalBest]).grounded).toBe(false);
+  test("hybrid: an unrelated question is refused, with the nearest topics offered", () => {
+    const verdict = assessGrounding(
+      [semanticOnly(AI_ASK_MIN_SEMANTIC_SIMILARITY - 0.01)],
+      "hybrid",
+    );
+    expect(verdict.grounded).toBe(false);
+    expect(verdict.topics).toHaveLength(1);
   });
 
-  test("lexical: a keyword-matched best hit is grounded despite its single-leg score", () => {
-    const verdict = assessGrounding([lexicalBest], "lexical");
-    expect(verdict.grounded).toBe(true);
-    expect(verdict.topics).toEqual([]);
+  test("lexical: similarity is never trusted, since no real embedding ran", () => {
+    expect(assessGrounding([semanticOnly(0.9)], "lexical").grounded).toBe(false);
   });
 
-  test("both modes refuse when the best hit missed the keyword leg", () => {
-    const semanticOnly = hit({ keywordRank: null, rrfScore: 0.05 });
-    expect(assessGrounding([semanticOnly], "hybrid").grounded).toBe(false);
-    expect(assessGrounding([semanticOnly], "lexical").grounded).toBe(false);
+  test("hybrid: any keyword-matched hit grounds the question, not only the first", () => {
+    expect(assessGrounding([semanticOnly(0.3), lexicalBest], "hybrid").grounded).toBe(true);
   });
 
   test("both modes refuse with no hits and offer no topics", () => {

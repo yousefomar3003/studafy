@@ -6,7 +6,9 @@ import '../../../design/kit/kit.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
 import '../application/teacher_providers.dart';
 import '../domain/teacher_class.dart';
+import 'coordinator_subjects_screen.dart';
 import 'grading_assignments_screen.dart';
+import 'plan_reviews_screen.dart';
 import 'teacher_class_detail_screen.dart';
 import '../../../design/layout/bottom_inset_padding.dart';
 
@@ -16,7 +18,8 @@ import '../../../design/layout/bottom_inset_padding.dart';
 ///
 /// Led by the "Marks" entry ([GradingAssignmentsScreen]): academic marks are recorded per section
 /// and subject rather than per class, so they get one entry point here instead of a per-class
-/// action, shown whatever state the class list is in.
+/// action, shown whatever state the class list is in. A teacher who coordinates a subject also
+/// gets the "Coordinator" entry ([CoordinatorEntryTile]) beneath it.
 class TeacherClassListScreen extends ConsumerWidget {
   const TeacherClassListScreen({super.key});
 
@@ -31,14 +34,14 @@ class TeacherClassListScreen extends ConsumerWidget {
         error: (error, stackTrace) => const _ScrollableMessage(
           icon: Icons.error_outline,
           messageKey: 'teacher.classes.error',
-          header: MarksEntryTile(),
+          header: _GradingEntries(),
         ),
         data: (list) {
           if (list.isEmpty) {
             return const _ScrollableMessage(
               icon: Icons.school_outlined,
               messageKey: 'teacher.classes.empty',
-              header: MarksEntryTile(),
+              header: _GradingEntries(),
             );
           }
           return ListView.separated(
@@ -50,7 +53,7 @@ class TeacherClassListScreen extends ConsumerWidget {
             separatorBuilder: (context, index) =>
                 const SizedBox(height: AppSpacing.space12),
             itemBuilder: (context, index) => index == 0
-                ? const MarksEntryTile()
+                ? const _GradingEntries()
                 : _ClassTile(summary: list[index - 1]),
           );
         },
@@ -92,6 +95,22 @@ class _ClassTile extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The Marks entry, and the Coordinator and plan review entries for a teacher who coordinates a
+/// subject.
+class _GradingEntries extends StatelessWidget {
+  const _GradingEntries();
+
+  @override
+  Widget build(BuildContext context) => const Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      MarksEntryTile(),
+      CoordinatorEntryTile(),
+      PlanReviewsEntryTile(),
+    ],
+  );
 }
 
 /// Opens the teacher's academic mark sheets ([GradingAssignmentsScreen]): a brand-tinted

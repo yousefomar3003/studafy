@@ -3,6 +3,8 @@ import { HTTPException } from "hono/http-exception";
 
 import { CodedHttpException } from "../../coded-http-exception";
 
+import { cleanNameAr } from "./section-service";
+
 import type { TransactionSql } from "postgres";
 
 // ---------------------------------------------------------------------------
@@ -16,6 +18,8 @@ export interface AcademicYearRow {
   school_id: string;
   code: string;
   name: string;
+  /** Arabic name (000264); null falls back to `name`. */
+  name_ar: string | null;
   starts_on: Date;
   ends_on: Date;
   status: AcademicPeriodStatus;
@@ -32,6 +36,7 @@ export interface ListAcademicYearsParams {
 export interface CreateAcademicYearParams {
   code: string;
   name: string;
+  name_ar?: string | null;
   starts_on: string;
   ends_on: string;
   status?: string;
@@ -40,6 +45,8 @@ export interface CreateAcademicYearParams {
 export interface UpdateAcademicYearParams {
   code?: string;
   name?: string;
+  /** Omitted: unchanged. null or blank: cleared. */
+  name_ar?: string | null;
   starts_on?: string;
   ends_on?: string;
   status?: string;
@@ -60,7 +67,7 @@ export async function listAcademicYears(
 
   const [rows, countResult] = await Promise.all([
     tx<AcademicYearRow[]>`
-      SELECT id, school_id, code, name, starts_on, ends_on, status, created_at, updated_at
+      SELECT id, school_id, code, name, name_ar, starts_on, ends_on, status, created_at, updated_at
       FROM app.academic_years
       WHERE school_id = ${schoolId}
         ${statusFilter}
@@ -85,7 +92,7 @@ export async function getAcademicYear(
   yearId: string,
 ): Promise<AcademicYearRow | undefined> {
   const [row] = await tx<AcademicYearRow[]>`
-    SELECT id, school_id, code, name, starts_on, ends_on, status, created_at, updated_at
+    SELECT id, school_id, code, name, name_ar, starts_on, ends_on, status, created_at, updated_at
     FROM app.academic_years
     WHERE id = ${yearId} AND school_id = ${schoolId}
   `;
@@ -101,16 +108,17 @@ export async function createAcademicYear(
   await validateNoDateOverlap(tx, schoolId, params.starts_on, params.ends_on);
 
   const [row] = await tx<AcademicYearRow[]>`
-    INSERT INTO app.academic_years (school_id, code, name, starts_on, ends_on, status)
+    INSERT INTO app.academic_years (school_id, code, name, name_ar, starts_on, ends_on, status)
     VALUES (
       ${schoolId},
       ${params.code},
       ${params.name},
+      ${cleanNameAr(params.name_ar)},
       ${params.starts_on}::date,
       ${params.ends_on}::date,
       ${params.status ?? "planned"}::app.academic_period_status
     )
-    RETURNING id, school_id, code, name, starts_on, ends_on, status, created_at, updated_at
+    RETURNING id, school_id, code, name, name_ar, starts_on, ends_on, status, created_at, updated_at
   `;
 
   return row!;
@@ -137,12 +145,14 @@ export async function updateAcademicYear(
     UPDATE app.academic_years
     SET code = COALESCE(${params.code ?? null}, code),
         name = COALESCE(${params.name ?? null}, name),
+        name_ar = CASE WHEN ${params.name_ar !== undefined}
+          THEN ${cleanNameAr(params.name_ar)}::text ELSE name_ar END,
         starts_on = COALESCE(${params.starts_on ? params.starts_on : null}::date, starts_on),
         ends_on = COALESCE(${params.ends_on ? params.ends_on : null}::date, ends_on),
         status = COALESCE(${params.status ?? null}::app.academic_period_status, status),
         updated_at = CURRENT_TIMESTAMP
     WHERE id = ${yearId} AND school_id = ${schoolId}
-    RETURNING id, school_id, code, name, starts_on, ends_on, status, created_at, updated_at
+    RETURNING id, school_id, code, name, name_ar, starts_on, ends_on, status, created_at, updated_at
   `;
 
   if (!row) {

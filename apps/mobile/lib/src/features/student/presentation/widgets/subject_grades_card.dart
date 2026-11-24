@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/api/generated/models/published_grade.dart';
+import '../../../../core/localization/localized_name.dart';
 import '../../../../design/tokens/app_radius_tokens.dart';
 import '../../../../design/tokens/app_spacing_tokens.dart';
 import '../../domain/grade_report.dart';
@@ -45,7 +46,7 @@ class SubjectGradesCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        subject.courseName,
+                        context.localizedName(subject.courseName, subject.subjectNameAr),
                         style: textTheme.titleMedium,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,

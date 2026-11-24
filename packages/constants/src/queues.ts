@@ -206,6 +206,10 @@ export const JOB_NAMES = {
   // the sweep runs app.delete_expired_ai_messages() per school until a batch comes back short.
   // Registered on the maintenance queue via Job Scheduler.
   PURGE_EXPIRED_AI_MESSAGES: "purge-expired-ai-messages",
+  // Scheduled re-embed of material chunks whose vectors are not from the live embedding model
+  // (ADR-024): the pre-ADR-024 mock vectors, outage fallbacks, or an older model. Carries no payload.
+  // Registered on the maintenance queue via Job Scheduler; a no-op without AI_EMBEDDING_MODEL.
+  REEMBED_STALE_CHUNKS: "reembed-stale-chunks",
   // Scheduled creation of the coming months' partitions of the monthly-partitioned tables
   // (app.audit_logs, app.attendance_sessions, app.attendance_records). Neither family has a default
   // partition, so a write dated in a month with no partition fails; this keeps three months ready.

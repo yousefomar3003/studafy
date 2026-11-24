@@ -33,11 +33,13 @@ export function GradeLevelModal({ open, grade, nextSortOrder, onClose }: GradeLe
   const update = useUpdateGradeLevel();
   const saving = grade ? update : create;
   const [name, setName] = useState("");
+  const [nameAr, setNameAr] = useState("");
   const [sortOrder, setSortOrder] = useState("0");
 
   useEffect(() => {
     if (!open) return;
     setName(grade?.name ?? "");
+    setNameAr(grade?.name_ar ?? "");
     setSortOrder(String(grade?.sort_order ?? nextSortOrder));
   }, [open, grade, nextSortOrder]);
 
@@ -51,7 +53,11 @@ export function GradeLevelModal({ open, grade, nextSortOrder, onClose }: GradeLe
 
   function handleSubmit() {
     if (!canSubmit) return;
-    const body = { name: name.trim(), sort_order: parsedOrder };
+    // A blank Arabic name clears it on an edit and is left out of a new grade.
+    const arabic = nameAr.trim() || null;
+    const body = grade
+      ? { name: name.trim(), name_ar: arabic, sort_order: parsedOrder }
+      : { name: name.trim(), sort_order: parsedOrder, ...(arabic ? { name_ar: arabic } : {}) };
     const onSuccess = () => {
       show({
         variant: "success",
@@ -94,6 +100,15 @@ export function GradeLevelModal({ open, grade, nextSortOrder, onClose }: GradeLe
             maxLength={MAX_NAME_LENGTH}
             placeholder={t("principal.sections.gradeModal.namePlaceholder")}
             onChange={(event) => setName(event.target.value)}
+          />
+          <Input
+            label={t("principal.sections.nameAr")}
+            helperText={t("principal.sections.nameArHelper")}
+            value={nameAr}
+            maxLength={MAX_NAME_LENGTH}
+            dir="rtl"
+            lang="ar"
+            onChange={(event) => setNameAr(event.target.value)}
           />
           <Input
             label={t("principal.sections.gradeModal.sortOrder")}

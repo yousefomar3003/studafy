@@ -28,8 +28,9 @@ import type { TransactionSql } from "postgres";
  */
 export interface StudentSubjectMarks {
   grading_method: "weighted" | "total_points" | "descriptive";
-  result_format: ResultFormatKind;
-  /** 100 for percentage; the grade's out-of or GPA maximum otherwise. */
+  /** A points_total (IB Diploma) grade shows one subject as its points, like a GPA. */
+  result_format: Exclude<ResultFormatKind, "points_total">;
+  /** 100 for percentage; the grade's out-of or GPA maximum otherwise (a diploma subject: 7). */
   result_scale_max: number;
   /** The student is exempt from the subject: no result, no marks expected. */
   exempt: boolean;
@@ -91,10 +92,18 @@ export async function getStudentSubjectMarks(
   } catch {
     return "not_configured";
   }
-  const format = program.result_format;
-  const scaleMax = format === "percentage" ? 100 : Number(program.result_scale_max ?? 100);
-
   const engine = toEngineConfig(loaded, { sectionId });
+  // An IB Diploma grade (points_total) totals its subjects' points out of 45; one subject on its
+  // own is its points on the scale (1-7), shown like a GPA out of the scale's highest points.
+  const diplomaSubject = program.result_format === "points_total";
+  const format: StudentSubjectMarks["result_format"] =
+    program.result_format === "points_total" ? "gpa" : program.result_format;
+  const scaleMax =
+    format === "percentage"
+      ? 100
+      : diplomaSubject
+        ? Math.max(0, ...engine.scale.map((band) => band.gpaPoints ?? 0)) || 7
+        : Number(program.result_scale_max ?? 100);
   const visible = loaded.assessments.filter(
     (assessment) =>
       assessment.status === "active" &&

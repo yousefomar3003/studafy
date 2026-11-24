@@ -444,6 +444,76 @@ const IELTS_EXAM = {
   updated_at: "2026-09-01T00:00:00.000Z",
 };
 
+const IGCSE_SESSION = {
+  id: "session-igcse",
+  exam: {
+    id: "exam-igcse",
+    code: "IGCSE",
+    name: "IGCSE (A*-G)",
+    per_subject: true,
+    archived: false,
+  },
+  series: "May/June 2027",
+  entry_deadline: "2027-02-21",
+  starts_on: "2027-04-27",
+  ends_on: "2027-06-10",
+  results_date: "2027-08-12",
+  note: null,
+  draft_count: 1,
+  entered_count: 1,
+  withdrawn_count: 0,
+  created_at: "2026-09-01T00:00:00.000Z",
+  updated_at: "2026-09-01T00:00:00.000Z",
+};
+
+const examEntry = (id: string, first: string, status: string, candidate: string | null) => ({
+  id,
+  session_id: "session-igcse",
+  student: {
+    id: `stu-${first.toLowerCase()}`,
+    admission_number: `A-${first}`,
+    first_name: first,
+    last_name: "Haddad",
+    grade_level_name: "Grade 10",
+    section_name: "C",
+  },
+  candidate_number: candidate,
+  status,
+  note: null,
+  subjects: [
+    {
+      subject_id: "sub-math",
+      code: "IG-MATH",
+      name: "IGCSE Mathematics",
+      tier: "Extended",
+      option_code: "0580",
+    },
+  ],
+  result_count: 0,
+  entered_at: status === "draft" ? null : "2026-10-01T00:00:00.000Z",
+  withdrawn_at: null,
+  created_at: "2026-09-01T00:00:00.000Z",
+  updated_at: "2026-09-01T00:00:00.000Z",
+});
+
+const SESSION_ENTRIES = {
+  session: IGCSE_SESSION,
+  entries: [
+    examEntry("entry-lina", "Lina", "entered", "JO-0001"),
+    examEntry("entry-sami", "Sami", "draft", null),
+  ],
+  subject_counts: [
+    {
+      subject_id: "sub-math",
+      code: "IG-MATH",
+      name: "IGCSE Mathematics",
+      draft: 1,
+      entered: 1,
+      withdrawn: 0,
+    },
+  ],
+};
+
 const EXTERNAL_EXAM_PRESETS = [
   {
     key: "tawjihi",
@@ -535,12 +605,154 @@ const GRADUATION_REPORT = {
   ],
 };
 
+const MATH_COORDINATOR = {
+  id: "coord-1",
+  academic_year_id: "year-1",
+  subject_id: "sub-math",
+  subject_code: "MTH",
+  subject_name: "Mathematics",
+  user_id: "user-omar",
+  user_name: "Omar Aziz",
+  grade_levels: [{ id: "grade-10", name: "Grade 10" }],
+  ...STAMP,
+};
+
+const PLANNING_SETTINGS = {
+  show_outcomes_on_report_cards: false,
+  lesson_plan_lead_days: 1,
+  term_plan_due_days: 7,
+  achievement_levels: [
+    { level: 1, label: "Beginning", label_ar: null },
+    { level: 2, label: "Developing", label_ar: null },
+    { level: 3, label: "Meeting", label_ar: null },
+    { level: 4, label: "Exceeding", label_ar: null },
+  ],
+  achievement_levels_default: true,
+};
+
+const FRACTIONS_OUTCOME = {
+  id: "outcome-1",
+  subject_id: "sub-math",
+  subject_code: "MTH",
+  subject_name: "Mathematics",
+  grade_level_id: "grade-10",
+  grade_level_name: "Grade 10",
+  code: "M10.1",
+  text: "Adds fractions",
+  text_ar: "يجمع الكسور",
+  strand: "Number",
+  sort_order: 1,
+  archived: false,
+  in_use: true,
+  ...STAMP,
+};
+
+const PLAN_HEADER = {
+  academic_year_id: "year-1",
+  term_id: "term-1",
+  term_name: "Term 1",
+  section_id: "sec-10c",
+  section_name: "C",
+  grade_level_id: "grade-10",
+  grade_level_name: "Grade 10",
+  subject_id: "sub-math",
+  subject_name: "Mathematics",
+  author_user_id: "user-2",
+  author_name: "Omar Aziz",
+  status: "submitted",
+  first_submitted_at: "2026-09-12T08:00:00.000Z",
+  submitted_at: "2026-09-12T08:00:00.000Z",
+  reviewed_at: null,
+  reviewed_by_user_id: null,
+  reviewed_by_name: null,
+  review_comment: null,
+  due_on: "2026-09-08",
+  on_time: false,
+  ...STAMP,
+};
+
+const TERM_PLAN = {
+  ...PLAN_HEADER,
+  id: "plan-1",
+  can_edit: false,
+  can_submit: false,
+  can_delete: false,
+  can_review: true,
+  notes: "Number first",
+  weeks: [
+    {
+      week_number: 1,
+      starts_on: null,
+      unit: "Fractions",
+      notes: null,
+      outcomes: [
+        { id: "outcome-1", code: "M10.1", text: "Adds fractions", text_ar: null, strand: null },
+      ],
+    },
+  ],
+};
+
+const PLAN_COVERAGE = {
+  academic_year_id: "year-1",
+  term_id: "term-1",
+  term_name: "Term 1",
+  rows: [
+    {
+      section_id: "sec-10c",
+      section_name: "C",
+      grade_level_name: "Grade 10",
+      subject_id: "sub-math",
+      subject_name: "Mathematics",
+      teacher_names: ["Omar Aziz"],
+      term_plan: {
+        id: "plan-1",
+        status: "submitted",
+        submitted_at: "2026-09-12T08:00:00.000Z",
+        on_time: false,
+      },
+      term_plan_due_on: "2026-09-08",
+      lesson_plans: {
+        total: 4,
+        draft: 1,
+        submitted: 1,
+        approved: 2,
+        returned: 0,
+        on_time: 2,
+        late: 1,
+        overdue: 1,
+      },
+      outcomes: { total: 6, covered: 3 },
+    },
+  ],
+};
+
 const GET_RESPONSES: Record<string, unknown> = {
+  "/api/grading/planning-settings": PLANNING_SETTINGS,
+  "/api/grading/learning-outcomes": { outcomes: [FRACTIONS_OUTCOME] },
+  "/api/grading/plan-coverage": PLAN_COVERAGE,
+  "/api/grading/plan-reviews": {
+    academic_year_id: "year-1",
+    status: "submitted",
+    term_plans: [
+      { ...PLAN_HEADER, id: "plan-1", week_count: 1, outcome_count: 1, can_review: true },
+    ],
+    lesson_plans: [],
+  },
+  "/api/grading/term-plans/{planId}": TERM_PLAN,
+  "/api/grading/years/{yearId}/subject-coordinators": { coordinators: [MATH_COORDINATOR] },
   "/api/grading/graduation-requirement-sets": { sets: [DIPLOMA] },
   "/api/grading/graduation-requirements/report": GRADUATION_REPORT,
   "/api/grading/external-exams": { exams: [IELTS_EXAM] },
   "/api/grading/external-exam-presets": { presets: EXTERNAL_EXAM_PRESETS },
+  "/api/grading/external-exam-sessions": { sessions: [IGCSE_SESSION] },
+  "/api/grading/external-exam-sessions/{sessionId}/entries": SESSION_ENTRIES,
   "/api/grading/report-card-settings": REPORT_SETTINGS,
+  "/api/grading/document-language-settings": {
+    report_card_language: "viewer",
+    certificate_language: "viewer",
+    transcript_language: "viewer",
+    school_name_ar: null,
+  },
   "/api/grading/sections/{sectionId}/report-notes": REPORT_NOTES,
   "/api/grading/certificates/{certificateId}": CERTIFICATE,
   "/api/academics/years": { academic_years: [YEAR], total: 1 },
@@ -610,6 +822,25 @@ const GET_RESPONSES: Record<string, unknown> = {
     ],
   },
   "/api/grading/certificates": { certificates: [] },
+  "/api/grading/sections/{sectionId}/diploma-core": {
+    section_id: "sec-10c",
+    section_name: "C",
+    grade_level_name: "Grade 10",
+    academic_year_id: "year-1",
+    enabled: true,
+    predicted_enabled: false,
+    editable: true,
+    students: [
+      {
+        student_id: "s-1",
+        first_name: "Lina",
+        last_name: "Haddad",
+        admission_number: "ADM-s-1",
+        final: { tok_grade: "B", ee_grade: null, cas_complete: true, updated_at: STAMP.updated_at },
+        predicted: null,
+      },
+    ],
+  },
   "/api/grading/years/{yearId}/proposed-assessments": { assessments: [] },
   "/api/grading/years/{yearId}/assessment-releases": {
     releases: [
@@ -676,8 +907,11 @@ const putMock = mock((_path: string, _init?: unknown) =>
 const deleteMock = mock((_path: string, _init?: unknown) =>
   Promise.resolve<unknown>({ data: undefined }),
 );
+const patchMock = mock((_path: string, _init?: unknown) =>
+  Promise.resolve<unknown>({ data: { ...MATH_COORDINATOR, grade_levels: [] } }),
+);
 mock.module("../../../lib/api", () => ({
-  api: { GET: getMock, POST: postMock, PUT: putMock, DELETE: deleteMock },
+  api: { GET: getMock, POST: postMock, PUT: putMock, PATCH: patchMock, DELETE: deleteMock },
 }));
 
 async function renderAt(tab: string) {
@@ -716,6 +950,7 @@ afterEach(() => {
     Promise.resolve<unknown>({ data: { config: MATH_CONFIG, affected_section_ids: [] } }),
   );
   deleteMock.mockClear();
+  patchMock.mockClear();
 });
 
 describe("AcademicSetupPage", () => {
@@ -880,6 +1115,59 @@ describe("AcademicSetupPage", () => {
       rank_basis: "average",
       rank_scope: "grade_level",
       rank_visibility: "students_and_parents",
+    });
+  });
+
+  test("a grade can show its result as the IB Diploma total, with the IB rules as editable defaults", async () => {
+    await renderAt("/subjects");
+
+    fireEvent.click(await screen.findByRole("combobox", { name: "Final result shown as" }));
+    fireEvent.click(
+      screen.getByRole("option", { name: "IB Diploma points total (e.g. out of 45)" }),
+    );
+    const max = screen.getByRole("spinbutton", { name: /Total out of/ }) as HTMLInputElement;
+    expect(max.value).toBe("45");
+    // The defaults are labelled as editable IB values the school must check.
+    expect(screen.getByText(/stored as editable defaults/)).toBeTruthy();
+    const counted = screen.getByRole("spinbutton", {
+      name: /Subjects counted/,
+    }) as HTMLInputElement;
+    expect(counted.value).toBe("6");
+    fireEvent.change(screen.getByRole("spinbutton", { name: "D / D" }), {
+      target: { value: "1" },
+    });
+    putMock.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "Save policies" }));
+
+    await waitFor(() => expect(putMock).toHaveBeenCalledTimes(1));
+    const [, init] = putMock.mock.calls[0]! as [
+      string,
+      { body: { diploma_config: { core_matrix: { tok: string; ee: string; points: number }[] } } },
+    ];
+    expect(init.body).toMatchObject({ result_format: "points_total", result_scale_max: 45 });
+    expect(init.body.diploma_config).toMatchObject({ counted_subjects: 6 });
+    expect(init.body.diploma_config.core_matrix).toHaveLength(25);
+    expect(init.body.diploma_config.core_matrix).toContainEqual({ tok: "D", ee: "D", points: 1 });
+    expect(init.body.diploma_config.core_matrix).toContainEqual({ tok: "A", ee: "A", points: 3 });
+  });
+
+  test("leadership enters a section's IB Diploma core grades", async () => {
+    await renderAt("/results");
+
+    const heading = await screen.findByRole("heading", { name: "IB Diploma core grades" });
+    const panel = heading.closest("section")!;
+    const row = within(panel).getByText("ADM-s-1").closest("tr")!;
+    fireEvent.click(within(row).getByRole("combobox", { name: "Extended Essay" }));
+    fireEvent.click(screen.getByRole("option", { name: "A" }));
+    putMock.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "Save core grades" }));
+
+    await waitFor(() => expect(putMock).toHaveBeenCalledTimes(1));
+    const [path, init] = putMock.mock.calls[0]! as [string, { body: Record<string, unknown> }];
+    expect(path).toBe("/api/grading/sections/{sectionId}/diploma-core");
+    expect(init.body).toEqual({
+      kind: "final",
+      grades: [{ student_id: "s-1", tok_grade: "B", ee_grade: "A", cas_complete: true }],
     });
   });
 
@@ -1290,6 +1578,309 @@ describe("AcademicSetupPage", () => {
     expect((within(listening).getByLabelText(/Part name/) as HTMLInputElement).disabled).toBe(
       false,
     );
+  });
+
+  test("lists the year's subject coordinators, adds one and widens one to every grade", async () => {
+    // A subject and a teacher to pick, for this test only.
+    RESPONSES_BY_PATH.set("/api/academics/subjects", {
+      subjects: [{ id: "sub-sci", code: "SCI", name: "Science", ...STAMP }],
+      total: 1,
+    });
+    RESPONSES_BY_PATH.set("/api/teachers", {
+      teachers: [{ id: "teacher-lina", user_id: "user-lina", employee_number: "T-9" }],
+      next_cursor: null,
+    });
+    RESPONSES_BY_PATH.set("/api/users", {
+      users: [{ id: "user-lina", display_name: "Lina Saleh" }],
+      next_cursor: null,
+    });
+    try {
+      const { container } = await renderAt("/coordinators");
+      const edit = await screen.findByRole("button", {
+        name: "Edit Omar Aziz as Mathematics coordinator",
+      });
+      expect(within(edit.closest("tr")!).getByText("Grade 10")).toBeTruthy();
+      await expectNoA11yViolations(container);
+
+      fireEvent.click(screen.getByRole("button", { name: "Add coordinator" }));
+      const save = await screen.findByRole("button", { name: "Save" });
+      expect((save as HTMLButtonElement).disabled).toBe(true);
+      fireEvent.click(screen.getByRole("combobox", { name: /^Subject/ }));
+      fireEvent.click(await screen.findByRole("option", { name: "Science" }));
+      fireEvent.click(screen.getByRole("combobox", { name: /^Coordinator/ }));
+      fireEvent.click(await screen.findByRole("option", { name: "Lina Saleh" }));
+      fireEvent.click(await screen.findByLabelText("Grade 10"));
+      await waitFor(() => expect((save as HTMLButtonElement).disabled).toBe(false));
+      fireEvent.click(save);
+      await waitFor(() => expect(postMock).toHaveBeenCalledTimes(1));
+      const [path, init] = postMock.mock.calls[0] as [string, { params: unknown; body: unknown }];
+      expect(path).toBe("/api/grading/years/{yearId}/subject-coordinators");
+      expect(init.params).toEqual({ path: { yearId: "year-1" } });
+      expect(init.body).toEqual({
+        subject_id: "sub-sci",
+        user_id: "user-lina",
+        grade_level_ids: ["grade-10"],
+      });
+
+      // Unticking the only grade covers every grade that takes the subject.
+      fireEvent.click(
+        await screen.findByRole("button", { name: "Edit Omar Aziz as Mathematics coordinator" }),
+      );
+      const dialog = await screen.findByRole("dialog");
+      fireEvent.click(within(dialog).getByLabelText("Grade 10"));
+      fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+      await waitFor(() => expect(patchMock).toHaveBeenCalledTimes(1));
+      const [patchPath, patchInit] = patchMock.mock.calls[0] as [
+        string,
+        { params: unknown; body: unknown },
+      ];
+      expect(patchPath).toBe("/api/grading/subject-coordinators/{coordinatorId}");
+      expect(patchInit).toEqual({
+        params: { path: { coordinatorId: "coord-1" } },
+        body: { grade_level_ids: [] },
+      });
+    } finally {
+      RESPONSES_BY_PATH.set("/api/academics/subjects", { subjects: [], total: 0 });
+      RESPONSES_BY_PATH.delete("/api/teachers");
+      RESPONSES_BY_PATH.delete("/api/users");
+    }
+  });
+
+  test("adds an exam session with its series and dates", async () => {
+    await renderAt("/exam-entries");
+    expect(await screen.findByText("May/June 2027")).toBeTruthy();
+    expect(screen.getByText("1 entered · 1 draft · 0 withdrawn")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Add a session" }));
+    fireEvent.click(await screen.findByRole("combobox", { name: /^Exam/ }));
+    fireEvent.click(await screen.findByRole("option", { name: "IELTS Academic" }));
+    fireEvent.change(screen.getByLabelText(/^Series/), { target: { value: "April 2027" } });
+    fireEvent.change(screen.getByLabelText("First exam"), { target: { value: "2027-04-03" } });
+    fireEvent.change(screen.getByLabelText("Last exam"), { target: { value: "2027-04-01" } });
+    // The last exam cannot come before the first.
+    expect(
+      await screen.findByText("Give the first exam date, on or before the last one."),
+    ).toBeTruthy();
+    expect(
+      (screen.getByRole("button", { name: "Save session" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+    fireEvent.change(screen.getByLabelText("Last exam"), { target: { value: "2027-04-10" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save session" }));
+    await waitFor(() => expect(postMock).toHaveBeenCalledTimes(1));
+    const [path, init] = postMock.mock.calls[0] as [string, { body: unknown }];
+    expect(path).toBe("/api/grading/external-exam-sessions");
+    expect(init.body).toEqual({
+      exam_id: "exam-ielts",
+      series: "April 2027",
+      entry_deadline: null,
+      starts_on: "2027-04-03",
+      ends_on: "2027-04-10",
+      results_date: null,
+      note: null,
+    });
+  });
+
+  test("opens a session: subject counts, entering a section, and marking drafts entered", async () => {
+    RESPONSES_BY_PATH.set("/api/academics/subjects", {
+      subjects: [{ id: "sub-math", code: "IG-MATH", name: "IGCSE Mathematics", ...STAMP }],
+      total: 1,
+    });
+    try {
+      const { container } = await renderAt("/exam-entries");
+      fireEvent.click(
+        await screen.findByRole("button", { name: "Open IGCSE (A*-G) — May/June 2027" }),
+      );
+      expect(
+        await screen.findByRole("heading", { name: "IGCSE (A*-G) — May/June 2027" }),
+      ).toBeTruthy();
+      const counts = screen.getByRole("table", { name: "Students per subject" });
+      expect(within(counts).getByText("IGCSE Mathematics")).toBeTruthy();
+      expect(rowOf("Lina Haddad").textContent).toContain("JO-0001");
+      expect(rowOf("Lina Haddad").textContent).toContain("IGCSE Mathematics · Extended · 0580");
+      await expectNoA11yViolations(container);
+
+      // Enter section C for Mathematics, Core tier.
+      fireEvent.click(screen.getByRole("combobox", { name: "Section" }));
+      fireEvent.click(await screen.findByRole("option", { name: "Grade 10 – C" }));
+      fireEvent.click(await screen.findByLabelText("IGCSE Mathematics"));
+      fireEvent.change(screen.getByLabelText(/^Tier for IGCSE Mathematics/), {
+        target: { value: "Core" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Enter students" }));
+      await waitFor(() => expect(postMock).toHaveBeenCalledTimes(1));
+      expect(postMock.mock.calls[0]).toEqual([
+        "/api/grading/external-exam-sessions/{sessionId}/entries",
+        {
+          params: { path: { sessionId: "session-igcse" } },
+          body: {
+            section_id: "sec-10c",
+            subjects: [{ subject_id: "sub-math", tier: "Core", option_code: null }],
+            status: "draft",
+          },
+        },
+      ]);
+
+      // Only the selected draft is marked entered; withdrawing needs an entered one.
+      fireEvent.click(screen.getByRole("checkbox", { name: "Select Sami Haddad" }));
+      expect(
+        (screen.getByRole("button", { name: "Withdraw (0)" }) as HTMLButtonElement).disabled,
+      ).toBe(true);
+      fireEvent.click(screen.getByRole("button", { name: "Mark entered (1)" }));
+      await waitFor(() => expect(postMock).toHaveBeenCalledTimes(2));
+      expect(postMock.mock.calls[1]).toEqual([
+        "/api/grading/external-exam-sessions/{sessionId}/entries/status",
+        {
+          params: { path: { sessionId: "session-igcse" } },
+          body: { entry_ids: ["entry-sami"], status: "entered" },
+        },
+      ]);
+      // Only a draft can be deleted.
+      expect(
+        screen.queryByRole("button", { name: "Delete the draft entry of Lina Haddad" }),
+      ).toBeNull();
+      expect(
+        screen.getByRole("button", { name: "Delete the draft entry of Sami Haddad" }),
+      ).toBeTruthy();
+    } finally {
+      RESPONSES_BY_PATH.set("/api/academics/subjects", { subjects: [], total: 0 });
+    }
+  });
+
+  test("sets the document language and the school's Arabic name, with a preview", async () => {
+    await renderAt("/report-cards");
+
+    fireEvent.click(await screen.findByRole("combobox", { name: "Certificates" }));
+    fireEvent.click(await screen.findByRole("option", { name: "Arabic" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "School name in Arabic" }), {
+      target: { value: "مدرسة النور" },
+    });
+
+    // The preview follows the unsaved choice: an Arabic certificate reads right to left.
+    fireEvent.click(screen.getByRole("button", { name: "Show preview" }));
+    const preview = await screen.findByTestId("document-language-preview");
+    const article = within(preview).getByRole("article");
+    expect(article.getAttribute("dir")).toBe("rtl");
+    expect(within(article).getByText("مدرسة النور")).toBeTruthy();
+
+    putMock.mockImplementation(() =>
+      Promise.resolve<unknown>({
+        data: {
+          report_card_language: "viewer",
+          certificate_language: "ar",
+          transcript_language: "viewer",
+          school_name_ar: "مدرسة النور",
+        },
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Save document settings" }));
+    await waitFor(() =>
+      expect(putMock).toHaveBeenCalledWith("/api/grading/document-language-settings", {
+        body: {
+          report_card_language: "viewer",
+          certificate_language: "ar",
+          transcript_language: "viewer",
+          school_name_ar: "مدرسة النور",
+        },
+      }),
+    );
+  });
+
+  test("learning outcomes: the scale, the catalogue, a new outcome and a checked CSV import", async () => {
+    RESPONSES_BY_PATH.set("/api/academics/subjects", {
+      subjects: [{ id: "sub-math", code: "MTH", name: "Mathematics", ...STAMP }],
+      total: 1,
+    });
+    try {
+      const { container } = await renderAt("/learning-outcomes");
+      const row = (await screen.findByText("Adds fractions")).closest("tr")!;
+      expect(within(row).getByText("M10.1")).toBeTruthy();
+      // Used by achievement or plans: archive only, no delete.
+      expect(within(row).queryByRole("button", { name: "Delete outcome M10.1" })).toBeNull();
+      expect(screen.getByLabelText("Level 4")).toBeTruthy();
+      await expectNoA11yViolations(container);
+
+      fireEvent.click(screen.getByRole("button", { name: "Add outcome" }));
+      const dialog = await screen.findByRole("dialog");
+      fireEvent.click(within(dialog).getByRole("combobox", { name: /^Subject/ }));
+      fireEvent.click(await within(dialog).findByRole("option", { name: "Mathematics" }));
+      fireEvent.click(within(dialog).getByRole("combobox", { name: /^Grade/ }));
+      fireEvent.click(await within(dialog).findByRole("option", { name: "Grade 10" }));
+      fireEvent.change(within(dialog).getByLabelText(/^Code/), { target: { value: "M10.2" } });
+      fireEvent.change(within(dialog).getByLabelText(/^Outcome \(English\)/), {
+        target: { value: "Ratios" },
+      });
+      fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+      await waitFor(() => expect(postMock).toHaveBeenCalledTimes(1));
+      const [path, init] = postMock.mock.calls[0] as [string, { body: unknown }];
+      expect(path).toBe("/api/grading/learning-outcomes");
+      expect(init.body).toEqual({
+        subject_id: "sub-math",
+        grade_level_id: "grade-10",
+        code: "M10.2",
+        text: "Ratios",
+        text_ar: null,
+        strand: null,
+        sort_order: 0,
+      });
+      postMock.mockClear();
+
+      postMock.mockImplementation(() =>
+        Promise.resolve<unknown>({
+          data: { applied: false, created: 1, updated: 0, unchanged: 0, errors: [] },
+        }),
+      );
+      fireEvent.click(await screen.findByRole("button", { name: "Import CSV" }));
+      const importDialog = await screen.findByRole("dialog");
+      const apply = within(importDialog).getByRole("button", { name: "Import" });
+      expect((apply as HTMLButtonElement).disabled).toBe(true);
+      fireEvent.change(within(importDialog).getByLabelText(/^Or paste the CSV/), {
+        target: { value: "subject,grade,code,text\nMTH,Grade 10,M10.3,Percentages" },
+      });
+      fireEvent.click(within(importDialog).getByRole("button", { name: "Check" }));
+      expect(await within(importDialog).findByText("1 new, 0 changed, 0 unchanged.")).toBeTruthy();
+      expect(
+        (postMock.mock.calls[0] as [string, { body: { dry_run: boolean } }])[1].body.dry_run,
+      ).toBe(true);
+      await waitFor(() => expect((apply as HTMLButtonElement).disabled).toBe(false));
+    } finally {
+      RESPONSES_BY_PATH.set("/api/academics/subjects", { subjects: [], total: 0 });
+      postMock.mockReset();
+      postMock.mockImplementation((path: string) => {
+        if (path === "/api/grading/finalizations/{finalizationId}/certificates") {
+          return Promise.resolve<unknown>({ data: { issued: ["cert-1"], skipped: [] } });
+        }
+        return Promise.resolve<unknown>({ data: MATH_CONFIG });
+      });
+    }
+  });
+
+  test("plans: term coverage, and a submitted plan returned only with a comment", async () => {
+    const { container } = await renderAt("/plans");
+    const coverageRow = (await screen.findByText("2 approved", { exact: false })).closest("tr")!;
+    expect(within(coverageRow).getByText("3 of 6")).toBeTruthy();
+    expect(within(coverageRow).getByText("Late")).toBeTruthy();
+    await expectNoA11yViolations(container);
+
+    fireEvent.click(screen.getByRole("button", { name: "Open Term plan: Term 1" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByText("Adds fractions")).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Return" }));
+    expect(
+      await within(dialog).findByText("Say what to change before returning the plan."),
+    ).toBeTruthy();
+    expect(postMock).not.toHaveBeenCalled();
+    fireEvent.change(within(dialog).getByLabelText(/^Comment for the teacher/), {
+      target: { value: "Add week 2" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Return" }));
+    await waitFor(() => expect(postMock).toHaveBeenCalledTimes(1));
+    expect(postMock.mock.calls[0]).toEqual([
+      "/api/grading/term-plans/{planId}/review",
+      {
+        params: { path: { planId: "plan-1" } },
+        body: { decision: "return", comment: "Add week 2" },
+      },
+    ]);
   });
 
   test("has no accessibility violations on the report cards screen", async () => {
