@@ -221,7 +221,7 @@ labels and category names exist in English and Arabic.
 | BTEC                       | Distinction\* 90, Distinction 75, Merit 60, Pass 40, Unclassified                         | percentage | pass 40; assignments 70, practical 30                                                                                           |
 | British Key Stages, IB PYP | descriptors (Greater depth / Expected / Working towards; Exceeding … Beginning)           | percentage | descriptive, one "Attainment" skill per term                                                                                    |
 | IB MYP                     | 1–7 at totals 0, 6, 10, 15, 19, 24, 28 of 32 (as % of 32), GPA points 1–7                 | GPA of 7   | total points; criteria A–D out of 8 per term; max marks 32; pass at grade 3; 3-decimal rounding                                 |
-| IB DP subjects             | 7 80, 6 70, 5 60, 4 50, 3 40, 2 25, 1                                                     | GPA of 7   | pass 40; internal assessment 25, tests 25, end-of-term exam 50; HL/SL as course levels                                          |
+| IB DP subjects             | 7 80, 6 70, 5 60, 4 50, 3 40, 2 25, 1                                                     | 45 points  | pass 40; internal assessment 25, tests 25, end-of-term exam 50; HL/SL as course levels; IB Diploma rules (000262)               |
 | American                   | A+ 97 (4.0) … D 65 (1.0), F (0.0)                                                         | GPA of 4   | pass 65; tests 40, quizzes 20, homework 15, classwork 15, projects 10; 1 credit = coefficient 1; Standard / Honors +0.5 / AP +1 |
 | French                     | Très bien 80, Bien 70, Assez bien 60, Passable 50, Insuffisant                            | out of 20  | max marks 20, pass 50; the school's exam system                                                                                 |
 | Irish Junior Cycle         | Distinction 90, Higher Merit 75, Merit 55, Achieved 40, Partially Achieved 20, Not Graded | percentage | pass 40; the school's exam system                                                                                               |
@@ -314,6 +314,78 @@ Where it shows (`class_rank`: `status` `ranked` / `not_ranked` / `pending`, `bas
   `cohort_size`, `percentile`, `basis`, `scope`) in their immutable content at issue, when the grade
   ranks, the rank is visible to students and parents (the documents are issued to them) and the
   student was ranked. Absent otherwise and on documents issued before 000257.
+
+### IB Diploma total (000262)
+
+A grade program may show its result as the **IB Diploma total**: `result_format = points_total`
+with `result_scale_max` 45. The rules are pure and unit-tested in
+[`@studafy/grading-engine` `diploma.ts`](../../packages/grading-engine/src/diploma.ts):
+
+- **Subject points**: each subject counted in the average (not exempt, not descriptive) gives its
+  grade band's points (`gpa_points`, 1–7 on the IB DP scale). The best `counted_subjects` (6)
+  count; fewer is the `TOO_FEW_SUBJECTS` failing condition. An incomplete counted subject, or a
+  band without points, leaves the total unknown (the publish check warns about such a scale,
+  `DIPLOMA_POINTS_MISSING`).
+- **Core points**: the cell of the TOK × Extended Essay matrix (grades A–E) for the student's two
+  grades. **Total** = subject points + core points, once both are known. CAS carries no points; it
+  is complete or not.
+- **Award conditions** (editable data, one flat row each): `min_total` (24), `cas_complete`,
+  `core_grade_not` (no E in TOK or EE), `max_subjects_at_or_below` (no grade 1; at most two 2s; at
+  most three grades of 3 or below) and `min_level_points` (12 points at HL from the best three, 9 at
+  SL). A level condition applies only when a counted subject has that course level (`course_level`,
+  compared without case), so a school that never sets HL/SL is not failed on it. Not modelled: the
+  "N" (no grade) result and the IB's "two SL subjects need 5 points" variant.
+- **Status**: `not_awarded` as soon as any condition fails (an E in TOK fails even while the EE
+  grade is missing); otherwise `pending` while a subject result, the TOK/EE grade or CAS is missing
+  (`pending_reasons`); otherwise `awarded`. Failing conditions carry the rule, the required and
+  the actual figures.
+
+**The matrix and conditions are editable defaults, not the IB's authority.** `DEFAULT_DIPLOMA_CONFIG`
+is the bonus matrix published for diplomas from 2015 (A/A 3 … D/D 0, any E 0) and the main failing
+conditions. A grade switching to `points_total` starts with them in `grade_programs.diploma_config`
+(jsonb, validated by the engine, NULL for every other format, `ck_grade_programs_diploma_config`);
+the school edits them in Academic setup and must check them against the IB rules in force for its
+exam session. The IB DP curriculum template now applies `points_total` out of 45 with these
+defaults (it keeps a grade's existing rules when applied again). Copying a year copies the rules.
+
+**Core grades** (`app.student_diploma_core_grades`): per student and year, one `final` and one
+`predicted` row with `tok_grade`, `ee_grade` (A–E) and `cas_complete`, each nullable; a row with
+nothing recorded is deleted. Written by school leadership (web, Results) or any teacher of the
+student's section (app; TOK and EE supervisors usually teach the section): `PUT
+/api/grading/sections/{sectionId}/diploma-core`, audited with old and new values. Refused with
+`DIPLOMA_TOTAL_DISABLED` unless the grade is `points_total`, predicted ones with
+`PREDICTED_GRADES_DISABLED` while predicted grades are off, and with `ACADEMIC_CONFIG_LOCKED` once
+the year is finalized. Final core grades are staff data (RLS `app.can_read_student_diploma_core`:
+leadership or a teacher of the student's section that year); predicted ones follow predicted
+grades (`app.can_read_student_predicted_grade`).
+
+**Finalization** reads the final core grades like marks and stores the outcome
+(`student_overall_results.diploma_result`, jsonb snapshot per ADR-017; the total is also
+`result_value`) and the diploma rules in each subject's `config_snapshot.program.diploma`. A core
+grade changed after finalization reaches the result through the **correction workflow** (a
+correction with no mark changes is enough): it recomputes with the stored rules and the current core
+grades, as it does with marks. Term finalizations of a points_total grade compute the same way.
+
+**Predicted total** (`GET /api/grading/students/{studentId}/diploma`): for each year the grade is
+`points_total`, the student's counted subjects' predicted grades (the year's prediction, else the
+latest term's) turned into points on the subject's scale (or a numeric label when it has none) plus
+the predicted core grades, through the same engine. Staff see it with the final and predicted core
+grades; the student and linked parents see the predicted total and predicted core grades only while
+the grade shows predicted grades to them, never the final core grades (those reach them on
+finalized results).
+
+**Where it shows**: the result preview, finalized results (`diploma` beside `result_display`,
+which reads "36 / 45"), the student and parent app (total, core points, status with failing
+conditions, and the predicted total), and in report cards, certificates and transcripts as an
+optional `overall.diploma` stored at issue (absent on documents issued before 000262, which render
+unchanged). A single subject's mark view of a points_total grade shows its points like a GPA out of
+the scale's top points (7), not out of 45.
+
+**Class rank and graduation requirements**: `rank_basis = points_total` ranks by the total (allowed
+only on a `points_total` grade; a pending total takes no place); `average` still ranks by the
+subjects' average percentage. Graduation requirements are unchanged: credits and passed subjects
+work as before; a `cumulative_gpa` rule over IB years reads the mean of the subject points (the
+years carry no GPA maximum), and there is no "diploma awarded" rule yet.
 
 ## Certificates and report cards
 
