@@ -138,14 +138,126 @@ class SubjectResult {
 enum ResultFormat {
   percentage,
   outOf,
-  gpa;
+  gpa,
+
+  /// The IB Diploma total: the best subjects' points plus core points, out of 45.
+  pointsTotal;
 
   static ResultFormat? fromWire(Object? value) => switch (value) {
     'percentage' => ResultFormat.percentage,
     'out_of' => ResultFormat.outOf,
     'gpa' => ResultFormat.gpa,
+    'points_total' => ResultFormat.pointsTotal,
     _ => null,
   };
+}
+
+/// Whether an IB Diploma is awarded; [unknown] for a value this build does not know yet.
+enum DiplomaStatus {
+  awarded,
+  notAwarded,
+  pending,
+  unknown;
+
+  static DiplomaStatus fromWire(Object? value) => switch (value) {
+    'awarded' => awarded,
+    'not_awarded' => notAwarded,
+    'pending' => pending,
+    _ => unknown,
+  };
+}
+
+/// One failing condition of a diploma ("Total 22 is below 24"). [code] stays the wire string so
+/// a condition this build does not know still shows (as its code).
+class DiplomaFailingCondition {
+  const DiplomaFailingCondition({
+    required this.code,
+    this.required,
+    this.actual,
+    this.component,
+    this.grade,
+    this.level,
+    this.points,
+  });
+
+  factory DiplomaFailingCondition.fromJson(Map<String, Object?> json) =>
+      DiplomaFailingCondition(
+        code: json['code'] as String? ?? '',
+        required: _num(json['required']),
+        actual: _num(json['actual']),
+        component: _text(json['component']),
+        grade: _text(json['grade']),
+        level: _text(json['level']),
+        points: _num(json['points']),
+      );
+
+  final String code;
+  final double? required;
+  final double? actual;
+
+  /// `tok` or `ee` (CORE_GRADE).
+  final String? component;
+  final String? grade;
+  final String? level;
+  final double? points;
+}
+
+/// The IB Diploma outcome of a points_total result (000262): the total out of 45, core points,
+/// the TOK / Extended Essay / CAS used and whether the diploma is awarded. Also the predicted
+/// total (from predicted grades), which has the same shape.
+class DiplomaOutcome {
+  const DiplomaOutcome({
+    required this.status,
+    required this.total,
+    required this.max,
+    required this.subjectPoints,
+    required this.corePoints,
+    required this.tokGrade,
+    required this.eeGrade,
+    required this.casComplete,
+    required this.failingConditions,
+    required this.pendingReasons,
+  });
+
+  /// Null for anything that isn't a diploma object (results of every other format, and results
+  /// and documents from before the diploma total).
+  static DiplomaOutcome? fromJson(Object? json) {
+    if (json is! Map) return null;
+    return DiplomaOutcome(
+      status: DiplomaStatus.fromWire(json['status']),
+      total: _num(json['total']),
+      max: _num(json['max']) ?? 45,
+      subjectPoints: _num(json['subject_points']),
+      corePoints: _num(json['core_points']),
+      tokGrade: _text(json['tok_grade']),
+      eeGrade: _text(json['ee_grade']),
+      casComplete: json['cas_complete'] as bool?,
+      failingConditions: [
+        for (final row in _list(json['failing_conditions']))
+          DiplomaFailingCondition.fromJson(row),
+      ],
+      pendingReasons: [
+        for (final reason
+            in (json['pending_reasons'] as List<Object?>?) ?? const [])
+          if (reason is String) reason,
+      ],
+    );
+  }
+
+  final DiplomaStatus status;
+
+  /// Null while pending (TOK/EE grade or a subject result missing).
+  final double? total;
+  final double max;
+  final double? subjectPoints;
+  final double? corePoints;
+  final String? tokGrade;
+  final String? eeGrade;
+  final bool? casComplete;
+  final List<DiplomaFailingCondition> failingConditions;
+
+  /// `subjects_incomplete`, `core_grades_missing`, `cas_not_recorded` (unknown ones are kept).
+  final List<String> pendingReasons;
 }
 
 /// The final result in the grade's chosen format: 16.5 out of 20, or a GPA of 3.4 out of 4.
@@ -185,6 +297,7 @@ class OverallResult {
     this.creditsAttempted,
     this.creditsEarned,
     this.classRank,
+    this.diploma,
   });
 
   /// Reads a finalized result (`result_display`) or a certificate's overall block (`display`).
@@ -203,6 +316,8 @@ class OverallResult {
     creditsEarned: _num(json['credits_earned']),
     // Absent when the grade does not rank, the school keeps it for staff, and on older results.
     classRank: ClassRank.fromJson(json['class_rank']),
+    // IB Diploma grades only; absent on every other result and on older ones.
+    diploma: DiplomaOutcome.fromJson(json['diploma']),
   );
 
   final double? averagePercentage;
@@ -222,6 +337,9 @@ class OverallResult {
 
   /// Where the result places the student in their section or grade; null when not shown.
   final ClassRank? classRank;
+
+  /// The IB Diploma total, core points and award status; null for every other result format.
+  final DiplomaOutcome? diploma;
 }
 
 /// A class rank's state: a place, a result that takes none (incomplete), or a grade-wide rank

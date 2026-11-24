@@ -1866,6 +1866,29 @@
           "graded": "Graded"
         }
       }
+    },
+    "diploma": {
+      "entry": "IB Diploma core",
+      "entrySubtitle": "TOK, Extended Essay and CAS",
+      "title": "IB Diploma core",
+      "help": "Theory of Knowledge and Extended Essay grades (A–E) and CAS for each student. Final grades are used when results are finalized; predicted ones give the predicted total.",
+      "kind": {
+        "finalGrades": "Final",
+        "predicted": "Predicted"
+      },
+      "tok": "TOK",
+      "ee": "Extended Essay",
+      "cas": "CAS",
+      "casComplete": "Complete",
+      "casIncomplete": "Not complete",
+      "none": "Not recorded",
+      "save": "Save",
+      "saved": "Core grades saved",
+      "error": "Couldn't load the core grades.",
+      "disabled": "This grade doesn't use the IB Diploma total this year.",
+      "readOnly": "This year is closed, so core grades can no longer change.",
+      "predictedOff": "Your school hasn't switched predicted grades on for this grade.",
+      "noStudents": "No students in this section."
     }
   },
   "parent": {
@@ -2704,6 +2727,38 @@
         "notRecorded": "Not recorded yet"
       },
       "missing": "Still to pass: {subjects}"
+    },
+    "diploma": {
+      "title": "IB Diploma",
+      "total": "{value} / {max} points",
+      "totalPending": "Total pending",
+      "corePoints": "Core points: {points}",
+      "core": "TOK {tok} · Extended Essay {ee} · CAS {cas}",
+      "tok": "TOK",
+      "ee": "Extended Essay",
+      "casComplete": "complete",
+      "casIncomplete": "not complete",
+      "status": {
+        "awarded": "Awarded",
+        "notAwarded": "Not awarded",
+        "pending": "Pending",
+        "unknown": "—"
+      },
+      "failing": {
+        "TOO_FEW_SUBJECTS": "Only {actual} of {required} subjects",
+        "MIN_TOTAL": "Total {actual} is below {required}",
+        "CAS_INCOMPLETE": "CAS not complete",
+        "CORE_GRADE": "{component} grade {grade}",
+        "SUBJECTS_AT_OR_BELOW": "{actual} subjects at {points} points or fewer (at most {required})",
+        "LEVEL_POINTS": "{actual} points at {level} (needs {required})"
+      },
+      "pending": {
+        "subjects_incomplete": "Subject results incomplete",
+        "core_grades_missing": "TOK or Extended Essay grade missing",
+        "cas_not_recorded": "CAS not recorded"
+      },
+      "predictedTitle": "Predicted IB Diploma total",
+      "predictedHelp": "From your teachers' predicted grades. This is not a result."
     }
   },
   "features": {

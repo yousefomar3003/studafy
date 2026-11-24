@@ -15,6 +15,7 @@ import {
   WeightedGpa,
 } from "./components";
 import { setupHref } from "./context";
+import { DiplomaSummary } from "./diploma";
 import { useCertificate } from "./queries";
 import { ReportNotesBlock } from "./ReportNotesBlock";
 
@@ -221,6 +222,14 @@ export function CertificateDocument({
           </div>
         )}
         <DocumentRankFact rank={content.overall.class_rank} />
+        {content.overall.diploma ? (
+          <div>
+            <dt>{t("academicGrading.diploma.column")}</dt>
+            <dd>
+              <DiplomaSummary diploma={content.overall.diploma} />
+            </dd>
+          </div>
+        ) : null}
         <div>
           <dt>{t("academicGrading.certificate.total")}</dt>
           <dd>

@@ -442,6 +442,7 @@ describe("structure", () => {
         "/api/grading/sections/{sectionId}/subjects/{subjectId}/marks",
         "/api/grading/sections/{sectionId}/subjects/{subjectId}/override",
         "/api/grading/sections/{sectionId}/subjects/{subjectId}/predicted-grades",
+        "/api/grading/sections/{sectionId}/diploma-core",
         "/api/grading/sections/{sectionId}/subjects/{subjectId}/report-comments",
         "/api/grading/subject-coordinators/{coordinatorId}",
         "/api/grading/students/{studentId}/certificates",
@@ -449,6 +450,7 @@ describe("structure", () => {
         "/api/grading/students/{studentId}/graduation-requirements",
         "/api/grading/students/{studentId}/marks",
         "/api/grading/students/{studentId}/predicted-grades",
+        "/api/grading/students/{studentId}/diploma",
         "/api/grading/students/{studentId}/results",
         "/api/grading/students/{studentId}/transcript-readiness",
         "/api/grading/students/{studentId}/transcripts",
@@ -1452,6 +1454,10 @@ describe("security", () => {
         "GET /api/grading/sections/{sectionId}/subjects",
         "GET /api/grading/sections/{sectionId}/subjects/{subjectId}/marks",
         "GET /api/grading/sections/{sectionId}/subjects/{subjectId}/predicted-grades",
+        // IB Diploma total (000262): core grades behind grade:read plus the section's teachers or
+        // leadership; a student's diploma behind grade:read plus app.can_read_student.
+        "GET /api/grading/sections/{sectionId}/diploma-core",
+        "GET /api/grading/students/{studentId}/diploma",
         "GET /api/grading/students/{studentId}/certificates",
         // External exams and test scores (000255): the catalogue behind academicConfig:read/manage,
         // a student's results behind grade:read plus app.can_read_student.
@@ -1550,6 +1556,7 @@ describe("security", () => {
         "PUT /api/grading/sections/{sectionId}/subject-enrollments",
         "PUT /api/grading/sections/{sectionId}/subjects/{subjectId}/marks",
         "PUT /api/grading/sections/{sectionId}/subjects/{subjectId}/predicted-grades",
+        "PUT /api/grading/sections/{sectionId}/diploma-core",
         "PUT /api/grading/sections/{sectionId}/subjects/{subjectId}/report-comments",
         "PUT /api/grading/subject-configs/{configId}",
         "PUT /api/grading/years/{yearId}/programs/{gradeLevelId}",

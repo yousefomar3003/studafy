@@ -5,6 +5,7 @@ import '../../../../design/theme/app_semantic_colors.dart';
 import '../../../../design/tokens/app_radius_tokens.dart';
 import '../../../../design/tokens/app_spacing_tokens.dart';
 import '../../domain/academic_results.dart';
+import 'diploma_widgets.dart';
 import 'status_pill.dart';
 
 /// Up to two decimals, trailing zeros dropped — "92", "87.5", "66.67".
@@ -62,9 +63,11 @@ String formatResultValue(ResultDisplay? display, num? percentage) {
   final max = formatResultNumber(display.max);
   final value = display.value;
   if (value == null) {
-    return display.format == ResultFormat.gpa
-        ? 'academicResults.gpaUnavailable'.tr()
-        : '—';
+    return switch (display.format) {
+      ResultFormat.gpa => 'academicResults.gpaUnavailable'.tr(),
+      ResultFormat.pointsTotal => 'academicResults.diploma.totalPending'.tr(),
+      _ => '—',
+    };
   }
   return display.format == ResultFormat.gpa
       ? 'academicResults.gpaValue'.tr(
@@ -186,6 +189,10 @@ class OverallResultSummary extends StatelessWidget {
             ),
           ],
         ),
+        if (overall.diploma case final diploma?) ...[
+          const SizedBox(height: AppSpacing.space12),
+          DiplomaOutcomeView(diploma: diploma),
+        ],
       ],
     );
   }

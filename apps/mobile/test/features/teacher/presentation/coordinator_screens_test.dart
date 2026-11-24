@@ -9,7 +9,6 @@ import 'package:studafy_mobile/src/features/teacher/application/mark_sheet_provi
 import 'package:studafy_mobile/src/features/teacher/data/coordinator_client.dart';
 import 'package:studafy_mobile/src/features/teacher/domain/coordinator.dart';
 import 'package:studafy_mobile/src/features/teacher/domain/mark_sheet.dart';
-import 'package:studafy_mobile/src/features/teacher/presentation/coordinator_mark_sheet_screen.dart';
 import 'package:studafy_mobile/src/features/teacher/presentation/coordinator_subjects_screen.dart';
 
 import '../../../support/ensure_date_formatting.dart';

@@ -1,3 +1,6 @@
+import { DEFAULT_DIPLOMA_CONFIG, DEFAULT_DIPLOMA_MAX } from "./diploma";
+
+import type { DiplomaConfig } from "./diploma";
 import type {
   CategoryAggregation,
   CategoryKind,
@@ -111,6 +114,11 @@ export interface CurriculumTemplate {
   subject: TemplateSubjectDefaults;
   /** Course levels a subject can be set to afterwards (shown as guidance; not applied). */
   courseLevels: readonly TemplateCourseLevel[];
+  /**
+   * A `points_total` template's diploma rules (TOK x EE matrix and award conditions), applied to
+   * the grade as editable defaults. Absent for every other result format.
+   */
+  diploma?: DiplomaConfig;
 }
 
 // ---------------------------------------------------------------------------
@@ -463,8 +471,8 @@ export const CURRICULUM_TEMPLATES: readonly CurriculumTemplate[] = [
     family: "ib",
     name: text("IB Diploma subjects (DP)", "البكالوريا الدولية - مواد الدبلوم (DP)"),
     description: text(
-      "Subjects graded 1 to 7 with internal assessment and exams; the result is the average grade out of 7. HL and SL are course levels.",
-      "مواد بدرجات من 1 إلى 7 مع التقييم الداخلي والاختبارات؛ النتيجة متوسط الدرجات من 7. المستوى العالي والعادي مستويات للمادة.",
+      "Subjects graded 1 to 7 with internal assessment and exams. The result is the Diploma total out of 45: the best six subjects plus up to 3 core points from TOK and the Extended Essay, with CAS and the award conditions (editable IB defaults to check against the current IB rules). HL and SL are course levels.",
+      "مواد بدرجات من 1 إلى 7 مع التقييم الداخلي والاختبارات. النتيجة مجموع الدبلوم من 45: أفضل ست مواد مع حتى 3 نقاط من نظرية المعرفة والمقالة الموسعة، مع الإبداع والنشاط والخدمة وشروط منح الدبلوم (قيم افتراضية قابلة للتعديل يجب مراجعتها مع قواعد البكالوريا الدولية الحالية). المستوى العالي والعادي مستويات للمادة.",
     ),
     scale: {
       name: same("IB DP 1–7"),
@@ -479,7 +487,8 @@ export const CURRICULUM_TEMPLATES: readonly CurriculumTemplate[] = [
       ]),
     },
     descriptors: null,
-    resultFormat: { format: "gpa", max: 7 },
+    resultFormat: { format: "points_total", max: DEFAULT_DIPLOMA_MAX },
+    diploma: DEFAULT_DIPLOMA_CONFIG,
     overallRounding: HALF_UP_2,
     subject: numericSubject(40, {
       source: "categories",

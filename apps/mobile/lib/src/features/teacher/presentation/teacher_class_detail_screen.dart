@@ -11,6 +11,8 @@ import '../application/teacher_providers.dart';
 import 'class_announcement_composer_screen.dart';
 import 'grade_entry_screen.dart';
 import 'incident_report_screen.dart';
+import '../application/diploma_core_providers.dart';
+import 'diploma_core_screen.dart';
 import 'predicted_grades_screen.dart';
 import 'teacher_content_screen.dart';
 import 'widgets/roster_entry_tile.dart';
@@ -94,6 +96,8 @@ class TeacherClassDetailScreen extends ConsumerWidget {
                   const SizedBox(height: AppSpacing.space16),
                   _PredictedGradesTile(classId: classId, classCode: classCode),
                   const SizedBox(height: AppSpacing.space8),
+                  // IB Diploma classes only: takes no space for any other grade.
+                  _DiplomaCoreTile(classId: classId, classCode: classCode),
                   // The class's rows in the school's custom lists (a bus group, a homeroom); takes
                   // no space when there are none.
                   LinkedCustomListsSection(
@@ -218,9 +222,7 @@ class _ClassHero extends StatelessWidget {
       title: courseName,
       subtitle: rosterSize == null
           ? null
-          : 'teacher.classes.roster'.tr(
-              namedArgs: {'count': '$rosterSize'},
-            ),
+          : 'teacher.classes.roster'.tr(namedArgs: {'count': '$rosterSize'}),
     );
   }
 }
@@ -247,6 +249,39 @@ class _PredictedGradesTile extends StatelessWidget {
           MaterialPageRoute<void>(
             builder: (_) =>
                 PredictedGradesScreen(classId: classId, classCode: classCode),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Opens [DiplomaCoreScreen] for the class's section, offered only when the section's grade uses
+/// the IB Diploma total (the API lets any teacher of the section enter TOK, EE and CAS).
+class _DiplomaCoreTile extends ConsumerWidget {
+  const _DiplomaCoreTile({required this.classId, required this.classCode});
+
+  final String classId;
+  final String classCode;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sectionId = ref.watch(classDiplomaSectionProvider(classId)).value;
+    if (sectionId == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.space8),
+      child: Card(
+        margin: EdgeInsets.zero,
+        child: ListTile(
+          leading: const Icon(Icons.workspace_premium_outlined),
+          title: Text('teacher.diploma.entry'.tr()),
+          subtitle: Text('teacher.diploma.entrySubtitle'.tr()),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) =>
+                  DiplomaCoreScreen(sectionId: sectionId, classCode: classCode),
+            ),
           ),
         ),
       ),

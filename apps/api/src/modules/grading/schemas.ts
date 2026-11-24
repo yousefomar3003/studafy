@@ -1,6 +1,8 @@
 import { z } from "@hono/zod-openapi";
 import { dateSchema, dateTimeSchema, uuidSchema } from "@studafy/shared-schemas";
 
+import { diplomaConfigSchema, diplomaResultSchema } from "./diploma-schemas";
+
 // ---------------------------------------------------------------------------
 // Params and shared enums
 // ---------------------------------------------------------------------------
@@ -85,10 +87,12 @@ export const categoryKindSchema = z.enum([
   "other",
 ]);
 const categoryScopeSchema = z.enum(["term", "annual"]);
-export const resultFormatSchema = z.enum(["percentage", "out_of", "gpa"]).openapi("ResultFormat", {
-  description:
-    "How a grade shows its final result: percentage (out of 100), out_of (rescaled to result_scale_max) or gpa (weighted GPA points out of result_scale_max).",
-});
+export const resultFormatSchema = z
+  .enum(["percentage", "out_of", "gpa", "points_total"])
+  .openapi("ResultFormat", {
+    description:
+      "How a grade shows its final result: percentage (out of 100), out_of (rescaled to result_scale_max), gpa (weighted GPA points out of result_scale_max) or points_total (the IB Diploma total: the best subjects' points plus TOK/EE core points, out of result_scale_max, 45).",
+  });
 export const resultDisplaySchema = z
   .object({
     format: resultFormatSchema,
@@ -99,10 +103,12 @@ export const resultDisplaySchema = z
     description:
       "The final result in the grade's format. value is null when it can't be worked out (a GPA with a subject that has no GPA points).",
   });
-export const rankBasisSchema = z.enum(["average", "gpa", "weighted_gpa"]).openapi("RankBasis", {
-  description:
-    "What students are ranked by: average (the overall average percentage), gpa, or weighted_gpa (the plain GPA for a student without boosted subjects). gpa and weighted_gpa need a grade whose result is a GPA.",
-});
+export const rankBasisSchema = z
+  .enum(["average", "gpa", "weighted_gpa", "points_total"])
+  .openapi("RankBasis", {
+    description:
+      "What students are ranked by: average (the overall average percentage), gpa, weighted_gpa (the plain GPA for a student without boosted subjects) or points_total (the IB Diploma total; a pending total is not ranked). gpa and weighted_gpa need a grade whose result is a GPA, points_total one whose result is the points total.",
+  });
 export const rankScopeSchema = z.enum(["section", "grade_level"]).openapi("RankScope", {
   description:
     "Who a student is ranked against: their section, or every section of their grade level (pending until every section is finalized for the period).",
@@ -166,6 +172,13 @@ const creditFields = {
   }),
   credits_earned: z.number().nullable().openapi({
     description: "Credits of those subjects that were passed; null when none carries credits.",
+  }),
+};
+/** The IB Diploma outcome beside a points_total result (000262). */
+const diplomaField = {
+  diploma: diplomaResultSchema.nullable().openapi({
+    description:
+      "points_total results only: the diploma total, core points and award status. Null for every other format and on results finalized before 000262.",
   }),
 };
 export const aggregationSchema = z.enum(["weighted_average", "total_points"]);
@@ -395,7 +408,11 @@ export const programBodySchema = z
     result_format: resultFormatSchema.optional(),
     result_scale_max: z.number().positive().max(1000).nullable().optional().openapi({
       description:
-        "The maximum for out_of (e.g. 20) or gpa (4 or 5, up to 10); ignored for percentage.",
+        "The maximum for out_of (e.g. 20), gpa (4 or 5, up to 10) or points_total (45); ignored for percentage.",
+    }),
+    diploma_config: diplomaConfigSchema.nullable().optional().openapi({
+      description:
+        "points_total only: the diploma rules. Omitted keeps the saved rules (the IB defaults for a grade switching to points_total); null resets them to the IB defaults. Cleared when the format is not points_total.",
     }),
     predicted_grades_enabled: z.boolean().optional().openapi({
       description: "Whether teachers record predicted grades for this grade and year.",
@@ -433,6 +450,9 @@ export const programSchema = z
     rank_basis: rankBasisSchema,
     rank_scope: rankScopeSchema,
     rank_visibility: rankVisibilitySchema,
+    diploma_config: diplomaConfigSchema.nullable().openapi({
+      description: "The diploma rules of a points_total grade; null for every other format.",
+    }),
     descriptors: z.array(descriptorSchema),
     updated_at: dateTimeSchema,
   })
@@ -1155,6 +1175,7 @@ export const resultPreviewSchema = z
           grade_label: z.string().nullable(),
           result_display: resultDisplaySchema.nullable(),
           ...creditFields,
+          ...diplomaField,
           subjects_failed: z.number().int(),
           academic_status: z.enum(["promoted", "supplementary", "retained", "incomplete"]),
           subjects: z.array(
@@ -1333,6 +1354,7 @@ export const storedStudentResultSchema = z
     grade_label: z.string().nullable(),
     result_display: resultDisplaySchema.nullable(),
     ...creditFields,
+    ...diplomaField,
     subjects_failed: z.number().int(),
     academic_status: z.enum(["promoted", "supplementary", "retained", "incomplete"]),
     subjects: z.array(storedSubjectResultSchema),
@@ -1722,6 +1744,10 @@ export const certificateContentSchema = z
         credits_attempted: z.number().nullable().optional(),
         credits_earned: z.number().nullable().optional(),
         class_rank: documentClassRankSchema.nullable().optional(),
+        diploma: diplomaResultSchema.nullable().optional().openapi({
+          description:
+            "The IB Diploma outcome when issued (points_total grades). Absent otherwise and on documents issued before 000262.",
+        }),
         subjects_failed: z.number().int(),
 
         academic_status: z.string(),

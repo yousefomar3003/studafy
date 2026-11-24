@@ -158,6 +158,8 @@ export const ERROR_CODES = {
   PREDICTED_GRADES_DISABLED: "PREDICTED_GRADES_DISABLED",
   // Subject coordinators (000260): the user already coordinates the subject that year.
   SUBJECT_COORDINATOR_DUPLICATE: "SUBJECT_COORDINATOR_DUPLICATE",
+  // IB Diploma total (000262): the grade's result is not the points total this year.
+  DIPLOMA_TOTAL_DISABLED: "DIPLOMA_TOTAL_DISABLED",
 
   // Enrollment — student-class binding.
   ENROLLMENT_DUPLICATE: "ENROLLMENT_DUPLICATE",

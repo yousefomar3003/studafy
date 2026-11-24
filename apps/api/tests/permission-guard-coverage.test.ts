@@ -168,6 +168,7 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/grading/years/{yearId}/subject-coordinators",
   "PATCH /api/grading/subject-coordinators/{coordinatorId}",
   "DELETE /api/grading/subject-coordinators/{coordinatorId}",
+  "PUT /api/grading/sections/{sectionId}/diploma-core",
   "POST /api/grading/finalizations/{finalizationId}/certificates",
   // External exams and test scores (000255): leadership behind academicConfig:manage; each write
   // records its old and new values in the service.

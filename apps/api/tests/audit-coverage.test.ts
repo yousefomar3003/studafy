@@ -273,6 +273,8 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/grading/years/{yearId}/subject-coordinators",
   "PATCH /api/grading/subject-coordinators/{coordinatorId}",
   "DELETE /api/grading/subject-coordinators/{coordinatorId}",
+  // IB Diploma core grades (000262): the service records each student's old and new grades.
+  "PUT /api/grading/sections/{sectionId}/diploma-core",
   // Graduation requirements (000258): leadership behind academicConfig:manage; each write records
   // its old and new values in the service.
   "POST /api/grading/graduation-requirement-sets",

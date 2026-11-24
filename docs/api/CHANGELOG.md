@@ -62,6 +62,22 @@ when it required the `version-bump` label.
   `RecordExternalExamResultBody` / `UpdateExternalExamResultBody` take an optional `entry_id`
   (on update, absent keeps the link and null clears it); `ExternalExamResult` returns `entry_id`.
 
+- IB Diploma total out of 45 (migration 000262; docs/database/academic-grading.md "IB Diploma
+  total"). `ResultFormat` adds `points_total` (`result_scale_max` up to 1000, 45 for the IB) and
+  `RankBasis` adds `points_total` (only on a `points_total` grade, else 400). `GradeProgramBody`
+  takes optional `diploma_config` (`DiplomaConfig`: `counted_subjects`, 25-cell `core_matrix` of
+  `DiplomaMatrixCell`, `conditions` of flat `DiplomaCondition`; null resets to the IB defaults) and
+  `GradeProgram` returns it (null for other formats). `FinalizedStudentResult` and the result
+  preview add `diploma` (`DiplomaResult`, nullable: `status` `awarded` / `not_awarded` /
+  `pending`, `total`, `max`, `subject_points`, `core_points`, `counted_subject_ids`, `tok_grade`,
+  `ee_grade`, `cas_complete`, `failing_conditions` of flat `DiplomaFailingCondition`,
+  `pending_reasons`); `CertificateContentOverall` and `TranscriptYearOverall` add an optional
+  `diploma` (absent on documents issued before). New `getSectionDiplomaCore` /
+  `saveSectionDiplomaCore` (`GET`/`PUT /api/grading/sections/{sectionId}/diploma-core`,
+  `grade:read`, writes `grade:update` or `result:finalize`; the section's teachers and leadership;
+  `SaveDiplomaCoreBody` with `kind` `final` / `predicted`) and `getStudentDiploma`
+  (`GET /api/grading/students/{studentId}/diploma`, `grade:read`) returning `StudentDiploma` with
+  the predicted total. New error code `DIPLOMA_TOTAL_DISABLED` (409).
 - Class rank and percentile (migration 000257; docs/database/academic-grading.md "Class rank and
   percentile"). New `listTopStudents`
   (`GET /api/grading/years/{yearId}/programs/{gradeLevelId}/top-students`, `result:finalize`;

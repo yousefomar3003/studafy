@@ -126,6 +126,7 @@ const STUDENT_SCOPED: {
   { path: (s) => `/api/grading/students/${s}/external-exam-results` },
   { path: (s) => `/api/grading/students/${s}/external-exam-entries` },
   { path: (s) => `/api/grading/students/${s}/predicted-grades` },
+  { path: (s) => `/api/grading/students/${s}/diploma` },
   { path: (s) => `/api/grading/students/${s}/graduation-requirements` },
   { path: (s) => `/api/grades/published/students/${s}/terms/${a?.termId ?? ":termId"}` },
   {

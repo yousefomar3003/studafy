@@ -166,7 +166,7 @@ export function WeightSlider({
 
 /** A final result as the grade shows it (see the API's ResultDisplay). */
 export interface ResultDisplayValue {
-  format: "percentage" | "out_of" | "gpa";
+  format: "percentage" | "out_of" | "gpa" | "points_total";
   value: number | null;
   max: number;
 }
@@ -195,7 +195,9 @@ export function ResultValue({
     value === null
       ? display.format === "gpa"
         ? t("academicGrading.resultFormat.gpaUnavailable")
-        : "—"
+        : display.format === "points_total"
+          ? t("academicGrading.diploma.totalPending")
+          : "—"
       : display.format === "gpa"
         ? t("academicGrading.resultFormat.gpaValue", { value, max })
         : t("academicGrading.resultFormat.valueOutOf", { value, max });

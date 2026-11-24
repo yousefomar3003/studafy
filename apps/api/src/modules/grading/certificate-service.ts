@@ -6,9 +6,11 @@ import { CodedHttpException } from "../../coded-http-exception";
 import { emitAuditLog } from "../../middleware/auditEmitter";
 
 import { attachClassRanks, documentClassRank } from "./class-rank-service";
+import { withDocumentDiploma } from "./diploma-service";
 import { readFinalizationResults, requireFinalization } from "./results-service";
 
 import type { DocumentClassRank } from "./class-rank-service";
+import type { DiplomaResultView } from "./diploma-service";
 import type { ReportNotes } from "./report-card-service";
 import type { FinalizationRow, StoredStudentResult } from "./results-service";
 import type { ResultDisplay } from "@studafy/grading-engine";
@@ -82,6 +84,11 @@ export interface CertificateContent {
      * documents issued before; readers treat absent as no rank.
      */
     class_rank?: DocumentClassRank;
+    /**
+     * The IB Diploma outcome when issued (000262): present only for a points_total grade. Absent
+     * on documents issued before; readers treat absent as none.
+     */
+    diploma?: DiplomaResultView;
     subjects_failed: number;
     academic_status: string;
   };
@@ -301,6 +308,7 @@ function renderContent(
         ? { credits_attempted: result.credits_attempted, credits_earned: result.credits_earned! }
         : {}),
       ...withDocumentRank(result),
+      ...withDocumentDiploma(result),
       subjects_failed: result.subjects_failed,
       academic_status: result.academic_status,
     },

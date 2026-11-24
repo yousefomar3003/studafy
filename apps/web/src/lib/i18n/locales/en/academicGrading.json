@@ -173,7 +173,8 @@
       "VALIDATION_FAILED": "Some values aren't valid.",
       "AUTHZ_FORBIDDEN": "You don't have permission to do this.",
       "PREDICTED_GRADES_DISABLED": "Predicted grades aren't switched on for this grade this year.",
-      "SUBJECT_COORDINATOR_DUPLICATE": "This person already coordinates this subject this year."
+      "SUBJECT_COORDINATOR_DUPLICATE": "This person already coordinates this subject this year.",
+      "DIPLOMA_TOTAL_DISABLED": "This grade doesn't use the IB Diploma total this year."
     }
   },
   "issues": {
@@ -383,7 +384,9 @@
         "scopeHelp": "A grade-wide rank appears once every section of the grade is finalized for the period.",
         "visibility": "Who sees the rank",
         "visibilityHelp": "When students and parents see it, it also appears in their app and on the report cards, certificates and transcripts issued to them."
-      }
+      },
+      "pointsMax": "Total out of",
+      "pointsMaxHelp": "45 for the IB Diploma: six subjects at 7 plus up to 3 core points."
     }
   },
   "editor": {
@@ -852,7 +855,8 @@
     "valueOutOf": "{{value}} / {{max}}",
     "gpaValue": "GPA {{value}} / {{max}}",
     "withPercentage": "{{percentage}}%",
-    "gpaUnavailable": "GPA not available"
+    "gpaUnavailable": "GPA not available",
+    "points_total": "IB Diploma points total (e.g. out of 45)"
   },
   "credits": {
     "label": "Credits",
@@ -1237,7 +1241,8 @@
     "basis": {
       "average": "Average",
       "gpa": "GPA",
-      "weighted_gpa": "Weighted GPA"
+      "weighted_gpa": "Weighted GPA",
+      "points_total": "Diploma total"
     },
     "scope": {
       "section": "Their section",
@@ -1645,5 +1650,87 @@
     "duplicateNumber": "This candidate number is already used in the session.",
     "saveEntry": "Save entry",
     "entrySaved": "Entry saved."
+  },
+  "diploma": {
+    "column": "Diploma",
+    "corePoints": "Core points: {{points}}",
+    "totalPending": "Total pending",
+    "status": {
+      "awarded": "Awarded",
+      "not_awarded": "Not awarded",
+      "pending": "Pending"
+    },
+    "component": {
+      "tok": "TOK",
+      "ee": "Extended Essay"
+    },
+    "failing": {
+      "TOO_FEW_SUBJECTS": "Only {{actual}} of {{required}} subjects",
+      "MIN_TOTAL": "Total {{actual}} is below {{required}}",
+      "CAS_INCOMPLETE": "CAS not complete",
+      "CORE_GRADE": "{{component}} grade {{grade}}",
+      "SUBJECTS_AT_OR_BELOW": "{{actual}} subjects at {{points}} points or fewer (at most {{required}})",
+      "LEVEL_POINTS": "{{actual}} points at {{level}} (needs {{required}})"
+    },
+    "pending": {
+      "subjects_incomplete": "Subject results incomplete",
+      "core_grades_missing": "TOK or Extended Essay grade missing",
+      "cas_not_recorded": "CAS not recorded"
+    },
+    "settings": {
+      "heading": "IB Diploma rules",
+      "disclaimer": "These start as the published IB bonus matrix and failing conditions, stored as editable defaults. Check them against the IB rules in force for your exam session before relying on them.",
+      "countedSubjects": "Subjects counted",
+      "countedSubjectsHelp": "The points of the best subjects count: 6 for the IB Diploma.",
+      "matrixCaption": "Core points for each Theory of Knowledge (rows) and Extended Essay (columns) grade",
+      "matrixCorner": "TOK \\ EE",
+      "tokRow": "TOK {{grade}}",
+      "eeColumn": "EE {{grade}}",
+      "cellLabel": "{{tok}} / {{ee}}",
+      "conditionsHeading": "Award conditions",
+      "conditionType": "Condition",
+      "types": {
+        "min_total": "Minimum total",
+        "cas_complete": "CAS complete",
+        "core_grade_not": "No TOK or Extended Essay grade of",
+        "max_subjects_at_or_below": "Limit subjects at low points",
+        "min_level_points": "Minimum points at a course level"
+      },
+      "value": {
+        "min_total": "Minimum total",
+        "max_subjects_at_or_below": "Most subjects allowed",
+        "min_level_points": "Minimum points"
+      },
+      "points": "At or below (points)",
+      "grade": "Grade",
+      "level": "Course level (e.g. HL)",
+      "bestOf": "Best subjects counted (blank for all)",
+      "addCondition": "Add condition",
+      "removeCondition": "Remove",
+      "reset": "Reset to IB defaults"
+    },
+    "core": {
+      "heading": "IB Diploma core grades",
+      "help": "Final Theory of Knowledge and Extended Essay grades and CAS are used when results are finalized; a change afterwards reaches finalized results through a correction. Predicted core grades, with predicted subject grades, give the predicted total.",
+      "kind": "Grades",
+      "kinds": {
+        "final": "Final",
+        "predicted": "Predicted"
+      },
+      "predictedOff": "Turn on predicted grades for this grade to record predicted core grades.",
+      "caption": "Core grades of the section's students",
+      "student": "Student",
+      "tok": "TOK",
+      "ee": "Extended Essay",
+      "cas": "CAS",
+      "casValues": {
+        "complete": "Complete",
+        "incomplete": "Incomplete"
+      },
+      "none": "—",
+      "save": "Save core grades",
+      "saved": "Core grades saved",
+      "failed": "Couldn't save the core grades"
+    }
   }
 }

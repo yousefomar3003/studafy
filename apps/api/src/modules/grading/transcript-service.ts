@@ -10,9 +10,11 @@ import { transcriptGraduationRequirements } from "../graduation-requirements/ser
 
 import { blockingReasons, withDocumentRank } from "./certificate-service";
 import { attachClassRanks } from "./class-rank-service";
+import { withDocumentDiploma } from "./diploma-service";
 import { readFinalizationResults } from "./results-service";
 
 import type { DocumentClassRank } from "./class-rank-service";
+import type { DiplomaResultView } from "./diploma-service";
 import type { StoredStudentResult } from "./results-service";
 import type { TranscriptExternalExam } from "../external-exams/service";
 import type { TranscriptGraduationRequirement } from "../graduation-requirements/service";
@@ -83,6 +85,8 @@ export interface TranscriptYear {
     credits_earned?: number;
     /** The year's class rank when issued (000257); absent without one and on older transcripts. */
     class_rank?: DocumentClassRank;
+    /** The year's IB Diploma outcome when issued (000262); absent otherwise and on older ones. */
+    diploma?: DiplomaResultView;
   };
 }
 
@@ -373,6 +377,7 @@ function renderYear(year: CoveredYear): TranscriptYear {
         ? { credits_attempted: result.credits_attempted, credits_earned: result.credits_earned! }
         : {}),
       ...withDocumentRank(result),
+      ...withDocumentDiploma(result),
     },
   };
 }
