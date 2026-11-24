@@ -264,6 +264,19 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/grading/graduation-requirement-sets",
   "PUT /api/grading/graduation-requirement-sets/{setId}",
   "DELETE /api/grading/graduation-requirement-sets/{setId}",
+  // Exam weeks (000265) and rooms: leadership behind timetable:manage; each write records its
+  // old and new values in the service.
+  "POST /api/academics/rooms",
+  "PATCH /api/academics/rooms/{roomId}",
+  "POST /api/academics/exam-periods",
+  "PUT /api/academics/exam-periods/{periodId}",
+  "DELETE /api/academics/exam-periods/{periodId}",
+  "POST /api/academics/exam-periods/{periodId}/slots",
+  "PUT /api/academics/exam-slots/{slotId}",
+  "DELETE /api/academics/exam-slots/{slotId}",
+  "POST /api/academics/exam-slots/{slotId}/seating",
+  "PUT /api/academics/exam-slots/{slotId}/seats/{studentId}",
+  "PUT /api/academics/exam-slots/{slotId}/invigilators",
   // Timetable (ST-101). Version lifecycle + slot CRUD with conflict detection.
   "POST /api/academics/timetable-versions",
   "PATCH /api/academics/timetable-versions/{versionId}",

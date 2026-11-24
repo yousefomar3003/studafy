@@ -105,6 +105,7 @@ import { bulkInviteRoutes } from "./modules/auth/invitation/bulk-invite-routes";
 import { invitationRoutes } from "./modules/auth/invitation/route";
 import { customListRoutes } from "./modules/custom-lists";
 import { disciplineRoutes, evaluationRoutes } from "./modules/discipline";
+import { examWeekRoutes } from "./modules/exam-weeks";
 import { externalExamRoutes } from "./modules/external-exams";
 import { createFeatureService, featureRoutes, provideFeatures } from "./modules/features";
 import {
@@ -1218,6 +1219,8 @@ export function createApp({
     app.route("/", gradingCurriculumTemplateRoutes(database));
     // Graduation requirements: the credits, subjects, GPA and exams a diploma needs (000258).
     app.route("/", graduationRequirementRoutes(database));
+    // Exam weeks: exam periods, their timetable, rooms, seating and invigilators (000265).
+    app.route("/", examWeekRoutes(database));
   }
 
   // Gradebook configuration (ST-112). Weighted assessment categories per gradebook and
