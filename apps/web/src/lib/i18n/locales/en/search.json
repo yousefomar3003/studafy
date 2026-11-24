@@ -345,6 +345,11 @@
       "where": "Principal › Academic setup › Top students",
       "keywords": "top students, class rank, rank, percentile, honor roll, best students, valedictorian, top of the class"
     },
+    "academic-ministry-export": {
+      "title": "Ministry results export",
+      "where": "Principal › Academic setup › Ministry export",
+      "keywords": "ministry export, ministry of education, moe, noor, esis, results export, national id, export results, csv, excel, xlsx, subject codes, government report"
+    },
     "academic-report-cards": {
       "title": "Report card comments",
       "where": "Principal › Academic setup › Report cards",
