@@ -16,6 +16,8 @@ export interface GradeLevelRow {
   id: string;
   school_id: string;
   name: string;
+  /** Arabic name (000264); null falls back to `name`. */
+  name_ar: string | null;
   sort_order: number;
   archived_at: Date | null;
   created_at: Date;
@@ -28,7 +30,10 @@ export interface SectionRow {
   academic_year_id: string;
   grade_level_id: string;
   grade_level_name: string;
+  grade_level_name_ar: string | null;
   name: string;
+  /** Arabic name (000264); null falls back to `name`. */
+  name_ar: string | null;
   student_count: number;
   archived_at: Date | null;
   created_at: Date;
@@ -57,6 +62,12 @@ export interface PlacementResult {
   skipped_class_ids: string[];
 }
 
+/** A trimmed Arabic name, or null for blank: an empty field clears it (000264). */
+export function cleanNameAr(value: string | null | undefined): string | null {
+  const trimmed = value?.trim() ?? "";
+  return trimmed === "" ? null : trimmed;
+}
+
 // ---------------------------------------------------------------------------
 // Grade levels
 // ---------------------------------------------------------------------------
@@ -66,7 +77,7 @@ export async function listGradeLevels(
   schoolId: string,
 ): Promise<{ rows: GradeLevelRow[]; total: number }> {
   const rows = await tx<GradeLevelRow[]>`
-    SELECT id, school_id, name, sort_order, archived_at, created_at, updated_at
+    SELECT id, school_id, name, name_ar, sort_order, archived_at, created_at, updated_at
     FROM app.grade_levels
     WHERE school_id = ${schoolId}
     ORDER BY sort_order ASC, name ASC
@@ -77,12 +88,12 @@ export async function listGradeLevels(
 export async function createGradeLevel(
   tx: TransactionSql,
   schoolId: string,
-  params: { name: string; sort_order: number },
+  params: { name: string; name_ar?: string | null; sort_order: number },
 ): Promise<GradeLevelRow> {
   const [row] = await tx<GradeLevelRow[]>`
-    INSERT INTO app.grade_levels (school_id, name, sort_order)
-    VALUES (${schoolId}, ${params.name}, ${params.sort_order})
-    RETURNING id, school_id, name, sort_order, archived_at, created_at, updated_at
+    INSERT INTO app.grade_levels (school_id, name, name_ar, sort_order)
+    VALUES (${schoolId}, ${params.name}, ${cleanNameAr(params.name_ar)}, ${params.sort_order})
+    RETURNING id, school_id, name, name_ar, sort_order, archived_at, created_at, updated_at
   `;
 
   await emitAuditLog(tx, {
@@ -99,15 +110,19 @@ export async function updateGradeLevel(
   tx: TransactionSql,
   schoolId: string,
   gradeLevelId: string,
-  params: { name?: string; sort_order?: number; archived?: boolean },
+  params: { name?: string; name_ar?: string | null; sort_order?: number; archived?: boolean },
 ): Promise<GradeLevelRow> {
-  const [before] = await tx<{ name: string; sort_order: number; archived_at: Date | null }[]>`
-    SELECT name, sort_order, archived_at FROM app.grade_levels
+  const [before] = await tx<
+    { name: string; name_ar: string | null; sort_order: number; archived_at: Date | null }[]
+  >`
+    SELECT name, name_ar, sort_order, archived_at FROM app.grade_levels
     WHERE id = ${gradeLevelId} AND school_id = ${schoolId}
   `;
   const [row] = await tx<GradeLevelRow[]>`
     UPDATE app.grade_levels
     SET name = COALESCE(${params.name ?? null}, name),
+        name_ar = CASE WHEN ${params.name_ar !== undefined}
+          THEN ${cleanNameAr(params.name_ar)}::text ELSE name_ar END,
         sort_order = COALESCE(${params.sort_order ?? null}::smallint, sort_order),
         archived_at = CASE ${params.archived ?? null}::boolean
           WHEN true THEN COALESCE(archived_at, CURRENT_TIMESTAMP)
@@ -116,7 +131,7 @@ export async function updateGradeLevel(
         END,
         updated_at = CURRENT_TIMESTAMP
     WHERE id = ${gradeLevelId} AND school_id = ${schoolId}
-    RETURNING id, school_id, name, sort_order, archived_at, created_at, updated_at
+    RETURNING id, school_id, name, name_ar, sort_order, archived_at, created_at, updated_at
   `;
   if (!row) {
     throw new HTTPException(404, { message: "Grade level not found" });
@@ -127,7 +142,12 @@ export async function updateGradeLevel(
     targetTable: "grade_levels",
     targetId: gradeLevelId,
     oldValues: before
-      ? { name: before.name, sort_order: before.sort_order, archived: before.archived_at !== null }
+      ? {
+          name: before.name,
+          name_ar: before.name_ar,
+          sort_order: before.sort_order,
+          archived: before.archived_at !== null,
+        }
       : null,
     newValues: { ...params },
   });
@@ -174,7 +194,8 @@ export async function deleteGradeLevel(
 // ---------------------------------------------------------------------------
 
 const sectionColumns = (tx: TransactionSql) => tx`
-  s.id, s.school_id, s.academic_year_id, s.grade_level_id, g.name AS grade_level_name, s.name,
+  s.id, s.school_id, s.academic_year_id, s.grade_level_id, g.name AS grade_level_name,
+  g.name_ar AS grade_level_name_ar, s.name, s.name_ar,
   (
     SELECT count(*)::int FROM app.student_sections AS ss
     WHERE ss.section_id = s.id AND ss.school_id = s.school_id
@@ -247,7 +268,12 @@ async function requireSection(
 export async function createSection(
   tx: TransactionSql,
   schoolId: string,
-  params: { academic_year_id: string; grade_level_id: string; name: string },
+  params: {
+    academic_year_id: string;
+    grade_level_id: string;
+    name: string;
+    name_ar?: string | null;
+  },
 ): Promise<SectionRow> {
   const [year] = await tx<{ id: string }[]>`
     SELECT id FROM app.academic_years
@@ -265,8 +291,11 @@ export async function createSection(
   }
 
   const [inserted] = await tx<{ id: string }[]>`
-    INSERT INTO app.sections (school_id, academic_year_id, grade_level_id, name)
-    VALUES (${schoolId}, ${params.academic_year_id}, ${params.grade_level_id}, ${params.name})
+    INSERT INTO app.sections (school_id, academic_year_id, grade_level_id, name, name_ar)
+    VALUES (
+      ${schoolId}, ${params.academic_year_id}, ${params.grade_level_id}, ${params.name},
+      ${cleanNameAr(params.name_ar)}
+    )
     RETURNING id
   `;
 
@@ -284,14 +313,17 @@ export async function updateSection(
   tx: TransactionSql,
   schoolId: string,
   sectionId: string,
-  params: { name?: string; archived?: boolean },
+  params: { name?: string; name_ar?: string | null; archived?: boolean },
 ): Promise<SectionRow> {
-  const [before] = await tx<{ name: string; archived_at: Date | null }[]>`
-    SELECT name, archived_at FROM app.sections WHERE id = ${sectionId} AND school_id = ${schoolId}
+  const [before] = await tx<{ name: string; name_ar: string | null; archived_at: Date | null }[]>`
+    SELECT name, name_ar, archived_at FROM app.sections
+    WHERE id = ${sectionId} AND school_id = ${schoolId}
   `;
   const updated = await tx`
     UPDATE app.sections
     SET name = COALESCE(${params.name ?? null}, name),
+        name_ar = CASE WHEN ${params.name_ar !== undefined}
+          THEN ${cleanNameAr(params.name_ar)}::text ELSE name_ar END,
         archived_at = CASE ${params.archived ?? null}::boolean
           WHEN true THEN COALESCE(archived_at, CURRENT_TIMESTAMP)
           WHEN false THEN NULL
@@ -309,7 +341,9 @@ export async function updateSection(
     action: "update",
     targetTable: "sections",
     targetId: sectionId,
-    oldValues: before ? { name: before.name, archived: before.archived_at !== null } : null,
+    oldValues: before
+      ? { name: before.name, name_ar: before.name_ar, archived: before.archived_at !== null }
+      : null,
     newValues: { ...params },
   });
 

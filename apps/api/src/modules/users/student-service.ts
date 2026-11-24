@@ -25,12 +25,22 @@ export interface StudentRow {
   middle_name: string | null;
   last_name: string;
   preferred_name: string | null;
+  /** Arabic names (000264); null when the school keeps none. */
+  first_name_ar: string | null;
+  middle_name_ar: string | null;
+  last_name_ar: string | null;
   date_of_birth: Date | null;
   nationality_country_id: string | null;
   admission_date: Date | null;
   status: StudentStatus;
   created_at: Date;
   updated_at: Date;
+}
+
+/** A trimmed Arabic name, or null for blank: an empty field clears it. */
+function cleanName(value: string | null | undefined): string | null {
+  const trimmed = value?.trim() ?? "";
+  return trimmed === "" ? null : trimmed;
 }
 
 export interface GuardianRow {
@@ -67,6 +77,8 @@ export async function listStudents(
         s.first_name ILIKE ${likeContains(params.search)}
         OR s.last_name ILIKE ${likeContains(params.search)}
         OR s.admission_number ILIKE ${likeContains(params.search)}
+        OR s.first_name_ar ILIKE ${likeContains(params.search)}
+        OR s.last_name_ar ILIKE ${likeContains(params.search)}
       )`
     : tx``;
 
@@ -90,6 +102,7 @@ export async function listStudents(
   const rows = await tx<StudentRow[]>`
     SELECT s.id, s.school_id, s.user_id, s.admission_number,
            s.first_name, s.middle_name, s.last_name, s.preferred_name,
+           s.first_name_ar, s.middle_name_ar, s.last_name_ar,
            s.date_of_birth, s.nationality_country_id, s.admission_date,
            s.status, s.created_at, s.updated_at
     FROM app.students s
@@ -128,6 +141,7 @@ export async function getStudent(
   const [row] = await tx<StudentRow[]>`
     SELECT s.id, s.school_id, s.user_id, s.admission_number,
            s.first_name, s.middle_name, s.last_name, s.preferred_name,
+           s.first_name_ar, s.middle_name_ar, s.last_name_ar,
            s.date_of_birth, s.nationality_country_id, s.admission_date,
            s.status, s.created_at, s.updated_at
     FROM app.students s
@@ -155,6 +169,7 @@ export async function getStudentSelfByUserId(
   const [row] = await tx<StudentRow[]>`
     SELECT s.id, s.school_id, s.user_id, s.admission_number,
            s.first_name, s.middle_name, s.last_name, s.preferred_name,
+           s.first_name_ar, s.middle_name_ar, s.last_name_ar,
            s.date_of_birth, s.nationality_country_id, s.admission_date,
            s.status, s.created_at, s.updated_at
     FROM app.students s
@@ -249,8 +264,8 @@ export async function createStudent(
     const [row] = await tx<StudentRow[]>`
       INSERT INTO app.students (
         school_id, user_id, admission_number, first_name, middle_name,
-        last_name, preferred_name, date_of_birth, nationality_country_id,
-        admission_date, status
+        last_name, preferred_name, first_name_ar, middle_name_ar, last_name_ar,
+        date_of_birth, nationality_country_id, admission_date, status
       ) VALUES (
         ${schoolId},
         ${user.id},
@@ -259,6 +274,9 @@ export async function createStudent(
         ${params.middle_name ?? null},
         ${params.last_name},
         ${params.preferred_name ?? null},
+        ${cleanName(params.first_name_ar)},
+        ${cleanName(params.middle_name_ar)},
+        ${cleanName(params.last_name_ar)},
         ${params.date_of_birth ? params.date_of_birth : null}::date,
         ${params.nationality_country_id ?? null}::uuid,
         ${params.admission_date ? params.admission_date : null}::date,
@@ -266,6 +284,7 @@ export async function createStudent(
       )
       RETURNING id, school_id, user_id, admission_number,
                 first_name, middle_name, last_name, preferred_name,
+                first_name_ar, middle_name_ar, last_name_ar,
                 date_of_birth, nationality_country_id, admission_date,
                 status, created_at, updated_at
     `;
@@ -369,6 +388,12 @@ export async function updateStudent(
         middle_name = COALESCE(${params.middle_name ?? null}::text, middle_name),
         last_name = COALESCE(${params.last_name ?? null}, last_name),
         preferred_name = COALESCE(${params.preferred_name ?? null}::text, preferred_name),
+        first_name_ar = CASE WHEN ${params.first_name_ar !== undefined}
+          THEN ${cleanName(params.first_name_ar)}::text ELSE first_name_ar END,
+        middle_name_ar = CASE WHEN ${params.middle_name_ar !== undefined}
+          THEN ${cleanName(params.middle_name_ar)}::text ELSE middle_name_ar END,
+        last_name_ar = CASE WHEN ${params.last_name_ar !== undefined}
+          THEN ${cleanName(params.last_name_ar)}::text ELSE last_name_ar END,
         date_of_birth = COALESCE(${params.date_of_birth ?? null}::date, date_of_birth),
         nationality_country_id = COALESCE(
           ${params.nationality_country_id ?? null}::uuid, nationality_country_id
@@ -380,6 +405,7 @@ export async function updateStudent(
     WHERE id = ${studentId}::uuid AND school_id = ${schoolId}
     RETURNING id, school_id, user_id, admission_number,
               first_name, middle_name, last_name, preferred_name,
+              first_name_ar, middle_name_ar, last_name_ar,
               date_of_birth, nationality_country_id, admission_date,
               status, created_at, updated_at
   `;
@@ -397,6 +423,9 @@ export async function updateStudent(
       last_name: existing.last_name,
       middle_name: existing.middle_name,
       preferred_name: existing.preferred_name,
+      first_name_ar: existing.first_name_ar,
+      middle_name_ar: existing.middle_name_ar,
+      last_name_ar: existing.last_name_ar,
       date_of_birth: existing.date_of_birth,
       admission_number: existing.admission_number,
       status: existing.status,
@@ -406,6 +435,9 @@ export async function updateStudent(
       last_name: updated.last_name,
       middle_name: updated.middle_name,
       preferred_name: updated.preferred_name,
+      first_name_ar: updated.first_name_ar,
+      middle_name_ar: updated.middle_name_ar,
+      last_name_ar: updated.last_name_ar,
       date_of_birth: updated.date_of_birth,
       admission_number: updated.admission_number,
       status: updated.status,

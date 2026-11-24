@@ -320,6 +320,24 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "student and linked parents.",
     },
     {
+      name: "Learning outcomes",
+      description:
+        "The learning outcomes catalogue per subject and grade level (code, English and Arabic " +
+        "text, strand), managed and imported from CSV by leadership (academicConfig:manage); the " +
+        "school's achievement scale; and each student's achievement per outcome and term, entered " +
+        "by the subject teacher and read by the subject's coordinator. Shown on report cards only " +
+        "when the school switches it on, from the finalized snapshot.",
+    },
+    {
+      name: "Lesson plans",
+      description:
+        "Term plans (weeks, units, outcomes, notes) and daily lesson plans (date and timetable " +
+        "period, objectives, outcomes, activities, linked class materials, homework, reflection) " +
+        "per section and subject. Teachers of the subject write and submit them; the subject's " +
+        "coordinator or leadership approves or returns them with a comment; leadership sees " +
+        "coverage per term. Staff-only: students and parents never read plans.",
+    },
+    {
       name: "Graduation requirements",
       description:
         "Graduation requirements checker: a school's requirement sets (total credits, credits in a " +
@@ -328,6 +346,68 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "results. Leadership (academicConfig:manage) manages the sets and reads the not-on-track " +
         "report; a checklist is read by leadership, the student's teachers, and the student and " +
         "linked parents when the set is shown to them.",
+    },
+    {
+      name: "Ministry export",
+      description:
+        "Ministry results export: a school's templates (target, CSV or XLSX, UTF-8 with or " +
+        "without a byte-order mark, per-subject or overall rows, ordered columns mapped to known " +
+        "fields with optional value maps, the ministry's subject codes) and running one over the " +
+        "finalized results of a year and term, with a preview and a validation report. " +
+        "Leadership, from web sessions only: templates behind academicConfig:manage, exports " +
+        "behind result:finalize. " +
+        "A sensitive national ID is masked in previews and opened for a download only with " +
+        "studentRecord:readSensitive, audited.",
+    },
+    {
+      name: "Tawjihi equivalency",
+      description:
+        "Tawjihi equivalency ESTIMATES: a school's own editable rule sets (IGCSE / A Level grades, " +
+        "the IB Diploma total, an American GPA and SAT, as weighted parts with grade tables, " +
+        "conversion tables or formulas) and each student's estimated Tawjihi-equivalent " +
+        "percentage with a step-by-step breakdown and missing-data reasons. An estimate the " +
+        "school confirms, never an official Ministry of Education conversion. Leadership " +
+        "(academicConfig:manage) manages the sets and lists a grade level; an estimate is read by " +
+        "leadership, the student's teachers, and the student and linked parents when the set is " +
+        "shown to them.",
+    },
+    {
+      name: "Multi-year results",
+      description:
+        "Multi-year results: a result weighted across several grade levels (grade 11 40% + grade " +
+        "12 60%), per subject and overall, from each year's current finalized annual result; " +
+        "pending while a year is not finalized. Leadership (academicConfig:manage) manages the " +
+        "configurations; a student's result is read by leadership, the student's teachers, and " +
+        "the student and linked parents when the configuration is shown to them.",
+    },
+    {
+      name: "Exam entries",
+      description:
+        "Entering students for external exams: sessions of a catalogue exam (series, entry " +
+        "deadline, dates, results date) and per-student entries with subjects, tiers, candidate " +
+        "numbers and a draft / entered / withdrawn status, exported as CSV for the board. " +
+        "Leadership (academicConfig:manage) manages them; a student's entries are read by " +
+        "leadership, the student's teachers, the student and linked parents.",
+    },
+    {
+      name: "Exam weeks",
+      description:
+        "Exam weeks: a school's exam periods (midterms, finals...), their timetable of exams, the " +
+        "rooms each exam sits in, generated and hand-adjusted seating, invigilators and clashes " +
+        "(a teacher in two rooms, a student with two exams at once, a room over capacity). " +
+        "Leadership (timetable:manage) builds them; once a period is published students and " +
+        "linked parents read the student's exam timetable with room and seat, and teachers their " +
+        "invigilation duties.",
+    },
+    {
+      name: "Remedial plans",
+      description:
+        "Remedial plans for struggling students: a plan per student, subject and term (or year) " +
+        "with its reason, target skills, actions, review dates, status and a timeline of progress " +
+        "and follow-up notes, plus suggestions of the students below the pass line on their " +
+        "current marks. The section's teachers of the subject write plans; the subject's " +
+        "coordinator and leadership follow them up; the student and linked parents read the " +
+        "shared plans when the school allows it, never internal notes.",
     },
     {
       name: "Gradebook Configuration",

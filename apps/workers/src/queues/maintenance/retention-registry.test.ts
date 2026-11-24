@@ -51,11 +51,20 @@ describe("isPersonalDataColumn", () => {
       "middle_name",
       "last_name",
       "preferred_name",
+      // app.students' Arabic names (000264).
+      "first_name_ar",
+      "middle_name_ar",
+      "last_name_ar",
       "date_of_birth",
       "original_file_name",
     ]) {
       expect(isPersonalDataColumn(column)).toBe(true);
     }
+  });
+
+  test("leaves a catalogue's Arabic label alone (subjects, grades, sections: 000264)", () => {
+    expect(isPersonalDataColumn("name_ar")).toBe(false);
+    expect(isPersonalDataColumn("grade_level_name_ar")).toBe(false);
   });
 
   test("does not match structural or identifier columns", () => {

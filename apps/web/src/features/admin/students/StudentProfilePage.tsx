@@ -11,6 +11,7 @@ import { LinkedListsPanel } from "../../custom-lists/LinkedListsPanel";
 import { calendarDay } from "../../records/fields";
 import { RecordsPanel } from "../../records/RecordsPanel";
 
+import { ArabicNameInputs } from "./ArabicNameInputs";
 import { LinkGuardianModal } from "./LinkGuardianModal";
 import { useUpdateStudent } from "./mutations";
 import {
@@ -47,9 +48,20 @@ function demographicsValuesFor(student: StudentProfile): EditStudentValues {
     last_name: student.last_name,
     middle_name: student.middle_name ?? "",
     preferred_name: student.preferred_name ?? "",
+    first_name_ar: student.first_name_ar ?? "",
+    middle_name_ar: student.middle_name_ar ?? "",
+    last_name_ar: student.last_name_ar ?? "",
     date_of_birth: student.date_of_birth ?? "",
     status: student.status,
   };
+}
+
+/** The Arabic full name, or null when the school keeps none (an older server sends no fields). */
+function arabicFullName(student: StudentProfile): string | null {
+  const name = [student.first_name_ar, student.middle_name_ar, student.last_name_ar]
+    .filter(Boolean)
+    .join(" ");
+  return name === "" ? null : name;
 }
 
 function admissionValuesFor(student: StudentProfile): EditAdmissionValues {
@@ -112,6 +124,9 @@ function DemographicsSection({ student, canEdit }: DemographicsSectionProps) {
           last_name: result.data.last_name,
           middle_name: result.data.middle_name,
           preferred_name: result.data.preferred_name,
+          first_name_ar: result.data.first_name_ar,
+          middle_name_ar: result.data.middle_name_ar,
+          last_name_ar: result.data.last_name_ar,
           date_of_birth: result.data.date_of_birth,
           status: result.data.status,
         },
@@ -153,6 +168,12 @@ function DemographicsSection({ student, canEdit }: DemographicsSectionProps) {
             <div>
               <dt>{t("adminPeople.students.profile.name")}</dt>
               <dd>{fullName(student) || "—"}</dd>
+            </div>
+            <div>
+              <dt>{t("adminPeople.students.form.arabicNames")}</dt>
+              <dd dir="rtl" lang="ar">
+                {arabicFullName(student) ?? "—"}
+              </dd>
             </div>
             <div>
               <dt>{t("adminPeople.students.form.preferredName")}</dt>
@@ -216,6 +237,11 @@ function DemographicsSection({ student, canEdit }: DemographicsSectionProps) {
             value={values.preferred_name}
             onChange={(e) => setField("preferred_name", e.target.value)}
             error={errors.preferred_name && t(errors.preferred_name)}
+          />
+          <ArabicNameInputs
+            values={values}
+            errors={errors}
+            onChange={(field, value) => setField(field, value)}
           />
           <Input
             label={t("adminPeople.students.form.dateOfBirth")}

@@ -12,6 +12,8 @@ import academicSetup from "@docs/help/academics/academic-setup.md?raw";
 // eslint-disable-next-line import-x/no-unresolved -- resolved at build time by Vite's `@docs` alias (see `vite.config.ts`)
 import buildTimetable from "@docs/help/academics/build-timetable.md?raw";
 // eslint-disable-next-line import-x/no-unresolved -- resolved at build time by Vite's `@docs` alias (see `vite.config.ts`)
+import examWeeks from "@docs/help/academics/exam-weeks.md?raw";
+// eslint-disable-next-line import-x/no-unresolved -- resolved at build time by Vite's `@docs` alias (see `vite.config.ts`)
 import takeAttendance from "@docs/help/academics/take-attendance.md?raw";
 // eslint-disable-next-line import-x/no-unresolved -- resolved at build time by Vite's `@docs` alias (see `vite.config.ts`)
 import timetable from "@docs/help/academics/timetable.md?raw";
@@ -52,6 +54,7 @@ import type { HelpArticle, HelpSearchHit } from "./content.types";
 const ARTICLE_SOURCES = [
   { path: "@docs/help/academics/academic-setup.md", raw: academicSetup },
   { path: "@docs/help/academics/build-timetable.md", raw: buildTimetable },
+  { path: "@docs/help/academics/exam-weeks.md", raw: examWeeks },
   { path: "@docs/help/academics/take-attendance.md", raw: takeAttendance },
   { path: "@docs/help/academics/timetable.md", raw: timetable },
   { path: "@docs/help/billing/subscriptions.md", raw: subscriptions },

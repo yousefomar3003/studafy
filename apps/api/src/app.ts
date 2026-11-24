@@ -24,6 +24,8 @@ import {
   accountDeletionGuard,
   legalAcceptanceGuard,
 } from "./middleware";
+import { academicEquivalencyRoutes } from "./modules/academic-equivalency";
+import { academicPlanRoutes, learningOutcomeRoutes } from "./modules/academic-planning";
 import {
   academicYearRoutes,
   termRoutes,
@@ -105,6 +107,8 @@ import { bulkInviteRoutes } from "./modules/auth/invitation/bulk-invite-routes";
 import { invitationRoutes } from "./modules/auth/invitation/route";
 import { customListRoutes } from "./modules/custom-lists";
 import { disciplineRoutes, evaluationRoutes } from "./modules/discipline";
+import { examEntryRoutes } from "./modules/exam-entries";
+import { examWeekRoutes } from "./modules/exam-weeks";
 import { externalExamRoutes } from "./modules/external-exams";
 import { createFeatureService, featureRoutes, provideFeatures } from "./modules/features";
 import {
@@ -141,7 +145,10 @@ import {
 } from "./modules/grades";
 import {
   gradingConfigRoutes,
+  gradingCoordinatorRoutes,
   gradingCurriculumTemplateRoutes,
+  gradingDiplomaRoutes,
+  gradingDocumentLanguageRoutes,
   gradingMarksRoutes,
   gradingPredictedGradesRoutes,
   gradingReportCardRoutes,
@@ -166,6 +173,7 @@ import {
 } from "./modules/licensing";
 import { uploadConsistencyRoutes } from "./modules/licensing/upload-consistency-routes";
 import { messagingRoutes } from "./modules/messaging";
+import { ministryExportRoutes } from "./modules/ministry-export";
 import { mobileConfigRoutes, EMPTY_MOBILE_RELEASE_CONFIG } from "./modules/mobile";
 import { notificationRoutes, notificationPreferencesRoutes } from "./modules/notifications";
 import { platformGrantRoutes, platformRoutes, platformUserSupportRoutes } from "./modules/platform";
@@ -173,6 +181,7 @@ import { platformOpsRoutes } from "./modules/platform/ops/routes";
 import { privacyRoutes } from "./modules/privacy";
 import { realtimeTicketRoutes } from "./modules/realtime";
 import { DEVELOPMENT_RECORD_KEYRING, recordRoutes } from "./modules/records";
+import { remedialPlanRoutes } from "./modules/remedial-plans";
 import { childComparisonRoutes } from "./modules/reports";
 import {
   platformSchoolApplicationRoutes,
@@ -1217,14 +1226,34 @@ export function createApp({
     app.route("/", gradingTranscriptRoutes(database));
     // Report card comments, attendance and conduct (000209).
     app.route("/", gradingReportCardRoutes(database));
+    // Arabic + English documents: the language each document type is issued in (000264).
+    app.route("/", gradingDocumentLanguageRoutes(database));
     // External exams and test scores: SAT, IELTS, IGCSE finals... (000255).
     app.route("/", externalExamRoutes(database));
+    // Exam entries: sessions of those exams and the students entered for them (000262).
+    app.route("/", examEntryRoutes(database));
     // Predicted grades (000254).
     app.route("/", gradingPredictedGradesRoutes(database));
+    // Subject coordinators (000261).
+    app.route("/", gradingCoordinatorRoutes(database));
+    // IB Diploma total: core grades and the predicted total (000263).
+    app.route("/", gradingDiplomaRoutes(database));
     // Curriculum templates (IGCSE, IB, American...) applied to a year's grades.
     app.route("/", gradingCurriculumTemplateRoutes(database));
     // Graduation requirements: the credits, subjects, GPA and exams a diploma needs (000258).
     app.route("/", graduationRequirementRoutes(database));
+    // Ministry results export: configurable templates over finalized results (000265).
+    // `recordKeyring` opens a sensitive national ID for a download (ADR-019).
+    app.route("/", ministryExportRoutes(database, recordKeyring));
+    // Exam weeks: exam periods, their timetable, rooms, seating and invigilators (000266).
+    app.route("/", examWeekRoutes(database));
+    // Remedial plans for struggling students: plans, follow-up and suggestions (000269).
+    app.route("/", remedialPlanRoutes(database));
+    // Learning outcomes and their achievement; lesson and term plans with review (000268).
+    app.route("/", learningOutcomeRoutes(database));
+    app.route("/", academicPlanRoutes(database));
+    // Tawjihi equivalency estimates and multi-year results (000267).
+    app.route("/", academicEquivalencyRoutes(database));
   }
 
   // Gradebook configuration (ST-112). Weighted assessment categories per gradebook and

@@ -8,6 +8,7 @@ import { useGradeLevels } from "../sections/queries";
 import { Badge, ConfirmModal, QueryState } from "./components";
 import { ROUNDING_MODES } from "./config-form";
 import { DescriptorScaleForm } from "./DescriptorScaleForm";
+import { DiplomaSettings, defaultDiplomaConfig } from "./diploma";
 import { problemMessage } from "./errors";
 import { useDeleteSubjectConfig, useSaveGradeProgram } from "./mutations";
 import { useGradePrograms, useGradeScales, useGradeSubjectConfigs } from "./queries";
@@ -15,7 +16,7 @@ import { SubjectConfigEditor } from "./SubjectConfigEditor";
 
 import type { RoundingMode } from "./config-form";
 import type { SetupContext } from "./context";
-import type { GradeProgram, GradeScale, SubjectConfig } from "./queries";
+import type { DiplomaConfig, GradeProgram, GradeScale, SubjectConfig } from "./queries";
 import type { EditorTarget } from "./SubjectConfigEditor";
 
 /**
@@ -92,7 +93,7 @@ export function SubjectsTab({ ctx }: { ctx: SetupContext }) {
 }
 
 type ResultFormat = GradeProgram["result_format"];
-const RESULT_FORMATS: readonly ResultFormat[] = ["percentage", "out_of", "gpa"];
+const RESULT_FORMATS: readonly ResultFormat[] = ["percentage", "out_of", "gpa", "points_total"];
 type PredictedVisibility = GradeProgram["predicted_grades_visibility"];
 const PREDICTED_VISIBILITIES: readonly PredictedVisibility[] = ["staff", "students_and_parents"];
 type RankBasis = GradeProgram["rank_basis"];
@@ -100,9 +101,16 @@ type RankScope = GradeProgram["rank_scope"];
 type RankVisibility = GradeProgram["rank_visibility"];
 const RANK_SCOPES: readonly RankScope[] = ["section", "grade_level"];
 const RANK_VISIBILITIES: readonly RankVisibility[] = ["staff", "students_and_parents"];
-/** A GPA basis needs the grade's result shown as a GPA (the API refuses it otherwise). */
+/**
+ * A GPA basis needs the grade's result shown as a GPA, and the diploma total a points-total grade
+ * (the API refuses them otherwise).
+ */
 const rankBases = (format: ResultFormat): readonly RankBasis[] =>
-  format === "gpa" ? ["average", "gpa", "weighted_gpa"] : ["average"];
+  format === "gpa"
+    ? ["average", "gpa", "weighted_gpa"]
+    : format === "points_total"
+      ? ["average", "points_total"]
+      : ["average"];
 
 function ProgramForm({
   ctx,
@@ -137,6 +145,9 @@ function ProgramForm({
   const [predictedVisibility, setPredictedVisibility] = useState<PredictedVisibility>(
     program?.predicted_grades_visibility ?? "staff",
   );
+  const [diploma, setDiploma] = useState<DiplomaConfig>(
+    program?.diploma_config ?? defaultDiplomaConfig(),
+  );
   const [rankEnabled, setRankEnabled] = useState(program?.rank_enabled ?? false);
   const [rankBasis, setRankBasis] = useState<RankBasis>(program?.rank_basis ?? "average");
   const [rankScope, setRankScope] = useState<RankScope>(program?.rank_scope ?? "section");
@@ -149,9 +160,11 @@ function ProgramForm({
 
   function chooseResultFormat(next: ResultFormat) {
     setResultFormat(next);
-    // Start each format from its usual maximum: out of 20, a 4-point GPA.
+    // Start each format from its usual maximum: out of 20, a 4-point GPA, 45 diploma points.
     if (next !== program?.result_format)
-      setScaleMax(next === "percentage" ? "" : next === "gpa" ? "4" : "20");
+      setScaleMax(
+        next === "percentage" ? "" : next === "gpa" ? "4" : next === "points_total" ? "45" : "20",
+      );
   }
 
   function submit() {
@@ -167,6 +180,7 @@ function ProgramForm({
           average_rounding_mode: mode,
           result_format: resultFormat,
           result_scale_max: resultFormat === "percentage" ? null : Number(scaleMax),
+          ...(resultFormat === "points_total" ? { diploma_config: diploma } : {}),
           predicted_grades_enabled: predicted,
           predicted_grades_visibility: predictedVisibility,
           rank_enabled: rankEnabled,
@@ -254,12 +268,16 @@ function ProgramForm({
               label={
                 resultFormat === "gpa"
                   ? t("academicGrading.subjects.program.gpaMax")
-                  : t("academicGrading.subjects.program.outOfMax")
+                  : resultFormat === "points_total"
+                    ? t("academicGrading.subjects.program.pointsMax")
+                    : t("academicGrading.subjects.program.outOfMax")
               }
               helperText={
                 resultFormat === "gpa"
                   ? t("academicGrading.subjects.program.gpaMaxHelp")
-                  : t("academicGrading.subjects.program.outOfMaxHelp")
+                  : resultFormat === "points_total"
+                    ? t("academicGrading.subjects.program.pointsMaxHelp")
+                    : t("academicGrading.subjects.program.outOfMaxHelp")
               }
               type="number"
               min={1}
@@ -271,6 +289,9 @@ function ProgramForm({
             />
           )}
         </div>
+        {resultFormat === "points_total" ? (
+          <DiplomaSettings value={diploma} onChange={setDiploma} disabled={disabled} />
+        ) : null}
         <Checkbox
           label={t("academicGrading.subjects.program.approval")}
           checked={approval}
@@ -308,7 +329,7 @@ function ProgramForm({
             <Select
               label={t("academicGrading.subjects.program.rank.basis")}
               helperText={
-                resultFormat === "gpa"
+                resultFormat === "gpa" || resultFormat === "points_total"
                   ? undefined
                   : t("academicGrading.subjects.program.rank.basisHelp")
               }

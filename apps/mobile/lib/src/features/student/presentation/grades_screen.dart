@@ -9,6 +9,7 @@ import '../application/grade_providers.dart';
 import '../domain/grade_report.dart';
 import '../domain/recent_grades.dart';
 import '../domain/work_and_grades.dart';
+import '../../exam_weeks/presentation/exam_timetable_screen.dart';
 import 'academic_results_screen.dart';
 import 'widgets/grade_term_selector.dart';
 import 'widgets/grade_trend_card.dart';
@@ -55,7 +56,7 @@ class GradesScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text('grades.title'.tr()),
-        actions: const [AcademicResultsButton()],
+        actions: const [ExamTimetableButton(), AcademicResultsButton()],
       ),
       body: GradesView(
         courseId: courseId,

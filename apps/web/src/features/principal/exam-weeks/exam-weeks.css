@@ -1,0 +1,86 @@
+/* Exam weeks (principal portal). Builds on academic-setup.css's ag-* blocks. */
+
+.ew-actions {
+  margin-block: var(--space-12);
+}
+
+.ew-fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.ew-fieldset legend {
+  margin-block-end: var(--space-8);
+  font-weight: var(--font-weight-medium);
+}
+
+.ew-room-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ew-room-list li + li {
+  margin-block-start: var(--space-8);
+}
+
+.ew-clashes {
+  margin: 0;
+  padding-inline-start: var(--space-20);
+}
+
+.ew-clashes li + li {
+  margin-block-start: var(--space-4);
+}
+
+.ew-sheet {
+  margin-block-end: var(--space-32);
+}
+
+.ew-sheet header h2 {
+  margin-block: var(--space-4);
+}
+
+.ew-sheet__room {
+  font-size: var(--font-size-2xl);
+}
+
+.ew-sheet__table {
+  inline-size: 100%;
+  border-collapse: collapse;
+}
+
+.ew-sheet__table th,
+.ew-sheet__table td {
+  padding: var(--space-4) var(--space-8);
+  border: 1px solid var(--color-border);
+  text-align: start;
+}
+
+@media print {
+  /* Print only the sheets when they are on the page, never the portal chrome around them. */
+  body:has(.ew-print) * {
+    visibility: hidden;
+  }
+
+  .ew-print,
+  .ew-print * {
+    visibility: visible;
+  }
+
+  .ew-print {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: 0;
+    inline-size: 100%;
+  }
+
+  .ew-sheet {
+    break-after: page;
+  }
+
+  .ew-no-print {
+    display: none;
+  }
+}

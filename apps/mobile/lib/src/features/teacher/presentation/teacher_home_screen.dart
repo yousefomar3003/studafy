@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../design/tokens/app_spacing_tokens.dart';
 import '../../../design/widgets/today_date_hero.dart';
+import '../../exam_weeks/application/exam_weeks_providers.dart';
+import '../../exam_weeks/presentation/invigilation_duties_screen.dart';
 import '../application/teacher_providers.dart';
 import 'widgets/take_attendance_button.dart';
 import 'widgets/teacher_agenda_cards.dart';
@@ -29,7 +31,8 @@ class TeacherHomeScreen extends ConsumerWidget {
         // classes → published assignments → pending submissions.
         ref
           ..invalidate(teacherTodaySessionsProvider)
-          ..invalidate(teacherClassesProvider);
+          ..invalidate(teacherClassesProvider)
+          ..invalidate(myInvigilationDutiesProvider);
       },
       child: ListView(
         padding: const EdgeInsets.all(
@@ -40,6 +43,7 @@ class TeacherHomeScreen extends ConsumerWidget {
           SizedBox(height: AppSpacing.space16),
           TakeAttendanceButton(),
           SizedBox(height: AppSpacing.space16),
+          InvigilationDutiesCard(),
           TeacherTodaySessionsCard(),
           SizedBox(height: AppSpacing.space16),
           TeacherGradingQueueCard(),

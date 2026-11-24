@@ -139,12 +139,13 @@ export async function copyYearConfiguration(
       rank_basis: string;
       rank_scope: string;
       rank_visibility: string;
+      diploma_config: object | null;
     }[]
   >`
     SELECT grade_level_id, grade_scale_id, max_failed_subjects_for_supplementary,
            mark_approval_required, average_rounding_decimals, average_rounding_mode,
            result_format, result_scale_max, predicted_grades_enabled, predicted_grades_visibility,
-           rank_enabled, rank_basis, rank_scope, rank_visibility
+           rank_enabled, rank_basis, rank_scope, rank_visibility, diploma_config
     FROM app.grade_programs WHERE school_id = ${schoolId}::uuid AND academic_year_id = ${sourceYearId}::uuid
   `;
   for (const program of programs) {
@@ -154,7 +155,7 @@ export async function copyYearConfiguration(
         max_failed_subjects_for_supplementary, mark_approval_required,
         average_rounding_decimals, average_rounding_mode, result_format, result_scale_max,
         predicted_grades_enabled, predicted_grades_visibility,
-        rank_enabled, rank_basis, rank_scope, rank_visibility
+        rank_enabled, rank_basis, rank_scope, rank_visibility, diploma_config
       ) VALUES (
         ${schoolId}::uuid, ${targetYearId}::uuid, ${program.grade_level_id}::uuid,
         ${mapScale(program.grade_scale_id)}::uuid, ${program.max_failed_subjects_for_supplementary},
@@ -162,7 +163,8 @@ export async function copyYearConfiguration(
         ${program.average_rounding_mode}, ${program.result_format},
         ${program.result_scale_max}::numeric, ${program.predicted_grades_enabled},
         ${program.predicted_grades_visibility}, ${program.rank_enabled}, ${program.rank_basis},
-        ${program.rank_scope}, ${program.rank_visibility}
+        ${program.rank_scope}, ${program.rank_visibility},
+        ${program.diploma_config === null ? null : tx.json(program.diploma_config as never)}
       )
     `;
     // The grade's descriptor scale (descriptive subjects) comes along with it.

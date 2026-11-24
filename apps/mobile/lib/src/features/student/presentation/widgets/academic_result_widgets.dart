@@ -1,10 +1,12 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../core/localization/localized_name.dart';
 import '../../../../design/theme/app_semantic_colors.dart';
 import '../../../../design/tokens/app_radius_tokens.dart';
 import '../../../../design/tokens/app_spacing_tokens.dart';
 import '../../domain/academic_results.dart';
+import 'diploma_widgets.dart';
 import 'status_pill.dart';
 
 /// Up to two decimals, trailing zeros dropped — "92", "87.5", "66.67".
@@ -62,9 +64,11 @@ String formatResultValue(ResultDisplay? display, num? percentage) {
   final max = formatResultNumber(display.max);
   final value = display.value;
   if (value == null) {
-    return display.format == ResultFormat.gpa
-        ? 'academicResults.gpaUnavailable'.tr()
-        : '—';
+    return switch (display.format) {
+      ResultFormat.gpa => 'academicResults.gpaUnavailable'.tr(),
+      ResultFormat.pointsTotal => 'academicResults.diploma.totalPending'.tr(),
+      _ => '—',
+    };
   }
   return display.format == ResultFormat.gpa
       ? 'academicResults.gpaValue'.tr(
@@ -186,6 +190,10 @@ class OverallResultSummary extends StatelessWidget {
             ),
           ],
         ),
+        if (overall.diploma case final diploma?) ...[
+          const SizedBox(height: AppSpacing.space12),
+          DiplomaOutcomeView(diploma: diploma),
+        ],
       ],
     );
   }
@@ -213,9 +221,16 @@ class ReportNotesSection extends StatelessWidget {
       for (final subject in subjects)
         if (subject.comment != null) subject,
     ];
-    if ((notes == null || notes.isEmpty) && commented.isEmpty) {
+    final withOutcomes = [
+      for (final subject in subjects)
+        if (subject.outcomes.isNotEmpty) subject,
+    ];
+    if ((notes == null || notes.isEmpty) &&
+        commented.isEmpty &&
+        withOutcomes.isEmpty) {
       return const SizedBox.shrink();
     }
+    final arabic = context.locale.languageCode == 'ar';
     final conduct = notes?.conductFor(context.locale.languageCode);
     final attendance = notes?.attendance;
 
@@ -239,12 +254,47 @@ class ReportNotesSection extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    subject.name,
+                    context.localizedName(subject.name, subject.nameAr),
                     style: theme.textTheme.labelLarge?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   Text(subject.comment!, style: theme.textTheme.bodyMedium),
+                ],
+              ),
+            ),
+        ],
+        if (withOutcomes.isNotEmpty) ...[
+          heading('academicResults.report.outcomes'),
+          for (final subject in withOutcomes)
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.space8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    subject.name,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  for (final outcome in subject.outcomes)
+                    Text(
+                      'academicResults.report.outcomeLine'.tr(
+                        namedArgs: {
+                          'code': outcome.code,
+                          'text':
+                              (arabic ? outcome.textAr : null) ?? outcome.text,
+                          'level':
+                              (arabic ? outcome.labelAr : null) ??
+                              outcome.label ??
+                              (outcome.level == null
+                                  ? '—'
+                                  : '${outcome.level}'),
+                        },
+                      ),
+                      style: theme.textTheme.bodyMedium,
+                    ),
                 ],
               ),
             ),
@@ -397,7 +447,10 @@ class SubjectResultsTable extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(subject.name, style: theme.textTheme.bodyMedium),
+                  Text(
+                    context.localizedName(subject.name, subject.nameAr),
+                    style: theme.textTheme.bodyMedium,
+                  ),
                   if (subject.courseLevel != null || subject.credits != null)
                     Padding(
                       padding: const EdgeInsets.only(top: AppSpacing.space4),

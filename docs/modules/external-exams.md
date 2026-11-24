@@ -14,6 +14,9 @@ Results can appear on transcripts.
 - Mobile: "Test scores" on the results screen, for the student and for a parent's child
   (`features/student/presentation/widgets/test_scores_section.dart`)
 
+Students are entered for these exams through [exam entries](exam-entries.md) (sessions,
+candidate numbers, the board's entry list); a result can link back to its entry (`entry_id`).
+
 The feature is opt-in: a school that adds no exam sees an empty tab and an empty panel, and its
 transcripts are unchanged.
 

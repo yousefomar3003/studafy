@@ -60,6 +60,9 @@ All endpoints require `student:import` (ORG_ADMIN, SUPER_ADMIN) on the web chann
 | `last_name`            | `students`  | yes      |                                                                             |
 | `middle_name`          | `students`  | no       |                                                                             |
 | `preferred_name`       | `students`  | no       |                                                                             |
+| `first_name_ar`        | `students`  | no       | Arabic spelling (000264). Header must say Arabic: "First name (Arabic)".    |
+| `middle_name_ar`       | `students`  | no       | Arabic father's name, e.g. "اسم الأب بالعربي".                              |
+| `last_name_ar`         | `students`  | no       | Arabic family name, e.g. "اسم العائلة بالعربي".                             |
 | `date_of_birth`        | `students`  | no       | `YYYY-MM-DD` only; `03/04/2010` is rejected, not guessed.                   |
 | `status`               | `students`  | no       | `applicant`, `enrolled`, … Case-insensitive; Arabic words (منتظم) accepted. |
 | `grade`                | `placement` | no       | Grade name, as in Academics. Places the student (see Placement below).      |
@@ -75,7 +78,11 @@ All endpoints require `student:import` (ORG_ADMIN, SUPER_ADMIN) on the web chann
 | `parent2_relationship` | `links`     | no       |                                                                             |
 
 Arabic header spellings are recognised too (رقم الطالب, الاسم الأول, الصف, الشعبة, رقم العائلة,
-اسم ولي الأمر 1, صلة القرابة 2, …; see `packages/student-import/src/fields.ts`).
+اسم ولي الأمر 1, صلة القرابة 2, …; see `packages/student-import/src/fields.ts`). A plain Arabic
+header such as الاسم الأول still maps to the English field, as before; the Arabic-name fields need a
+header that says so (الاسم الأول بالعربي, "Arabic first name"). Like the other student fields, an
+Arabic name in the file updates an existing student and a blank cell leaves the live value alone
+(see [Arabic + English documents](bilingual-documents.md)).
 
 A parent is all or nothing: a name or an email (or both), a relationship and a phone number. A
 relationship or a phone with neither name nor email is rejected, and so is a parent without a

@@ -7,10 +7,15 @@ import '../../../core/api/generated/models/discipline_incident.dart';
 import '../../../design/kit/kit.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
 import '../../custom_lists/presentation/linked_custom_lists_section.dart';
+import '../../remedial_plans/presentation/section_remedial_plans_screen.dart';
 import '../application/teacher_providers.dart';
+import 'academic_plans_screen.dart';
 import 'class_announcement_composer_screen.dart';
 import 'grade_entry_screen.dart';
 import 'incident_report_screen.dart';
+import 'outcome_achievement_screen.dart';
+import '../application/diploma_core_providers.dart';
+import 'diploma_core_screen.dart';
 import 'predicted_grades_screen.dart';
 import 'teacher_content_screen.dart';
 import 'widgets/roster_entry_tile.dart';
@@ -93,6 +98,24 @@ class TeacherClassDetailScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: AppSpacing.space16),
                   _PredictedGradesTile(classId: classId, classCode: classCode),
+                  const SizedBox(height: AppSpacing.space8),
+                  // IB Diploma classes only: takes no space for any other grade.
+                  _DiplomaCoreTile(classId: classId, classCode: classCode),
+                  _RemedialPlansTile(classId: classId, classCode: classCode),
+                  const SizedBox(height: AppSpacing.space8),
+                  _EntryTile(
+                    icon: Icons.event_note_outlined,
+                    titleKey: 'teacher.plans.entry',
+                    subtitleKey: 'teacher.plans.entrySubtitle',
+                    builder: (_) => AcademicPlansScreen(classId: classId, classCode: classCode),
+                  ),
+                  const SizedBox(height: AppSpacing.space8),
+                  _EntryTile(
+                    icon: Icons.flag_circle_outlined,
+                    titleKey: 'teacher.outcomes.entry',
+                    subtitleKey: 'teacher.outcomes.entrySubtitle',
+                    builder: (_) => OutcomeAchievementScreen(classId: classId, classCode: classCode),
+                  ),
                   const SizedBox(height: AppSpacing.space8),
                   // The class's rows in the school's custom lists (a bus group, a homeroom); takes
                   // no space when there are none.
@@ -218,9 +241,7 @@ class _ClassHero extends StatelessWidget {
       title: courseName,
       subtitle: rosterSize == null
           ? null
-          : 'teacher.classes.roster'.tr(
-              namedArgs: {'count': '$rosterSize'},
-            ),
+          : 'teacher.classes.roster'.tr(namedArgs: {'count': '$rosterSize'}),
     );
   }
 }
@@ -249,6 +270,99 @@ class _PredictedGradesTile extends StatelessWidget {
                 PredictedGradesScreen(classId: classId, classCode: classCode),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Opens [DiplomaCoreScreen] for the class's section, offered only when the section's grade uses
+/// the IB Diploma total (the API lets any teacher of the section enter TOK, EE and CAS).
+class _DiplomaCoreTile extends ConsumerWidget {
+  const _DiplomaCoreTile({required this.classId, required this.classCode});
+
+  final String classId;
+  final String classCode;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sectionId = ref.watch(classDiplomaSectionProvider(classId)).value;
+    if (sectionId == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.space8),
+      child: Card(
+        margin: EdgeInsets.zero,
+        child: ListTile(
+          leading: const Icon(Icons.workspace_premium_outlined),
+          title: Text('teacher.diploma.entry'.tr()),
+          subtitle: Text('teacher.diploma.entrySubtitle'.tr()),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) =>
+                  DiplomaCoreScreen(sectionId: sectionId, classCode: classCode),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Opens [TeacherRemedialPlansScreen] for the class's section and subject: the students below the
+/// pass line and their remedial plans (000269). Costs no request until it is tapped.
+class _RemedialPlansTile extends StatelessWidget {
+  const _RemedialPlansTile({required this.classId, required this.classCode});
+
+  final String classId;
+  final String classCode;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: EdgeInsets.zero,
+      child: ListTile(
+        leading: const Icon(Icons.support_outlined),
+        title: Text('remedial.entry'.tr()),
+        subtitle: Text('remedial.entrySubtitle'.tr()),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => TeacherRemedialPlansScreen(
+              classId: classId,
+              classCode: classCode,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A row opening one of the class's section-and-subject screens (lesson plans, learning
+/// outcomes, 000268). Like [_PredictedGradesTile], it costs no request until tapped.
+class _EntryTile extends StatelessWidget {
+  const _EntryTile({
+    required this.icon,
+    required this.titleKey,
+    required this.subtitleKey,
+    required this.builder,
+  });
+
+  final IconData icon;
+  final String titleKey;
+  final String subtitleKey;
+  final WidgetBuilder builder;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: EdgeInsets.zero,
+      child: ListTile(
+        leading: Icon(icon),
+        title: Text(titleKey.tr()),
+        subtitle: Text(subtitleKey.tr()),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: builder)),
       ),
     );
   }

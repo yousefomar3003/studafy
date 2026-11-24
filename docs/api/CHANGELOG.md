@@ -13,6 +13,159 @@ when it required the `version-bump` label.
 
 ### Added
 
+- Remedial plans (migration 000269; docs/modules/remedial-plans.md), new tag "Remedial plans".
+  `listRemedialPlans` (`GET /api/grading/remedial-plans`, query `academic_year_id`,
+  `grade_level_id`, `section_id`, `subject_id`, `status`, `overdue`; `RemedialPlanList` with
+  `counts` and `truncated`), `createRemedialPlan` (`POST` same path, `CreateRemedialPlanBody`),
+  `getRemedialPlan` / `updateRemedialPlan` (`GET` / `PATCH /api/grading/remedial-plans/{planId}`,
+  `UpdateRemedialPlanBody`), `addRemedialPlanNote`
+  (`POST /api/grading/remedial-plans/{planId}/notes`, `AddRemedialPlanNoteBody`), all returning
+  `RemedialPlan` (reviews, timeline `RemedialPlanNote`, `access`, `can_edit`, `can_add_note`);
+  `getSectionRemedialPlans` (`GET /api/grading/sections/{sectionId}/subjects/{subjectId}/remedial-plans`,
+  query `term_id`; `SectionRemedialPlans` with suggestions below the pass line);
+  `getStudentRemedialPlans` (`GET /api/grading/students/{studentId}/remedial-plans`);
+  `getRemedialPlanSettings` / `updateRemedialPlanSettings`
+  (`GET` / `PUT /api/grading/remedial-plan-settings`, `RemedialPlanSettings.family_visible`).
+  Reads `grade:read`; plan writes `grade:update` or `result:finalize`; the setting
+  `academicConfig:read` / `academicConfig:manage`. New problem codes `REMEDIAL_PLAN_DUPLICATE` and
+  `REMEDIAL_PLAN_CLOSED` (409).
+- Learning outcomes and lesson and term plans (migration 000268;
+  docs/modules/lesson-plans-and-outcomes.md), tags "Learning outcomes" and "Lesson plans".
+  `getPlanningSettings` / `updatePlanningSettings` (`/api/grading/planning-settings`:
+  achievement scale, `show_outcomes_on_report_cards`, plan due days); `listLearningOutcomes`,
+  `createLearningOutcome`, `updateLearningOutcome`, `deleteLearningOutcome` and
+  `importLearningOutcomes` (`/api/grading/learning-outcomes`, CSV with dry run; 409
+  `LEARNING_OUTCOME_DUPLICATE` / `LEARNING_OUTCOME_IN_USE`); `getSectionOutcomeAchievements` /
+  `saveSectionOutcomeAchievements` (`.../sections/{sectionId}/subjects/{subjectId}/outcome-achievements`,
+  `grade:read` / `grade:update`); term plans (`listTermPlans`, `createTermPlan`, `getTermPlan`,
+  `updateTermPlan`, `deleteTermPlan`, `submitTermPlan`, `reviewTermPlan`), lesson plans
+  (`listLessonPlans`, `createLessonPlan`, `getLessonPlanOptions`, `getLessonPlan`,
+  `updateLessonPlan`, `deleteLessonPlan`, `submitLessonPlan`, `reviewLessonPlan`,
+  `saveLessonReflection`), `listPlanReviews` (`/api/grading/plan-reviews`) and `getPlanCoverage`
+  (`/api/grading/plan-coverage`). Plan writes need `lesson:create` / `lesson:update` /
+  `lesson:delete` and a teacher of the section and subject; reads and reviews `academicConfig:read`,
+  narrowed to the section's teachers, the subject's coordinator and leadership. Additive:
+  `FinalizedSubjectResult.outcomes` (`OutcomeAchievementResult[]`, empty unless the school shows
+  outcomes on report cards) and `CertificateContentSubject.outcomes` (optional).
+- Tawjihi equivalency estimates and multi-year results (migration 000267;
+  docs/modules/tawjihi-equivalency.md), tags "Tawjihi equivalency" and "Multi-year results".
+  Rule sets: `listEquivalencyRuleSets` (`GET /api/grading/equivalency-rule-sets`,
+  `academicConfig:read`), `createEquivalencyRuleSet` (`POST`), `updateEquivalencyRuleSet`
+  (`PUT .../{setId}`) and `deleteEquivalencyRuleSet` (`DELETE .../{setId}`), writes
+  `academicConfig:manage`, with `EquivalencyRuleSet` / `EquivalencyRuleSetInput`
+  (`EquivalencySourceSystem`, grade levels, ordered weighted `EquivalencyPart`s of an
+  `EquivalencyPartType` — `exam_subjects`, `diploma_total`, `gpa`, `exam_total` — with a grade
+  table or an `EquivalencyConversion` table/formula); a duplicate name is 409
+  `CONFLICT_DUPLICATE_ENTRY`. `listEquivalencyStudents`
+  (`GET /api/grading/equivalency-rule-sets/{setId}/students?academic_year_id=&grade_level_id=`,
+  `academicConfig:manage`, `EquivalencyStudentList`) and `getStudentEquivalency`
+  (`GET /api/grading/students/{studentId}/equivalency`, `grade:read` + `app.can_read_student`,
+  `StudentEquivalency`: per set an `EquivalencyStatus`, the estimated percentage, each
+  `EquivalencyPartResult` and `EquivalencyIssue`s). Estimates under the school's own rules, not
+  official conversions; students and parents see only sets shown to them. Multi-year:
+  `listMultiYearResultConfigs` / `createMultiYearResultConfig` / `updateMultiYearResultConfig` /
+  `deleteMultiYearResultConfig` (`/api/grading/multi-year-result-configs[/{configId}]`,
+  `MultiYearResultConfig` / `MultiYearResultConfigInput`: 2–6 grade levels with relative weights)
+  and `getStudentMultiYearResults` (`GET /api/grading/students/{studentId}/multi-year-results`,
+  `StudentMultiYearResults`: `MultiYearStatus`, weighted overall and per-subject percentages, each
+  year's `MultiYearYearStatus`).
+- Subject coordinators (migration 000261; docs/modules/subject-coordinators.md), tag "Academic
+  grading". `listSubjectCoordinators` (`GET /api/grading/years/{yearId}/subject-coordinators`,
+  `academicConfig:read`), `createSubjectCoordinator` (`POST` same path, `SubjectCoordinatorBody`:
+  `subject_id`, `user_id`, `grade_level_ids`), `updateSubjectCoordinator`
+  (`PATCH /api/grading/subject-coordinators/{coordinatorId}`, `SubjectCoordinatorUpdateBody`) and
+  `deleteSubjectCoordinator` (`DELETE` same path), all writes `academicConfig:manage`, returning
+  `SubjectCoordinator` / `SubjectCoordinatorList`; a repeat is 409 `SUBJECT_COORDINATOR_DUPLICATE`,
+  a non-staff user 400. `listMyCoordinatedSubjects` (`GET /api/grading/my-coordinated-subjects`,
+  `academicConfig:read`, query `academic_year_id`) returns `MyCoordinatedSubjects` (subjects,
+  their sections, mark sheet status per period, current and finalized averages). `MarkSheet` adds
+  `access` (`SectionSubjectAccess`: `leadership`, `teacher`, `coordinator`); `getMarkSheet` and
+  `getSectionPredictedGrades` now also answer the subject's coordinator, read-only
+  (`can_edit_marks`, `can_add_assessments` and `editable` false).
+- Ministry results export (migration 000265; docs/modules/ministry-export.md), tag "Ministry
+  export", leadership from web sessions only. Templates: `listMinistryExportTemplates`
+  (`GET /api/grading/ministry-export-templates`), `createMinistryExportTemplate` (`POST`),
+  `updateMinistryExportTemplate` (`PUT .../{templateId}`) and `deleteMinistryExportTemplate`
+  (`DELETE .../{templateId}`), with `MinistryExportTemplate` / `MinistryExportTemplateInput`
+  (`MinistryExportFileFormat` `csv`/`xlsx`, `MinistryExportEncoding` `utf8`/`utf8_bom`,
+  `MinistryExportRowKind` `subject`/`overall`, ordered `MinistryExportColumn`s of a
+  `MinistryExportField` with optional value maps, subject codes, the national ID's student record
+  field), and `listMinistryExportExamples` (`GET /api/grading/ministry-export-examples`, editable
+  examples, not official formats), all `academicConfig:manage`. Exports, `result:finalize`:
+  `previewMinistryExport` (`POST /api/grading/ministry-exports/preview`, `MinistryExportPreview`:
+  heading, first rows, counts and `MinistryExportIssue`s — `national_id_source_missing`,
+  `missing_national_id`, `unmapped_subject`, `section_not_finalized`) and `downloadMinistryExport`
+  (`POST .../download`, `text/csv` or XLSX), both over finalized results of a year and a term or
+  the annual results (`MinistryExportRunInput`). A sensitive national ID is masked in the preview
+  and opened for the download only with `studentRecord:readSensitive` (403; 503
+  `RECORD_KEY_UNAVAILABLE`), audited as a reveal.
+- Exam entries (migration 000262; docs/modules/exam-entries.md), tag "Exam entries". Sessions:
+  `listExamSessions` (`GET /api/grading/external-exam-sessions?exam_id=`, `academicConfig:read`),
+  `createExamSession` (`POST`), `updateExamSession` (`PUT .../{sessionId}`) and
+  `deleteExamSession` (`DELETE .../{sessionId}`, 409 once it has entries), all
+  `academicConfig:manage`, with `ExamSession` (series, entry deadline, first and last exam, results
+  date, counts per `ExamEntryStatus`: `draft`, `entered`, `withdrawn`). Entries, all
+  `academicConfig:manage`: `listExamSessionEntries` (`GET .../{sessionId}/entries`,
+  `ExamSessionEntries` with `subject_counts`), `createExamEntries` (`POST .../{sessionId}/entries`,
+  bulk by `student_ids`, `section_id` or `grade_level_id` + `academic_year_id`),
+  `changeExamEntryStatus` (`POST .../{sessionId}/entries/status`), `assignExamCandidateNumbers`
+  (`POST .../{sessionId}/candidate-numbers`), `exportExamSessionEntries`
+  (`GET .../{sessionId}/entries/export?include_drafts=`, `text/csv`), `updateExamEntry`
+  (`PUT /api/grading/external-exam-entries/{entryId}`, 409 `CONFLICT_DUPLICATE_ENTRY` for a
+  candidate number used in the session) and `deleteExamEntry` (`DELETE`, drafts only). A student's
+  own: `listStudentExamEntries` (`GET /api/grading/students/{studentId}/external-exam-entries`,
+  `grade:read` + row scope, entered and withdrawn entries only, `StudentExamEntry`).
+  `RecordExternalExamResultBody` / `UpdateExternalExamResultBody` take an optional `entry_id`
+  (on update, absent keeps the link and null clears it); `ExternalExamResult` returns `entry_id`.
+
+- IB Diploma total out of 45 (migration 000263; docs/database/academic-grading.md "IB Diploma
+  total"). `ResultFormat` adds `points_total` (`result_scale_max` up to 1000, 45 for the IB) and
+  `RankBasis` adds `points_total` (only on a `points_total` grade, else 400). `GradeProgramBody`
+  takes optional `diploma_config` (`DiplomaConfig`: `counted_subjects`, 25-cell `core_matrix` of
+  `DiplomaMatrixCell`, `conditions` of flat `DiplomaCondition`; null resets to the IB defaults) and
+  `GradeProgram` returns it (null for other formats). `FinalizedStudentResult` and the result
+  preview add `diploma` (`DiplomaResult`, nullable: `status` `awarded` / `not_awarded` /
+  `pending`, `total`, `max`, `subject_points`, `core_points`, `counted_subject_ids`, `tok_grade`,
+  `ee_grade`, `cas_complete`, `failing_conditions` of flat `DiplomaFailingCondition`,
+  `pending_reasons`); `CertificateContentOverall` and `TranscriptYearOverall` add an optional
+  `diploma` (absent on documents issued before). New `getSectionDiplomaCore` /
+  `saveSectionDiplomaCore` (`GET`/`PUT /api/grading/sections/{sectionId}/diploma-core`,
+  `grade:read`, writes `grade:update` or `result:finalize`; the section's teachers and leadership;
+  `SaveDiplomaCoreBody` with `kind` `final` / `predicted`) and `getStudentDiploma`
+  (`GET /api/grading/students/{studentId}/diploma`, `grade:read`) returning `StudentDiploma` with
+  the predicted total. New error code `DIPLOMA_TOTAL_DISABLED` (409).
+- Arabic + English documents (migration 000264; docs/modules/bilingual-documents.md). New
+  `getDocumentLanguageSettings` / `updateDocumentLanguageSettings`
+  (`GET/PUT /api/grading/document-language-settings`, `academicConfig:read` / `:manage`) with
+  `DocumentLanguageSettings` (`report_card_language`, `certificate_language`,
+  `transcript_language`: `viewer`, `en`, `ar`, `bilingual`; `school_name_ar`). Optional Arabic
+  names: `StudentProfile`, `StudentDemographics`, `StudentSelf` and the create/update bodies add
+  `first_name_ar`, `middle_name_ar`, `last_name_ar`; `Subject`, `GradeLevel`, `Section`, `Term`,
+  `AcademicYear` and their bodies add `name_ar` (`Section` also `grade_level_name_ar`); omitted
+  keeps, null or blank clears. `Course` (list/get), `PublishedGrade.course`,
+  `ChildTimetableCourse`, `FinalizedSubjectResult` and `ReleasedMarkSubject` add the subject's
+  `subject_name_ar`; `FinalizedStudentResult` adds the student's Arabic names.
+  `CertificateContent` and `TranscriptContent` add optional `language` and `name_ar` /
+  `*_name_ar` fields, present only on documents issued with them. The student list search and the
+  global search also match a student's Arabic name.
+
+- Exam weeks (migration 000266; docs/modules/exam-weeks.md), tag "Exam weeks". Leadership
+  (`timetable:manage`): `listExamPeriods` / `createExamPeriod`
+  (`GET`/`POST /api/academics/exam-periods`, `?academic_year_id`), `getExamPeriod` /
+  `updateExamPeriod` / `deleteExamPeriod` (`.../{periodId}`; `ExamPeriod`, `ExamPeriodInput` with
+  `ExamPeriodKind` and `ExamPeriodStatus` `draft`/`published`), `createExamSlot`
+  (`POST .../{periodId}/slots`), `updateExamSlot` / `deleteExamSlot`
+  (`/api/academics/exam-slots/{slotId}`; `ExamSlot`, `ExamSlotInput`), `generateExamSeating`
+  (`POST .../{slotId}/seating`, `ExamSeatingStrategy` `by_section`/`alphabetical`/`mixed`,
+  `keep_existing`; `ExamSeatingResult`), `moveExamSeat` (`PUT .../{slotId}/seats/{studentId}`;
+  409 when another exam uses the seat), `setExamInvigilators` (`PUT .../{slotId}/invigilators`),
+  `getExamPeriodSeating` (`GET .../{periodId}/seating`) and `getExamPeriodClashes`
+  (`GET .../{periodId}/clashes`, `ExamClash`). Apps: `getStudentExamTimetable`
+  (`GET /api/academics/students/{studentId}/exam-timetable`, `student:read` + row scope;
+  published periods only, with room, seat and the school's timezone) and `getMyInvigilationDuties`
+  (`GET /api/academics/me/invigilation-duties`). Rooms: `createRoom` (`POST /api/academics/rooms`)
+  and `updateRoom` (`PATCH /api/academics/rooms/{roomId}`), both `timetable:manage`; `Room` adds
+  `exam_capacity` (nullable).
 - Class rank and percentile (migration 000257; docs/database/academic-grading.md "Class rank and
   percentile"). New `listTopStudents`
   (`GET /api/grading/years/{yearId}/programs/{gradeLevelId}/top-students`, `result:finalize`;

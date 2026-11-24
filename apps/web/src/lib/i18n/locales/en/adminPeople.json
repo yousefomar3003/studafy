@@ -202,7 +202,12 @@
       "dateOfBirth": "Date of birth",
       "admissionNumber": "Admission number",
       "admissionDate": "Admission date",
-      "status": "Status"
+      "status": "Status",
+      "arabicNames": "Arabic name",
+      "arabicNamesHelper": "Optional. Shown on Arabic and bilingual report cards, certificates and transcripts, and in the app in Arabic.",
+      "firstNameAr": "Arabic first name",
+      "middleNameAr": "Arabic father's name",
+      "lastNameAr": "Arabic family name"
     },
     "create": {
       "title": "New student",
@@ -288,7 +293,10 @@
         "parent2_email": "Parent 2 email",
         "parent2_name": "Parent 2 name",
         "parent2_relationship": "Parent 2 relationship",
-        "parent2_phone": "Parent 2 phone"
+        "parent2_phone": "Parent 2 phone",
+        "first_name_ar": "Arabic first name",
+        "middle_name_ar": "Arabic father's name",
+        "last_name_ar": "Arabic family name"
       },
       "hints": {
         "admission_number": "Your school's unique ID for the student.",

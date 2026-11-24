@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/localization/localized_name.dart';
 import '../../../design/layout/bottom_inset_padding.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
 import '../application/transcript_providers.dart';
@@ -73,6 +74,10 @@ class _Document extends StatelessWidget {
     final invalid = !transcript.status.isValid;
     final revokeReason = transcript.revokeReason?.trim();
     final gpaReason = cumulative.gpaUnavailableReason;
+    // Names as issued: in the transcript's language (both when bilingual), or the app's.
+    final readerLanguage = context.locale.languageCode;
+    String named(String name, String? nameAr) =>
+        documentName(content.language, readerLanguage, name, nameAr);
 
     return ListView(
       padding: const EdgeInsets.all(
@@ -123,165 +128,180 @@ class _Document extends StatelessWidget {
             ),
             child: Padding(
               padding: const EdgeInsets.all(AppSpacing.space16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    content.schoolName,
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: AppSpacing.space4),
-                  Text(
-                    'academicResults.transcript.title'.tr(),
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: AppSpacing.space8),
-                  Center(
-                    child: CertificateStatusPill(status: transcript.status),
-                  ),
-                  const Divider(height: AppSpacing.space32),
-                  _Field(
-                    label: 'academicResults.certificate.student'.tr(),
-                    value: content.studentName,
-                  ),
-                  _Field(
-                    label: 'academicResults.certificate.admission'.tr(),
-                    value: content.admissionNumber,
-                  ),
-                  for (final year in content.years) ...[
+              child: DocumentLanguageScope(
+                language: content.language,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      named(content.schoolName, content.schoolNameAr),
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: AppSpacing.space4),
+                    Text(
+                      'academicResults.transcript.title'.tr(),
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: AppSpacing.space8),
+                    Center(
+                      child: CertificateStatusPill(status: transcript.status),
+                    ),
                     const Divider(height: AppSpacing.space32),
-                    Text(
-                      year.academicYearName,
-                      style: theme.textTheme.titleSmall,
-                    ),
-                    Text(
-                      'academicResults.sectionLine'.tr(
-                        namedArgs: {
-                          'grade': year.gradeLevelName,
-                          'section': year.sectionName,
-                        },
-                      ),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.space8),
-                    SubjectResultsTable(subjects: year.subjects),
-                    const SizedBox(height: AppSpacing.space8),
-                    OverallResultSummary(overall: year.overall),
-                  ],
-                  const Divider(height: AppSpacing.space32),
-                  Text(
-                    'academicResults.transcript.cumulative'.tr(),
-                    style: theme.textTheme.titleSmall,
-                  ),
-                  const SizedBox(height: AppSpacing.space8),
-                  _Field(
-                    label: 'academicResults.transcript.cumulativeAverage'.tr(),
-                    value: formatResultPercent(cumulative.averagePercentage),
-                  ),
-                  _Field(
-                    label: 'academicResults.transcript.cumulativeGpa'.tr(),
-                    value: cumulative.gpa == null
-                        ? '—'
-                        : formatResultNumber(cumulative.gpa!),
-                  ),
-                  if (cumulative.gpa != null && cumulative.weightedGpa != null)
                     _Field(
-                      label: 'academicResults.transcript.cumulativeWeightedGpa'
-                          .tr(),
-                      value: formatResultNumber(cumulative.weightedGpa!),
+                      label: 'academicResults.certificate.student'.tr(),
+                      value: named(content.studentName, content.studentNameAr),
                     ),
-                  if (formatCreditsEarned(
-                        cumulative.creditsAttempted,
-                        cumulative.creditsEarned,
-                      )
-                      case final credits?)
                     _Field(
-                      label: 'academicResults.transcript.cumulativeCredits'
-                          .tr(),
-                      value: credits,
+                      label: 'academicResults.certificate.admission'.tr(),
+                      value: content.admissionNumber,
                     ),
-                  _Field(
-                    label: 'academicResults.transcript.yearsCovered'.tr(),
-                    value: '${cumulative.yearsCovered}',
-                  ),
-                  if (cumulative.gpa == null && gpaReason != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: AppSpacing.space4),
-                      child: Text(
-                        'academicResults.transcript.gpaReason.${gpaReason.name}'
-                            .tr(
-                              namedArgs: {
-                                'subjects': cumulative.subjectsWithoutGpaPoints
-                                    .join(', '),
-                                'scales': cumulative.mixedGpaScales
-                                    .map(
-                                      (scale) =>
-                                          'academicResults.transcript.gpaScale'
-                                              .tr(
-                                                namedArgs: {
-                                                  'year': scale.year,
-                                                  'max': formatResultNumber(
-                                                    scale.max,
-                                                  ),
-                                                },
-                                              ),
-                                    )
-                                    .join(', '),
-                              },
+                    for (final year in content.years) ...[
+                      const Divider(height: AppSpacing.space32),
+                      Text(
+                        named(year.academicYearName, year.academicYearNameAr),
+                        style: theme.textTheme.titleSmall,
+                      ),
+                      Text(
+                        'academicResults.sectionLine'.tr(
+                          namedArgs: {
+                            'grade': named(
+                              year.gradeLevelName,
+                              year.gradeLevelNameAr,
                             ),
+                            'section': named(
+                              year.sectionName,
+                              year.sectionNameAr,
+                            ),
+                          },
+                        ),
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
-                    ),
-                  for (final requirement in content.graduationRequirements)
-                    _Field(
-                      label: 'academicResults.transcript.graduation'.tr(
-                        namedArgs: {'name': requirement.name},
-                      ),
-                      value: 'academicResults.transcript.graduationValue'.tr(
-                        namedArgs: {
-                          'status': graduationStatusLabel(requirement.status),
-                          'met': '${requirement.rulesMet}',
-                          'total': '${requirement.rulesTotal}',
-                        },
-                      ),
-                    ),
-                  const Divider(height: AppSpacing.space32),
-                  _Field(
-                    label: 'academicResults.certificate.serialLabel'.tr(),
-                    value: content.serialNumber,
-                  ),
-                  _Field(
-                    label: 'academicResults.certificate.issueDate'.tr(),
-                    value: date(content.issuedAt),
-                  ),
-                  if (content.issuedByName != null)
-                    _Field(
-                      label: 'academicResults.certificate.issuedBy'.tr(),
-                      value: content.issuedByName!,
-                    ),
-                  if (content.reissueOfSerial != null) ...[
-                    const SizedBox(height: AppSpacing.space8),
+                      const SizedBox(height: AppSpacing.space8),
+                      SubjectResultsTable(subjects: year.subjects),
+                      const SizedBox(height: AppSpacing.space8),
+                      OverallResultSummary(overall: year.overall),
+                    ],
+                    const Divider(height: AppSpacing.space32),
                     Text(
-                      'academicResults.certificate.reissueOf'.tr(
-                        namedArgs: {'serial': content.reissueOfSerial!},
-                      ),
-                      style: theme.textTheme.bodySmall,
+                      'academicResults.transcript.cumulative'.tr(),
+                      style: theme.textTheme.titleSmall,
                     ),
-                    if (content.reissueReason?.trim().isNotEmpty ?? false)
+                    const SizedBox(height: AppSpacing.space8),
+                    _Field(
+                      label: 'academicResults.transcript.cumulativeAverage'
+                          .tr(),
+                      value: formatResultPercent(cumulative.averagePercentage),
+                    ),
+                    _Field(
+                      label: 'academicResults.transcript.cumulativeGpa'.tr(),
+                      value: cumulative.gpa == null
+                          ? '—'
+                          : formatResultNumber(cumulative.gpa!),
+                    ),
+                    if (cumulative.gpa != null &&
+                        cumulative.weightedGpa != null)
+                      _Field(
+                        label:
+                            'academicResults.transcript.cumulativeWeightedGpa'
+                                .tr(),
+                        value: formatResultNumber(cumulative.weightedGpa!),
+                      ),
+                    if (formatCreditsEarned(
+                          cumulative.creditsAttempted,
+                          cumulative.creditsEarned,
+                        )
+                        case final credits?)
+                      _Field(
+                        label: 'academicResults.transcript.cumulativeCredits'
+                            .tr(),
+                        value: credits,
+                      ),
+                    _Field(
+                      label: 'academicResults.transcript.yearsCovered'.tr(),
+                      value: '${cumulative.yearsCovered}',
+                    ),
+                    if (cumulative.gpa == null && gpaReason != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: AppSpacing.space4),
+                        child: Text(
+                          'academicResults.transcript.gpaReason.${gpaReason.name}'
+                              .tr(
+                                namedArgs: {
+                                  'subjects': cumulative
+                                      .subjectsWithoutGpaPoints
+                                      .join(', '),
+                                  'scales': cumulative.mixedGpaScales
+                                      .map(
+                                        (scale) =>
+                                            'academicResults.transcript.gpaScale'
+                                                .tr(
+                                                  namedArgs: {
+                                                    'year': scale.year,
+                                                    'max': formatResultNumber(
+                                                      scale.max,
+                                                    ),
+                                                  },
+                                                ),
+                                      )
+                                      .join(', '),
+                                },
+                              ),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    for (final requirement in content.graduationRequirements)
+                      _Field(
+                        label: 'academicResults.transcript.graduation'.tr(
+                          namedArgs: {'name': requirement.name},
+                        ),
+                        value: 'academicResults.transcript.graduationValue'.tr(
+                          namedArgs: {
+                            'status': graduationStatusLabel(requirement.status),
+                            'met': '${requirement.rulesMet}',
+                            'total': '${requirement.rulesTotal}',
+                          },
+                        ),
+                      ),
+                    const Divider(height: AppSpacing.space32),
+                    _Field(
+                      label: 'academicResults.certificate.serialLabel'.tr(),
+                      value: content.serialNumber,
+                    ),
+                    _Field(
+                      label: 'academicResults.certificate.issueDate'.tr(),
+                      value: date(content.issuedAt),
+                    ),
+                    if (content.issuedByName != null)
+                      _Field(
+                        label: 'academicResults.certificate.issuedBy'.tr(),
+                        value: content.issuedByName!,
+                      ),
+                    if (content.reissueOfSerial != null) ...[
+                      const SizedBox(height: AppSpacing.space8),
                       Text(
-                        'academicResults.certificate.reason'.tr(
-                          namedArgs: {'reason': content.reissueReason!.trim()},
+                        'academicResults.certificate.reissueOf'.tr(
+                          namedArgs: {'serial': content.reissueOfSerial!},
                         ),
                         style: theme.textTheme.bodySmall,
                       ),
+                      if (content.reissueReason?.trim().isNotEmpty ?? false)
+                        Text(
+                          'academicResults.certificate.reason'.tr(
+                            namedArgs: {
+                              'reason': content.reissueReason!.trim(),
+                            },
+                          ),
+                          style: theme.textTheme.bodySmall,
+                        ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
           ),

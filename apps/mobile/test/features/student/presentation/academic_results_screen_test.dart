@@ -1,21 +1,30 @@
-import 'package:easy_localization/easy_localization.dart';
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:studafy_mobile/src/core/localization/app_locales.dart';
 import 'package:studafy_mobile/src/design/theme/app_theme.dart';
+import 'package:studafy_mobile/src/features/student/application/academic_equivalency_providers.dart';
 import 'package:studafy_mobile/src/features/student/application/academic_results_providers.dart';
+import 'package:studafy_mobile/src/features/student/application/exam_entries_providers.dart';
+import 'package:studafy_mobile/src/features/student/application/diploma_providers.dart';
 import 'package:studafy_mobile/src/features/student/application/external_exam_results_providers.dart';
 import 'package:studafy_mobile/src/features/student/application/predicted_grades_providers.dart';
 import 'package:studafy_mobile/src/features/student/application/graduation_requirements_providers.dart';
 import 'package:studafy_mobile/src/features/student/application/student_context_providers.dart';
 import 'package:studafy_mobile/src/features/student/application/transcript_providers.dart';
+import 'package:studafy_mobile/src/features/student/data/academic_equivalency_client.dart';
 import 'package:studafy_mobile/src/features/student/data/academic_results_client.dart';
+import 'package:studafy_mobile/src/features/student/data/exam_entries_client.dart';
+import 'package:studafy_mobile/src/features/student/data/diploma_client.dart';
 import 'package:studafy_mobile/src/features/student/data/external_exam_results_client.dart';
 import 'package:studafy_mobile/src/features/student/data/graduation_requirements_client.dart';
 import 'package:studafy_mobile/src/features/student/data/predicted_grades_client.dart';
 import 'package:studafy_mobile/src/features/student/data/transcript_client.dart';
+import 'package:studafy_mobile/src/features/student/domain/academic_equivalency.dart';
 import 'package:studafy_mobile/src/features/student/domain/academic_results.dart';
+import 'package:studafy_mobile/src/features/student/domain/exam_entries.dart';
+import 'package:studafy_mobile/src/features/student/domain/diploma_prediction.dart';
 import 'package:studafy_mobile/src/features/student/domain/external_exam_results.dart';
 import 'package:studafy_mobile/src/features/student/domain/graduation_requirements.dart';
 import 'package:studafy_mobile/src/features/student/domain/predicted_grades.dart';
@@ -226,6 +235,20 @@ class _FakeTestScoresClient implements ExternalExamResultsClient {
       parseExternalExamResults(body);
 }
 
+/// Exam entries as the API sends them (parsed with the app's own parser).
+class _FakeExamEntriesClient implements ExamEntriesClient {
+  _FakeExamEntriesClient([this.body = const {'entries': <Object?>[]}]);
+
+  final Object? body;
+  final List<String> requestedStudents = [];
+
+  @override
+  Future<List<StudentExamEntry>> fetchEntries(String studentId) async {
+    requestedStudents.add(studentId);
+    return parseStudentExamEntries(body);
+  }
+}
+
 /// Predicted grades as the API hands them to a student or parent (no notes).
 class _FakePredictedClient implements StudentPredictedGradesClient {
   _FakePredictedClient([this.json]);
@@ -235,6 +258,17 @@ class _FakePredictedClient implements StudentPredictedGradesClient {
   @override
   Future<List<PredictedGradesYear>> fetch(String studentId) async =>
       parsePredictedGradeYears(json);
+}
+
+/// The IB Diploma prediction as the API hands it to a student or parent.
+class _FakeDiplomaClient implements StudentDiplomaClient {
+  _FakeDiplomaClient([this.json]);
+
+  final Map<String, Object?>? json;
+
+  @override
+  Future<List<DiplomaPredictionYear>> fetch(String studentId) async =>
+      parseDiplomaPredictions(json);
 }
 
 /// A graduation checklist as the API sends it (parsed with the app's own parser).
@@ -248,15 +282,37 @@ class _FakeGraduationClient implements GraduationRequirementsClient {
       parseGraduationChecklist(body);
 }
 
+/// Tawjihi equivalency and multi-year results as the API sends them (none by default).
+class _FakeEquivalencyClient implements AcademicEquivalencyClient {
+  _FakeEquivalencyClient({
+    this.equivalency = const {'estimates': <Object?>[]},
+    this.multiYear = const {'results': <Object?>[]},
+  });
+
+  final Object? equivalency;
+  final Object? multiYear;
+
+  @override
+  Future<List<EquivalencyEstimate>> fetchEquivalency(String studentId) async =>
+      parseStudentEquivalency(equivalency);
+
+  @override
+  Future<List<MultiYearResult>> fetchMultiYearResults(String studentId) async =>
+      parseStudentMultiYearResults(multiYear);
+}
+
 Future<void> _pump(
   WidgetTester tester,
   _FakeResultsClient client, {
+  AcademicEquivalencyClient? equivalency,
   ExternalExamResultsClient? testScores,
+  ExamEntriesClient? examEntries,
   GraduationRequirementsClient? graduation,
   Widget home = const AcademicResultsScreen(),
   String? currentStudentId = 'st-1',
   Locale locale = AppLocales.fallback,
   _FakePredictedClient? predicted,
+  _FakeDiplomaClient? diploma,
 }) async {
   tester.view.physicalSize = const Size(1080, 4000);
   tester.view.devicePixelRatio = 1;
@@ -271,11 +327,20 @@ Future<void> _pump(
           externalExamResultsClientProvider.overrideWithValue(
             testScores ?? _FakeTestScoresClient(),
           ),
+          examEntriesClientProvider.overrideWithValue(
+            examEntries ?? _FakeExamEntriesClient(),
+          ),
           studentPredictedGradesClientProvider.overrideWithValue(
             predicted ?? _FakePredictedClient(),
           ),
+          studentDiplomaClientProvider.overrideWithValue(
+            diploma ?? _FakeDiplomaClient(),
+          ),
           graduationRequirementsClientProvider.overrideWithValue(
             graduation ?? _FakeGraduationClient(),
+          ),
+          academicEquivalencyClientProvider.overrideWithValue(
+            equivalency ?? _FakeEquivalencyClient(),
           ),
           currentStudentIdProvider.overrideWithValue(currentStudentId),
         ],
@@ -360,6 +425,121 @@ void main() {
     // Read-only: nothing to add, edit or delete.
     expect(find.byIcon(Icons.edit_outlined), findsNothing);
     expect(find.byIcon(Icons.delete_outline), findsNothing);
+  });
+
+  final entries = {
+    'entries': [
+      {
+        'id': 'entry-igcse',
+        'exam': {'id': 'e-igcse', 'code': 'IGCSE', 'name': 'IGCSE (A*-G)'},
+        'session': {
+          'id': 'session-1',
+          'series': 'May/June 2027',
+          'entry_deadline': '2027-02-21',
+          'starts_on': '2027-04-27',
+          'ends_on': '2027-06-10',
+          'results_date': '2027-08-12',
+        },
+        'candidate_number': 'JO-0001',
+        'status': 'entered',
+        'subjects': [
+          {
+            'subject': {'id': 's-1', 'code': 'MAT', 'name': 'Mathematics'},
+            'tier': 'Extended',
+            'option_code': '0580',
+          },
+          {
+            'subject': {'id': 's-2', 'code': 'PHY', 'name': 'Physics'},
+            'tier': null,
+          },
+          // A subject the API could not name still shows, generically.
+          {'subject': null, 'tier': 'Core'},
+        ],
+        'entered_at': '2026-10-01T00:00:00.000Z',
+        'withdrawn_at': null,
+      },
+      {
+        'id': 'entry-ielts',
+        'exam': {'id': 'e-ielts', 'name': 'IELTS Academic'},
+        'session': {'id': 'session-2', 'series': 'April 2027'},
+        'candidate_number': null,
+        'status': 'withdrawn',
+        'subjects': <Object?>[],
+      },
+      {
+        'id': 'entry-future',
+        'exam': {'id': 'e-sat', 'name': 'SAT'},
+        'session': {'id': 'session-3', 'series': 'June 2027'},
+        // A status a newer API might send.
+        'status': 'confirmed_by_board',
+        'future_field': {'x': 1},
+      },
+      // Malformed rows are skipped, not fatal.
+      {'exam': 'not a map'},
+      'not a row',
+    ],
+  };
+
+  testWidgets('lists exam entries read-only: subjects, candidate number, dates', (
+    tester,
+  ) async {
+    final client = _FakeExamEntriesClient(entries);
+    await _pump(tester, _FakeResultsClient(), examEntries: client);
+
+    expect(client.requestedStudents, ['st-1']);
+    expect(find.text('Exam entries'), findsOneWidget);
+    expect(find.text('IGCSE (A*-G) — May/June 2027'), findsOneWidget);
+    expect(find.text('Candidate number: JO-0001'), findsOneWidget);
+    expect(find.text('Exams Apr 27, 2027 – Jun 10, 2027'), findsOneWidget);
+    expect(find.text('Results on Aug 12, 2027'), findsOneWidget);
+    expect(find.text('Mathematics · Extended · 0580'), findsOneWidget);
+    expect(find.text('Physics'), findsOneWidget);
+    expect(find.text('Subject · Core'), findsOneWidget);
+    expect(find.text('Entered'), findsOneWidget);
+    // A withdrawn entry, with no number yet; an unknown status reads neutrally.
+    expect(find.text('IELTS Academic — April 2027'), findsOneWidget);
+    expect(find.text('Withdrawn'), findsOneWidget);
+    expect(find.text('Candidate number: not set yet'), findsNWidgets(2));
+    expect(find.text('SAT — June 2027'), findsOneWidget);
+    expect(find.text('Entry'), findsOneWidget);
+    // Read-only.
+    expect(find.byIcon(Icons.edit_outlined), findsNothing);
+  });
+
+  testWidgets("a parent sees their child's exam entries", (tester) async {
+    final client = _FakeExamEntriesClient(entries);
+    await _pump(
+      tester,
+      _FakeResultsClient(),
+      examEntries: client,
+      currentStudentId: null,
+      home: const AcademicResultsScreen(
+        studentId: 'child-1',
+        studentName: 'Lina',
+      ),
+    );
+    expect(client.requestedStudents, ['child-1']);
+    expect(find.text('IGCSE (A*-G) — May/June 2027'), findsOneWidget);
+  });
+
+  testWidgets('exam entries render in Arabic', (tester) async {
+    await _pump(
+      tester,
+      _FakeResultsClient(),
+      examEntries: _FakeExamEntriesClient(entries),
+      locale: const Locale('ar'),
+    );
+    expect(find.text('تسجيل الامتحانات'), findsOneWidget);
+    expect(find.text('رقم الجلوس: JO-0001'), findsOneWidget);
+    expect(find.text('مسجّل'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('shows no exam entries section when the student has none', (
+    tester,
+  ) async {
+    await _pump(tester, _FakeResultsClient());
+    expect(find.text('Exam entries'), findsNothing);
   });
 
   testWidgets('says so when there are no test scores', (tester) async {
@@ -640,6 +820,110 @@ void main() {
     expect(find.text('A*'), findsOneWidget);
     expect(find.text('2025–2026'), findsNothing);
     expect(find.textContaining('Broken'), findsNothing);
+  });
+
+  testWidgets(
+    'an IB Diploma result shows the total out of 45, core points and why it is not awarded',
+    (tester) async {
+      final annual = _result(
+        id: 'fin-annual',
+        display: {'format': 'points_total', 'value': 23, 'max': 45},
+      );
+      (annual['result']! as Map<String, Object?>)['diploma'] = {
+        'status': 'not_awarded',
+        'total': 23,
+        'max': 45,
+        'subject_points': 22,
+        'core_points': 1,
+        'counted_subject_ids': <Object?>[],
+        'tok_grade': 'C',
+        'ee_grade': 'C',
+        'cas_complete': true,
+        'failing_conditions': [
+          {
+            'code': 'MIN_TOTAL',
+            'required': 24,
+            'actual': 23,
+            'component': null,
+            'grade': null,
+            'level': null,
+            'points': null,
+          },
+          // A condition this build does not know shows its code rather than breaking.
+          {'code': 'NEW_RULE'},
+        ],
+        'pending_reasons': <Object?>[],
+      };
+      await _pump(tester, _FakeResultsClient(results: [annual]));
+
+      expect(find.text('23 / 45'), findsOneWidget);
+      expect(find.text('IB Diploma'), findsOneWidget);
+      expect(find.text('Not awarded'), findsOneWidget);
+      expect(find.text('23 / 45 points · Core points: 1'), findsOneWidget);
+      expect(
+        find.text('TOK C · Extended Essay C · CAS complete'),
+        findsOneWidget,
+      );
+      expect(find.text('• Total 23 is below 24'), findsOneWidget);
+      expect(find.text('• NEW_RULE'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'the predicted IB Diploma total shows when the school shares it',
+    (tester) async {
+      await _pump(
+        tester,
+        _FakeResultsClient(),
+        diploma: _FakeDiplomaClient({
+          'student_id': 'st-1',
+          'years': [
+            {
+              'academic_year_name': '2026–2027',
+              'grade_level_name': 'DP2',
+              'section_name': 'A',
+              'final': null,
+              'predicted': null,
+              'predicted_result': {
+                'status': 'pending',
+                'total': null,
+                'max': 45,
+                'subject_points': 38,
+                'core_points': null,
+                'tok_grade': 'A',
+                'ee_grade': null,
+                'cas_complete': null,
+                'failing_conditions': <Object?>[],
+                'pending_reasons': ['core_grades_missing', 'cas_not_recorded'],
+              },
+            },
+            // A year without a visible prediction takes no space.
+            {'academic_year_name': '2025–2026', 'predicted_result': null},
+          ],
+        }),
+      );
+
+      expect(find.text('Predicted IB Diploma total'), findsOneWidget);
+      expect(find.text('2026–2027 · DP2 A'), findsOneWidget);
+      expect(find.text('Pending'), findsOneWidget);
+      expect(find.text('Total pending · Core points: —'), findsOneWidget);
+      expect(
+        find.text('• TOK or Extended Essay grade missing'),
+        findsOneWidget,
+      );
+      expect(find.text('2025–2026'), findsNothing);
+    },
+  );
+
+  test('diploma outcomes parse defensively', () {
+    expect(DiplomaOutcome.fromJson(null), isNull);
+    expect(DiplomaOutcome.fromJson('awarded'), isNull);
+    final odd = DiplomaOutcome.fromJson({'status': 'deferred'})!;
+    expect(odd.status, DiplomaStatus.unknown);
+    expect(odd.max, 45);
+    expect(odd.failingConditions, isEmpty);
+    expect(ResultFormat.fromWire('points_total'), ResultFormat.pointsTotal);
+    expect(ResultFormat.fromWire('points_total_v2'), isNull);
   });
 
   testWidgets('no predicted grades section when none are shared', (
@@ -928,6 +1212,71 @@ void main() {
     expect(find.text('ناجح ومنقول'), findsOneWidget);
   });
 
+  testWidgets(
+    'an Arabic certificate lays out right to left with the Arabic names it was issued with',
+    (tester) async {
+      final certificate = _certificate();
+      final content = certificate['content']! as Map<String, Object?>;
+      content['language'] = 'ar';
+      (content['school']! as Map<String, Object?>)['name_ar'] = 'مدرسة النور';
+      final student = content['student']! as Map<String, Object?>;
+      student['first_name_ar'] = 'لينا';
+      student['last_name_ar'] = 'حداد';
+      final subjects = content['subjects']! as List<Object?>;
+      (subjects.first! as Map<String, Object?>)['name_ar'] = 'الرياضيات';
+      await _pump(
+        tester,
+        _FakeResultsClient(certificates: [certificate]),
+        home: const CertificateDetailScreen(certificateId: 'cert-1'),
+      );
+
+      // The reader's app is in English; the document is Arabic.
+      expect(find.text('مدرسة النور'), findsOneWidget);
+      expect(find.text('لينا حداد'), findsOneWidget);
+      expect(find.text('Al Noor School'), findsNothing);
+      expect(find.text('الرياضيات'), findsOneWidget);
+      expect(
+        Directionality.of(tester.element(find.text('لينا حداد'))),
+        TextDirection.rtl,
+      );
+    },
+  );
+
+  testWidgets('a bilingual certificate shows both spellings', (tester) async {
+    final certificate = _certificate();
+    final content = certificate['content']! as Map<String, Object?>;
+    content['language'] = 'bilingual';
+    (content['school']! as Map<String, Object?>)['name_ar'] = 'مدرسة النور';
+    await _pump(
+      tester,
+      _FakeResultsClient(certificates: [certificate]),
+      home: const CertificateDetailScreen(certificateId: 'cert-1'),
+    );
+
+    expect(find.text('Al Noor School / مدرسة النور'), findsOneWidget);
+    // No Arabic name for the student: the English one stands alone.
+    expect(find.text('Lina Haddad'), findsOneWidget);
+  });
+
+  testWidgets(
+    'a certificate without a language follows the app, in Arabic too',
+    (tester) async {
+      final certificate = _certificate();
+      final content = certificate['content']! as Map<String, Object?>;
+      (content['school']! as Map<String, Object?>)['name_ar'] = 'مدرسة النور';
+      await _pump(
+        tester,
+        _FakeResultsClient(certificates: [certificate]),
+        home: const CertificateDetailScreen(certificateId: 'cert-1'),
+        locale: const Locale('ar'),
+      );
+
+      expect(find.text('مدرسة النور'), findsOneWidget);
+      // An unknown subject name falls back to English.
+      expect(find.text('Lina Haddad'), findsOneWidget);
+    },
+  );
+
   const report = {
     'teacher_comment': 'A kind and focused classmate.',
     'principal_comment': 'Well done this year.',
@@ -991,5 +1340,51 @@ void main() {
     expect(find.text('ممتاز'), findsOneWidget);
     expect(find.text('ملاحظة المدير'), findsOneWidget);
     expect(find.text('Well done this year.'), findsOneWidget);
+  });
+
+  testWidgets(
+    'shows the equivalency estimate and the multi-year result when shown',
+    (tester) async {
+      await _pump(
+        tester,
+        _FakeResultsClient(),
+        equivalency: _FakeEquivalencyClient(
+          equivalency: {
+            'estimates': [
+              {
+                'set': {'name': 'IGCSE equivalency'},
+                'status': 'estimated',
+                'percentage': 92,
+                'parts': <Object?>[],
+                'issues': <Object?>[],
+              },
+            ],
+          },
+          multiYear: {
+            'results': [
+              {
+                'config': {'name': 'Tawjihi two years'},
+                'status': 'pending',
+                'overall_percentage': null,
+                'years': <Object?>[],
+                'subjects': <Object?>[],
+              },
+            ],
+          },
+        ),
+      );
+      expect(find.text('Tawjihi equivalency (estimate)'), findsOneWidget);
+      expect(find.text('Estimated 92%'), findsOneWidget);
+      expect(find.text('Multi-year result'), findsOneWidget);
+      expect(find.text('Tawjihi two years'), findsOneWidget);
+    },
+  );
+
+  testWidgets('shows no equivalency or multi-year block by default', (
+    tester,
+  ) async {
+    await _pump(tester, _FakeResultsClient());
+    expect(find.text('Tawjihi equivalency (estimate)'), findsNothing);
+    expect(find.text('Multi-year result'), findsNothing);
   });
 }

@@ -31,6 +31,7 @@ export type CatalogArea =
   | "recordTemplates"
   | "search"
   | "customLists"
+  | "examWeeks"
   | "marketingPages";
 
 type Catalog = Record<string, unknown>;
@@ -65,6 +66,7 @@ const AREA_LOADERS: Record<Locale, Record<CatalogArea, () => CatalogModule>> = {
     recordTemplates: () => import("./locales/en/recordTemplates.json"),
     search: () => import("./locales/en/search.json"),
     customLists: () => import("./locales/en/customLists.json"),
+    examWeeks: () => import("./locales/en/examWeeks.json"),
     marketingPages: () => import("./locales/en/marketingPages.json"),
   },
   ar: {
@@ -83,6 +85,7 @@ const AREA_LOADERS: Record<Locale, Record<CatalogArea, () => CatalogModule>> = {
     recordTemplates: () => import("./locales/ar/recordTemplates.json"),
     search: () => import("./locales/ar/search.json"),
     customLists: () => import("./locales/ar/customLists.json"),
+    examWeeks: () => import("./locales/ar/examWeeks.json"),
     marketingPages: () => import("./locales/ar/marketingPages.json"),
   },
 };

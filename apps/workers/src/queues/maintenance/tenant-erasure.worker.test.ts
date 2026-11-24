@@ -101,8 +101,11 @@ describe("runTenantErasure", () => {
       expect(studentsEntry?.columns.sort()).toEqual([
         "date_of_birth",
         "first_name",
+        "first_name_ar",
         "last_name",
+        "last_name_ar",
         "middle_name",
+        "middle_name_ar",
         "preferred_name",
       ]);
 

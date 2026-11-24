@@ -61,6 +61,11 @@ const PRINCIPAL_LINK_GROUPS: readonly { key: string; links: readonly PrincipalLi
         permission: PERMISSIONS.TIMETABLE_MANAGE,
       },
       {
+        key: "examWeeks",
+        to: "/portal/principal/exam-weeks",
+        permission: PERMISSIONS.TIMETABLE_MANAGE,
+      },
+      {
         key: "academicSetup",
         to: "/portal/principal/academic-setup",
         permission: PERMISSIONS.ACADEMIC_CONFIG_READ,

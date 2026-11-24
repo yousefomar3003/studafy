@@ -6,6 +6,7 @@
 /// and status types it reuses): the stored `content` is rendered exactly as issued.
 library;
 
+import '../../../core/localization/localized_name.dart';
 import 'academic_results.dart';
 import 'graduation_requirements.dart';
 
@@ -17,12 +18,18 @@ class TranscriptYear {
     required this.sectionName,
     required this.subjects,
     required this.overall,
+    this.academicYearNameAr,
+    this.gradeLevelNameAr,
+    this.sectionNameAr,
   });
 
   factory TranscriptYear.fromJson(Map<String, Object?> json) => TranscriptYear(
     academicYearName: _map(json['academic_year'])['name'] as String? ?? '',
     gradeLevelName: json['grade_level_name'] as String? ?? '',
     sectionName: json['section_name'] as String? ?? '',
+    academicYearNameAr: arabicNameOf(_map(json['academic_year'])['name_ar']),
+    gradeLevelNameAr: arabicNameOf(json['grade_level_name_ar']),
+    sectionNameAr: arabicNameOf(json['section_name_ar']),
     subjects: [
       for (final subject in _list(json['subjects']))
         SubjectResult.fromJson(subject),
@@ -35,6 +42,11 @@ class TranscriptYear {
   final String sectionName;
   final List<SubjectResult> subjects;
   final OverallResult overall;
+
+  /// The Arabic names at issue (000264); null when there were none.
+  final String? academicYearNameAr;
+  final String? gradeLevelNameAr;
+  final String? sectionNameAr;
 }
 
 /// Why a transcript has no cumulative GPA (or no cumulative figures at all).
@@ -129,6 +141,9 @@ class TranscriptContent {
     required this.reissueOfSerial,
     required this.reissueReason,
     this.graduationRequirements = const [],
+    this.language,
+    this.schoolNameAr,
+    this.studentNameAr,
   });
 
   factory TranscriptContent.fromJson(Map<String, Object?> json) {
@@ -156,6 +171,10 @@ class TranscriptContent {
         for (final row in _list(json['graduation_requirements']))
           TranscriptGraduationRequirement.fromJson(row),
       ],
+      // Arabic + English documents (000264): absent on transcripts issued before.
+      language: DocumentLanguage.fromWire(json['language']),
+      schoolNameAr: arabicNameOf(_map(json['school'])['name_ar']),
+      studentNameAr: studentArabicName(student),
     );
   }
 
@@ -175,6 +194,11 @@ class TranscriptContent {
   /// Whether the student met each graduation requirement set applying to them, as it stood at
   /// issue. Empty when none applied, and on transcripts issued before they existed.
   final List<TranscriptGraduationRequirement> graduationRequirements;
+
+  /// The language it was issued in; null follows the app's language.
+  final DocumentLanguage? language;
+  final String? schoolNameAr;
+  final String? studentNameAr;
 }
 
 /// One graduation requirement set's outcome on a transcript.

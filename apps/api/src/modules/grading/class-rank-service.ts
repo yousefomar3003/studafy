@@ -247,6 +247,7 @@ function candidateOf(row: CohortRow): RankCandidate {
     averagePercentage: num(row.average_percentage),
     gpa: row.result_format === "gpa" ? num(row.result_value) : null,
     weightedGpa: row.result_format === "gpa" ? num(row.weighted_result_value) : null,
+    pointsTotal: row.result_format === "points_total" ? num(row.result_value) : null,
   };
 }
 

@@ -148,6 +148,9 @@ describe("GradesSectionsPage", () => {
     fireEvent.change(within(dialog).getByRole("textbox", { name: /^Name/ }), {
       target: { value: "Grade 12" },
     });
+    fireEvent.change(within(dialog).getByRole("textbox", { name: /^Arabic name/ }), {
+      target: { value: " الصف الثاني عشر " },
+    });
     // The order defaults to just after the highest existing one.
     expect(
       (within(dialog).getByRole("spinbutton", { name: /^Order/ }) as HTMLInputElement).value,
@@ -156,7 +159,7 @@ describe("GradesSectionsPage", () => {
 
     await waitFor(() =>
       expect(postMock).toHaveBeenCalledWith("/api/academics/grade-levels", {
-        body: { name: "Grade 12", sort_order: 11 },
+        body: { name: "Grade 12", sort_order: 11, name_ar: "الصف الثاني عشر" },
       }),
     );
     await screen.findByText("Grade added");

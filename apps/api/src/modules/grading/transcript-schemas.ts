@@ -4,7 +4,13 @@ import { dateTimeSchema, uuidSchema } from "@studafy/shared-schemas";
 import { transcriptExternalExamSchema } from "../external-exams/schemas";
 import { transcriptGraduationRequirementSchema } from "../graduation-requirements/schemas";
 
-import { documentClassRankSchema, resultDisplaySchema } from "./schemas";
+import { diplomaResultSchema } from "./diploma-schemas";
+import {
+  documentArabicStudentNameFields,
+  documentClassRankSchema,
+  nameArField,
+  resultDisplaySchema,
+} from "./schemas";
 
 /**
  * Academic transcripts (000207): every year of a student's finalized annual results on one
@@ -25,6 +31,7 @@ const transcriptSubjectSchema = z
   .object({
     code: z.string(),
     name: z.string(),
+    ...nameArField,
     requirement: z.string(),
     marks_obtained: z.number().nullable(),
     max_marks: z.number(),
@@ -65,10 +72,12 @@ const transcriptSubjectSchema = z
 const transcriptYearSchema = z
   .object({
     academic_year: z
-      .object({ id: uuidSchema, code: z.string(), name: z.string() })
+      .object({ id: uuidSchema, code: z.string(), name: z.string(), ...nameArField })
       .openapi("TranscriptAcademicYear"),
     grade_level_name: z.string(),
+    grade_level_name_ar: z.string().optional(),
     section_name: z.string(),
+    section_name_ar: z.string().optional(),
     finalization: z
       .object({ id: uuidSchema, version: z.number().int(), finalized_at: dateTimeSchema })
       .openapi("TranscriptFinalization"),
@@ -91,6 +100,10 @@ const transcriptYearSchema = z
         class_rank: documentClassRankSchema.nullable().optional().openapi({
           description:
             "The year's class rank when issued; absent without one and on older transcripts.",
+        }),
+        diploma: diplomaResultSchema.nullable().optional().openapi({
+          description:
+            "The year's IB Diploma outcome when issued (points_total grades); absent otherwise and on older transcripts.",
         }),
       })
       .openapi("TranscriptYearOverall"),
@@ -145,12 +158,19 @@ export const transcriptContentSchema = z
     kind: z.literal("transcript"),
     serial_number: z.string(),
     issued_at: dateTimeSchema,
-    school: z.object({ id: uuidSchema, name: z.string() }).openapi("TranscriptSchool"),
+    language: z.enum(["en", "ar", "bilingual"]).optional().openapi({
+      description:
+        "The language the school issued the transcript in (000264). Absent: it follows each reader's language, as transcripts issued before did.",
+    }),
+    school: z
+      .object({ id: uuidSchema, name: z.string(), ...nameArField })
+      .openapi("TranscriptSchool"),
     student: z
       .object({
         id: uuidSchema,
         first_name: z.string(),
         last_name: z.string(),
+        ...documentArabicStudentNameFields,
         admission_number: z.string(),
       })
       .openapi("TranscriptStudent"),

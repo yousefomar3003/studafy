@@ -6,6 +6,7 @@ import { useTranslation } from "../../../lib/i18n";
 import { answersFromDrafts, RecordsFormSection } from "../../records/RecordsFormSection";
 import { GuardianPicker } from "../people-links/LinkPickers";
 
+import { ArabicNameInputs } from "./ArabicNameInputs";
 import { useCreateStudent } from "./mutations";
 import { createStudentSchema, fieldErrors, STATUS_LABEL_KEYS } from "./schema";
 
@@ -21,6 +22,9 @@ const EMPTY_VALUES = {
   last_name: "",
   middle_name: "",
   preferred_name: "",
+  first_name_ar: "",
+  middle_name_ar: "",
+  last_name_ar: "",
   admission_number: "",
   admission_date: "",
   date_of_birth: "",
@@ -164,6 +168,11 @@ export function CreateStudentModal({
             onChange={(e) => setField("preferred_name", e.target.value)}
             error={errors.preferred_name && t(errors.preferred_name)}
             helperText={t("adminPeople.students.create.preferredNameHelper")}
+          />
+          <ArabicNameInputs
+            values={values}
+            errors={errors}
+            onChange={(field, value) => setField(field, value)}
           />
           <Input
             label={t("adminPeople.students.form.dateOfBirth")}

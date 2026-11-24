@@ -97,8 +97,8 @@ Future<ProviderContainer> _pump(
       scheduleClockProvider.overrideWithValue(() => now ?? scheduleMonday),
       scheduleClassLabelProvider.overrideWith(
         (ref, classId) async => switch (classId) {
-          'sci' => (code: 'SCI101-A', courseName: 'Integrated Science'),
-          _ => (code: 'MATH101-A', courseName: 'Algebra Foundations'),
+          'sci' => (code: 'SCI101-A', courseName: 'Integrated Science', subjectNameAr: null),
+          _ => (code: 'MATH101-A', courseName: 'Algebra Foundations', subjectNameAr: null),
         },
       ),
       timetableTeacherNameProvider.overrideWith(

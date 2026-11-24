@@ -102,6 +102,8 @@ export interface ExternalExamScoreInput {
 
 export interface ExternalExamResultInput {
   subject_id?: string | null | undefined;
+  /** The exam entry (000262) the result came from; on update, absent keeps the current one. */
+  entry_id?: string | null | undefined;
   sat_on: string;
   note?: string | null | undefined;
   scores: ExternalExamScoreInput[];
@@ -130,6 +132,7 @@ export interface ExternalExamResultView {
     archived: boolean;
   };
   subject: { id: string; code: string; name: string } | null;
+  entry_id: string | null;
   sat_on: string;
   total_score: number | null;
   note: string | null;
@@ -714,6 +717,7 @@ interface ResultRow {
   per_subject: boolean;
   archived_at: Date | null;
   subject_id: string | null;
+  entry_id: string | null;
   sat_on: string;
   total_score: string | null;
   note: string | null;
@@ -746,7 +750,7 @@ async function loadResults(
     SELECT result.id, result.student_id, result.exam_id, exam.code AS exam_code,
            exam.name AS exam_name, exam.total_mode, exam.total_min::text AS total_min,
            exam.total_max::text AS total_max, exam.per_subject, exam.archived_at, result.subject_id,
-           result.sat_on::text AS sat_on, result.total_score::text AS total_score, result.note,
+           result.entry_id, result.sat_on::text AS sat_on, result.total_score::text AS total_score, result.note,
            result.recorded_by_user_id, result.created_at, result.updated_at
     FROM app.student_external_exam_results AS result
     JOIN app.external_exams AS exam
@@ -796,6 +800,7 @@ async function loadResults(
       archived: row.archived_at !== null,
     },
     subject: row.subject_id === null ? null : (subjects.get(row.subject_id) ?? null),
+    entry_id: row.entry_id,
     sat_on: row.sat_on,
     total_score: num(row.total_score),
     note: row.note,
@@ -973,13 +978,18 @@ export async function recordExternalExamResult(
     conflict(`${exam.name} is archived: restore it to record new results`);
   }
   const { scores, total, subjectId } = await checkResult(tx, schoolId, exam, input);
+  const entryId = input.entry_id ?? null;
+  if (entryId !== null) {
+    await checkResultEntry(tx, schoolId, entryId, { studentId, examId: exam.id, subjectId });
+  }
   const [row] = await tx<{ id: string }[]>`
     INSERT INTO app.student_external_exam_results (
-      school_id, student_id, exam_id, subject_id, sat_on, total_score, note, recorded_by_user_id
+      school_id, student_id, exam_id, subject_id, entry_id, sat_on, total_score, note,
+      recorded_by_user_id
     )
     VALUES (
       ${schoolId}::uuid, ${studentId}::uuid, ${exam.id}::uuid, ${subjectId}::uuid,
-      ${input.sat_on}::date, ${total}, ${input.note ?? null}, ${userId}::uuid
+      ${entryId}::uuid, ${input.sat_on}::date, ${total}, ${input.note ?? null}, ${userId}::uuid
     )
     RETURNING id
   `;
@@ -992,6 +1002,7 @@ export async function recordExternalExamResult(
       student_id: studentId,
       exam_id: exam.id,
       subject_id: subjectId,
+      entry_id: entryId,
       sat_on: input.sat_on,
       total_score: total,
       scores: auditScores(scores),
@@ -1007,11 +1018,12 @@ async function requireResultRow(tx: TransactionSql, schoolId: string, resultId: 
       student_id: string;
       exam_id: string;
       subject_id: string | null;
+      entry_id: string | null;
       sat_on: string;
       total_score: string | null;
     }[]
   >`
-    SELECT id, student_id, exam_id, subject_id, sat_on::text AS sat_on,
+    SELECT id, student_id, exam_id, subject_id, entry_id, sat_on::text AS sat_on,
            total_score::text AS total_score
     FROM app.student_external_exam_results
     WHERE id = ${resultId}::uuid AND school_id = ${schoolId}::uuid
@@ -1031,6 +1043,14 @@ export async function updateExternalExamResult(
   const before = await requireResultRow(tx, schoolId, resultId);
   const exam = await requireExamRow(tx, schoolId, before.exam_id);
   const { scores, total, subjectId } = await checkResult(tx, schoolId, exam, input);
+  const entryId = input.entry_id === undefined ? before.entry_id : input.entry_id;
+  if (entryId !== null) {
+    await checkResultEntry(tx, schoolId, entryId, {
+      studentId: before.student_id,
+      examId: exam.id,
+      subjectId,
+    });
+  }
   const [oldScores] = await tx<{ scores: { component_id: string; score: string }[] | null }[]>`
     SELECT json_agg(json_build_object(
              'component_id', component_id,
@@ -1041,7 +1061,8 @@ export async function updateExternalExamResult(
   `;
   await tx`
     UPDATE app.student_external_exam_results
-    SET subject_id = ${subjectId}::uuid, sat_on = ${input.sat_on}::date, total_score = ${total},
+    SET subject_id = ${subjectId}::uuid, entry_id = ${entryId}::uuid,
+        sat_on = ${input.sat_on}::date, total_score = ${total},
         note = ${input.note ?? null}, updated_at = CURRENT_TIMESTAMP
     WHERE id = ${resultId}::uuid AND school_id = ${schoolId}::uuid
   `;
@@ -1056,12 +1077,14 @@ export async function updateExternalExamResult(
     targetId: resultId,
     oldValues: {
       subject_id: before.subject_id,
+      entry_id: before.entry_id,
       sat_on: before.sat_on,
       total_score: num(before.total_score),
       scores: oldScores?.scores ?? [],
     },
     newValues: {
       subject_id: subjectId,
+      entry_id: entryId,
       sat_on: input.sat_on,
       total_score: total,
       scores: auditScores(scores),
@@ -1092,6 +1115,55 @@ export async function deleteExternalExamResult(
       total_score: num(before.total_score),
     },
   });
+}
+
+// ---------------------------------------------------------------------------
+// Results recorded from an exam entry (000262)
+// ---------------------------------------------------------------------------
+
+/**
+ * Check that a result may link to `entryId`: an entry in the school, of the result's own student
+ * and exam, sent to the board, and -- when the entry lists subjects -- covering the result's subject.
+ */
+async function checkResultEntry(
+  tx: TransactionSql,
+  schoolId: string,
+  entryId: string,
+  result: { studentId: string; examId: string; subjectId: string | null },
+): Promise<void> {
+  const [entry] = await tx<
+    {
+      student_id: string;
+      exam_id: string;
+      status: "draft" | "entered" | "withdrawn";
+      subject_ids: string[];
+    }[]
+  >`
+    SELECT entry.student_id, entry.exam_id, entry.status,
+           coalesce(array_agg(entered.subject_id) FILTER (WHERE entered.subject_id IS NOT NULL),
+                    '{}') AS subject_ids
+    FROM app.external_exam_entries AS entry
+    LEFT JOIN app.external_exam_entry_subjects AS entered
+      ON entered.entry_id = entry.id AND entered.school_id = entry.school_id
+    WHERE entry.id = ${entryId}::uuid AND entry.school_id = ${schoolId}::uuid
+    GROUP BY entry.id
+  `;
+  if (!entry) notFound("Exam entry not found");
+  const mismatch = (code: string, message: string): never =>
+    invalid([{ code, severity: "error", message }]);
+  if (entry.student_id !== result.studentId || entry.exam_id !== result.examId) {
+    mismatch("ENTRY_MISMATCH", "The exam entry is for another student or exam.");
+  }
+  if (entry.status === "draft") {
+    mismatch("ENTRY_DRAFT", "A draft exam entry was never sent to the board.");
+  }
+  if (
+    result.subjectId !== null &&
+    entry.subject_ids.length > 0 &&
+    !entry.subject_ids.includes(result.subjectId)
+  ) {
+    mismatch("ENTRY_SUBJECT", "The student was not entered for this subject in that exam entry.");
+  }
 }
 
 // ---------------------------------------------------------------------------
