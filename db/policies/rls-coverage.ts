@@ -207,7 +207,13 @@ approved_flexible_columns(table_name, column_name) AS (
     -- 000262: the diploma outcome as finalized (total, points, TOK/EE/CAS used, failing
     -- conditions), a write-once snapshot like the subject breakdown (ADR-017); the total itself
     -- stays in the normalized result_value column.
-    ('student_overall_results', 'diploma_result')
+    ('student_overall_results', 'diploma_result'),
+    -- 000266: a Tawjihi equivalency rule set's weighted parts (exam subjects with their grade
+    -- table, the diploma total, the GPA, an exam total, each with a conversion table or formula),
+    -- validated whole by the API through the grading engine (a CHECK holds it to a 1-6 element
+    -- array), read with the set and never joined or filtered on. Edited as one unit like
+    -- diploma_config; a child table per part, grade and band would only scatter one setting.
+    ('equivalency_rule_sets', 'parts')
 ),
 relations AS (
   SELECT
