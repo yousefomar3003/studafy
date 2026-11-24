@@ -13,6 +13,7 @@ import {
   DISCIPLINE_TYPE_LABEL_KEYS,
 } from "../discipline/labels";
 
+import { EquivalencyPanel, MultiYearPanel } from "./EquivalencyPanels";
 import { GraduationPanel } from "./GraduationPanel";
 import { PredictedGradesPanel } from "./predicted-grades/PredictedGradesPanel";
 import { TestScoresPanel } from "./TestScoresPanel";
@@ -230,6 +231,8 @@ export function StudentOverviewPanels({ studentId }: { studentId: string }) {
       <PredictedGradesPanel studentId={studentId} />
 
       <GraduationPanel studentId={studentId} />
+      <MultiYearPanel studentId={studentId} />
+      <EquivalencyPanel studentId={studentId} />
 
       <TranscriptPanel studentId={studentId} />
 

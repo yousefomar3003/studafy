@@ -314,6 +314,8 @@ export const SEARCH_DESTINATIONS: readonly SearchDestination[] = [
     alsoRequires: [P.ACADEMIC_CONFIG_MANAGE],
   }),
   entry("academic-graduation", "page", `${SETUP}/graduation-requirements`, ACADEMIC),
+  entry("academic-multi-year", "page", `${SETUP}/multi-year-results`, ACADEMIC),
+  entry("academic-equivalency", "page", `${SETUP}/tawjihi-equivalency`, ACADEMIC),
   entry("academic-approvals", "page", `${SETUP}/approvals`, {
     ...ACADEMIC,
     alsoRequires: [P.APPROVAL_REVIEW],

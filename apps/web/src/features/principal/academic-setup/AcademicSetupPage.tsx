@@ -11,10 +11,12 @@ import { CertificateView } from "./CertificateView";
 import { YearStatusBadge } from "./components";
 import { SETUP_BASE } from "./context";
 import { CoordinatorsTab } from "./CoordinatorsTab";
+import { EquivalencyTab } from "./EquivalencyTab";
 import { ExamEntriesTab } from "./ExamEntriesTab";
 import { ExternalExamsTab } from "./ExternalExamsTab";
 import { GraduationRequirementsTab } from "./GraduationRequirementsTab";
 import { MinistryExportTab } from "./MinistryExportTab";
+import { MultiYearTab } from "./MultiYearTab";
 import { OverviewTab } from "./OverviewTab";
 import { useGradingOverview } from "./queries";
 import { ReportCardsTab } from "./ReportCardsTab";
@@ -43,6 +45,8 @@ const TABS: readonly TabDef[] = [
   { path: "external-exams", key: "externalExams", show: () => true },
   { path: "exam-entries", key: "examEntries", show: (ctx) => ctx.can.manage },
   { path: "graduation-requirements", key: "graduation", show: () => true },
+  { path: "multi-year-results", key: "multiYear", show: () => true },
+  { path: "tawjihi-equivalency", key: "equivalency", show: () => true },
   { path: "coordinators", key: "coordinators", show: () => true },
   { path: "approvals", key: "approvals", show: (ctx) => ctx.can.review },
   { path: "results", key: "results", show: (ctx) => ctx.can.finalize || ctx.can.certify },
@@ -69,6 +73,9 @@ const TABS: readonly TabDef[] = [
  *   withdrawals and the list for the exam board (leadership);
  * - graduation requirements — the credits, subjects, GPA and exams a diploma needs, a check
  *   against a student and the students of a grade not on track (not tied to the year);
+ * - multi-year results — a result weighted across grade levels (grade 11 40% + grade 12 60%);
+ * - tawjihi equivalency — the school's rules for ESTIMATING a Tawjihi-equivalent percentage from
+ *   IGCSE / A Level, IB or American records, and a grade's estimates with a CSV export;
  * - coordinators — who coordinates which subject this year, and for which grades;
  * - approvals — submitted mark sheets and teacher-proposed assessments;
  * - results — preview, finalize, correct, and certificates; `certificates/:id` prints one.
@@ -176,6 +183,8 @@ export default function AcademicSetupPage() {
             <Route path="exam-entries" element={<ExamEntriesTab ctx={ctx} />} />
           ) : null}
           <Route path="graduation-requirements" element={<GraduationRequirementsTab ctx={ctx} />} />
+          <Route path="multi-year-results" element={<MultiYearTab ctx={ctx} />} />
+          <Route path="tawjihi-equivalency" element={<EquivalencyTab ctx={ctx} />} />
           <Route path="coordinators" element={<CoordinatorsTab ctx={ctx} />} />
           {ctx.can.review ? <Route path="approvals" element={<ApprovalsTab ctx={ctx} />} /> : null}
           {ctx.can.finalize || ctx.can.certify ? (
