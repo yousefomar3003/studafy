@@ -29,6 +29,7 @@ export function CatalogItemModal({ target, onClose }: CatalogItemModalProps) {
   const updateCourse = useUpdateCourse();
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
+  const [nameAr, setNameAr] = useState("");
   const [status, setStatus] = useState<CatalogStatus>("active");
   const [credits, setCredits] = useState("");
 
@@ -36,6 +37,7 @@ export function CatalogItemModal({ target, onClose }: CatalogItemModalProps) {
     if (!target) return;
     setCode(target.item.code);
     setName(target.item.name);
+    setNameAr(target.kind === "subject" ? (target.item.name_ar ?? "") : "");
     setStatus(target.item.status as CatalogStatus);
     setCredits(target.kind === "course" ? String(target.item.credit_hours) : "");
   }, [target]);
@@ -62,7 +64,9 @@ export function CatalogItemModal({ target, onClose }: CatalogItemModalProps) {
         description: error instanceof ApiError ? (error.detail ?? error.title) : undefined,
       });
     if (target.kind === "subject") {
-      updateSubject.mutate({ subjectId: target.item.id, body: fields }, { onSuccess, onError });
+      // A blank Arabic name clears it (null); the course has none of its own.
+      const body = { ...fields, name_ar: nameAr.trim() || null };
+      updateSubject.mutate({ subjectId: target.item.id, body }, { onSuccess, onError });
     } else {
       // Credits are fixed once a course has published grades, so they are sent only when changed.
       const body =
@@ -84,6 +88,17 @@ export function CatalogItemModal({ target, onClose }: CatalogItemModalProps) {
             maxLength={MAX_NAME_LENGTH}
             onChange={(event) => setName(event.target.value)}
           />
+          {target?.kind === "subject" ? (
+            <Input
+              label={t("principal.catalog.modal.nameAr")}
+              helperText={t("principal.catalog.modal.nameArHelper")}
+              value={nameAr}
+              maxLength={MAX_NAME_LENGTH}
+              dir="rtl"
+              lang="ar"
+              onChange={(event) => setNameAr(event.target.value)}
+            />
+          ) : null}
           <Input
             label={t("principal.catalog.modal.code")}
             value={code}

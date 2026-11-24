@@ -1377,5 +1377,34 @@
       "empty": "No graduation requirements apply to this student.",
       "basis": "Academic years with finalized results counted: {{years}}."
     }
+  },
+  "documentLanguage": {
+    "heading": "Document language",
+    "help": "The language report cards, certificates and transcripts are issued in. A document keeps the language it was issued with; changing this only affects documents issued afterwards.",
+    "types": {
+      "report_card": "Report cards",
+      "certificate": "Certificates",
+      "transcript": "Transcripts"
+    },
+    "languages": {
+      "viewer": "Each reader's language",
+      "en": "English",
+      "ar": "Arabic",
+      "bilingual": "English and Arabic"
+    },
+    "schoolNameAr": "School name in Arabic",
+    "schoolNameArHelp": "Shown on Arabic and bilingual documents. Leave blank to use the school's name.",
+    "save": "Save document settings",
+    "saved": "Document settings saved",
+    "saveFailed": "Couldn't save the document settings",
+    "readOnly": "Only school leadership can change the document language.",
+    "previewHeading": "Preview",
+    "previewHelp": "A sample document in the language chosen above, with made-up names.",
+    "previewType": "Preview",
+    "sample": {
+      "school": "Your school"
+    },
+    "showPreview": "Show preview",
+    "hidePreview": "Hide preview"
   }
 }

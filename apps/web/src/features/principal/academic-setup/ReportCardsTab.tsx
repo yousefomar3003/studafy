@@ -6,6 +6,7 @@ import { useTerms } from "../school/queries";
 import { sectionDisplayName, useSections } from "../sections/queries";
 
 import { QueryState } from "./components";
+import { DocumentLanguageCard } from "./DocumentLanguageCard";
 import { problemMessage } from "./errors";
 import {
   conductCode,
@@ -52,6 +53,7 @@ export function ReportCardsTab({ ctx }: { ctx: SetupContext }) {
   return (
     <>
       <SettingsCard ctx={ctx} />
+      <DocumentLanguageCard ctx={ctx} />
       <NotesEditor ctx={ctx} />
     </>
   );
