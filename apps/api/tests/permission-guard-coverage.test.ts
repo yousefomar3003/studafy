@@ -217,6 +217,12 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/academics/exam-slots/{slotId}/seating",
   "PUT /api/academics/exam-slots/{slotId}/seats/{studentId}",
   "PUT /api/academics/exam-slots/{slotId}/invigilators",
+  // Remedial plans (000268): writes behind grade:update or result:finalize (the setting behind
+  // academicConfig:manage); each records its old and new values in the service.
+  "POST /api/grading/remedial-plans",
+  "PATCH /api/grading/remedial-plans/{planId}",
+  "POST /api/grading/remedial-plans/{planId}/notes",
+  "PUT /api/grading/remedial-plan-settings",
   // Transcripts (000207): issue, reissue and revoke behind academicCertificate:issue.
   "POST /api/grading/students/{studentId}/transcripts",
   "POST /api/grading/transcripts/{transcriptId}/reissue",

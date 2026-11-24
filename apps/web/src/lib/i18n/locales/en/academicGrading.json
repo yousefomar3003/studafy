@@ -20,7 +20,8 @@
     "graduation": "Graduation requirements",
     "coordinators": "Subject coordinators",
     "ministryExport": "Ministry export",
-    "examEntries": "Exam entries"
+    "examEntries": "Exam entries",
+    "remedialPlans": "Remedial plans"
   },
   "common": {
     "loading": "Loading…",
@@ -1761,5 +1762,79 @@
     },
     "showPreview": "Show preview",
     "hidePreview": "Hide preview"
+  },
+  "remedial": {
+    "heading": "Remedial plans",
+    "help": "Plans teachers write in the app for students who are struggling in a subject in {{year}}. Follow them up here: overdue reviews first, with each plan's targets, reviews and timeline.",
+    "countsLabel": "Plans by status",
+    "overdueReviews": "Overdue reviews",
+    "overdue": "Overdue",
+    "truncated": "Only the first 500 plans are shown. Narrow the filters to see the rest.",
+    "caption": "Remedial plans matching the filters",
+    "empty": "No remedial plans match these filters.",
+    "wholeYear": "Whole year",
+    "openLabel": "View {{student}}'s {{subject}} plan",
+    "planTitle": "{{student}}: {{subject}} remedial plan",
+    "shared": "Shared with the family",
+    "staffOnly": "Staff only",
+    "noReviews": "No review dates.",
+    "reviewDone": "Done",
+    "noNotes": "No notes yet.",
+    "internal": "Staff only",
+    "statusChanged": "Status changed to",
+    "noteAdded": "Note added",
+    "noteLabel": "Follow-up note",
+    "internalLabel": "Staff only (never shown to the student or parents)",
+    "addNote": "Add note",
+    "status": {
+      "open": "Open",
+      "in_progress": "In progress",
+      "achieved": "Achieved",
+      "closed": "Closed"
+    },
+    "filters": {
+      "grade": "Grade",
+      "subject": "Subject",
+      "status": "Status",
+      "allGrades": "All grades",
+      "allSubjects": "All subjects",
+      "allStatuses": "All statuses",
+      "overdueOnly": "Overdue reviews only"
+    },
+    "sharing": {
+      "label": "Teachers may share remedial plans with students and parents",
+      "help": "Each plan stays staff-only unless its teacher shares it. Notes marked staff only are never shown to students or parents.",
+      "saved": "Sharing setting saved",
+      "failed": "Unable to save the sharing setting"
+    },
+    "columns": {
+      "student": "Student",
+      "class": "Class",
+      "subject": "Subject",
+      "status": "Status",
+      "nextReview": "Next review",
+      "lastNote": "Last note",
+      "actions": "Actions"
+    },
+    "fields": {
+      "period": "Period",
+      "reason": "Reason",
+      "startPercentage": "Mark when opened",
+      "passLine": "pass line",
+      "openedBy": "Opened by",
+      "targets": "Target skills or outcomes",
+      "actions": "Actions",
+      "reviews": "Review dates",
+      "timeline": "Progress and follow-up"
+    },
+    "reason": {
+      "below_pass": "Below the pass line",
+      "teacher_concern": "Teacher's concern"
+    },
+    "author": {
+      "leadership": "School leadership",
+      "teacher": "Teacher",
+      "coordinator": "Subject coordinator"
+    }
   }
 }

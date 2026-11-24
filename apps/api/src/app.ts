@@ -179,6 +179,7 @@ import { platformOpsRoutes } from "./modules/platform/ops/routes";
 import { privacyRoutes } from "./modules/privacy";
 import { realtimeTicketRoutes } from "./modules/realtime";
 import { DEVELOPMENT_RECORD_KEYRING, recordRoutes } from "./modules/records";
+import { remedialPlanRoutes } from "./modules/remedial-plans";
 import { childComparisonRoutes } from "./modules/reports";
 import {
   platformSchoolApplicationRoutes,
@@ -1237,6 +1238,8 @@ export function createApp({
     app.route("/", ministryExportRoutes(database, recordKeyring));
     // Exam weeks: exam periods, their timetable, rooms, seating and invigilators (000265).
     app.route("/", examWeekRoutes(database));
+    // Remedial plans for struggling students: plans, follow-up and suggestions (000268).
+    app.route("/", remedialPlanRoutes(database));
   }
 
   // Gradebook configuration (ST-112). Weighted assessment categories per gradebook and

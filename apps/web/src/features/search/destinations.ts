@@ -337,6 +337,10 @@ export const SEARCH_DESTINATIONS: readonly SearchDestination[] = [
     ...ACADEMIC,
     alsoRequires: [P.RESULT_FINALIZE],
   }),
+  entry("academic-remedial-plans", "page", `${SETUP}/remedial-plans`, {
+    ...ACADEMIC,
+    alsoRequiresAny: [P.ACADEMIC_CONFIG_MANAGE, P.RESULT_FINALIZE],
+  }),
   entry("academic-report-cards", "page", `${SETUP}/report-cards`, {
     ...ACADEMIC,
     alsoRequiresAny: [P.ACADEMIC_CONFIG_MANAGE, P.GRADE_UPDATE, P.RESULT_FINALIZE],

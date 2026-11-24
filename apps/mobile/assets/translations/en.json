@@ -2944,5 +2944,96 @@
       "room": "Room: {room}",
       "next": "Next: {exam}, {when}, {room}"
     }
+  },
+  "remedial": {
+    "entry": "Remedial plans",
+    "entrySubtitle": "Students below the pass line and their support plans",
+    "coordinatorOpen": "Remedial plans",
+    "title": "Remedial plans",
+    "planTitle": "Remedial plan",
+    "error": "Couldn't load the remedial plans.",
+    "planError": "Couldn't load this remedial plan.",
+    "noSection": "This class isn't linked to a grade section, so it has no remedial plans.",
+    "help": "Students below the pass line on their current marks are suggested. Open a plan with the skills to target, what you'll do and when you'll review it.",
+    "followUpHelp": "Follow up this subject's remedial plans: read each plan and add notes. Only the subject's teachers open and change plans.",
+    "newPlan": "New plan",
+    "period": "Period",
+    "wholeYear": "Whole year",
+    "suggestions": "Suggested students",
+    "suggestionsHelp": "Below the pass line ({pass}) on the marks recorded so far.",
+    "noPassLine": "This subject has no pass percentage, so no students are suggested.",
+    "noSuggestions": "No student is below the pass line.",
+    "current": "Current mark {percentage}",
+    "currentProvisional": "Current mark {percentage} (some marks missing)",
+    "viewPlan": "View plan",
+    "openPlan": "Open plan",
+    "plans": "Plans this year",
+    "noPlans": "No remedial plans yet.",
+    "nextReview": "Next review {date}",
+    "overdue": "Review overdue",
+    "shared": "Shared with the family",
+    "staffOnly": "Staff only",
+    "edit": "Edit plan",
+    "addNote": "Add note",
+    "saveNote": "Save note",
+    "noteLabel": "Progress or follow-up note",
+    "internalLabel": "Staff only",
+    "internalHelp": "Never shown to the student or parents.",
+    "noReviews": "No review dates.",
+    "reviewDone": "Done",
+    "noNotes": "No notes yet.",
+    "statusChanged": "Status changed to",
+    "startWithPass": "{percentage} (pass line {pass})",
+    "status": {
+      "open": "Open",
+      "inProgress": "In progress",
+      "achieved": "Achieved",
+      "closed": "Closed",
+      "unknown": "Updated"
+    },
+    "reason": {
+      "belowPass": "Below the pass line",
+      "teacherConcern": "Teacher's concern"
+    },
+    "fields": {
+      "reason": "Reason",
+      "startPercentage": "Mark when opened",
+      "targets": "Target skills or outcomes",
+      "actions": "Actions",
+      "reviews": "Review dates",
+      "timeline": "Progress and follow-up"
+    },
+    "author": {
+      "leadership": "School leadership",
+      "teacher": "Teacher",
+      "coordinator": "Subject coordinator",
+      "family": "Staff"
+    },
+    "form": {
+      "editTitle": "Edit plan",
+      "save": "Save",
+      "required": "Required",
+      "student": "Student",
+      "status": "Status",
+      "statusNote": "Note on the status change (optional)",
+      "reasonNote": "Details (optional)",
+      "targetsHelp": "The skills or outcomes the student should reach.",
+      "actionsHelp": "What you and the student will do.",
+      "addReviewDate": "Add review date",
+      "share": "Share with the student and parents",
+      "shareHelp": "They see the plan and progress notes, never staff-only notes."
+    },
+    "family": {
+      "title": "Support plans",
+      "help": "Plans the school has shared to help in a subject, with their progress."
+    },
+    "errors": {
+      "duplicate": "This student already has an active plan in this subject for this period.",
+      "closed": "This plan is achieved or closed and can no longer change.",
+      "locked": "This year is closed, so plans can no longer change.",
+      "invalid": "Check the plan: a field is missing or not allowed.",
+      "forbidden": "You can't change this plan.",
+      "generic": "Something went wrong. Try again."
+    }
   }
 }

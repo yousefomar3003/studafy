@@ -13,6 +13,22 @@ when it required the `version-bump` label.
 
 ### Added
 
+- Remedial plans (migration 000268; docs/modules/remedial-plans.md), new tag "Remedial plans".
+  `listRemedialPlans` (`GET /api/grading/remedial-plans`, query `academic_year_id`,
+  `grade_level_id`, `section_id`, `subject_id`, `status`, `overdue`; `RemedialPlanList` with
+  `counts` and `truncated`), `createRemedialPlan` (`POST` same path, `CreateRemedialPlanBody`),
+  `getRemedialPlan` / `updateRemedialPlan` (`GET` / `PATCH /api/grading/remedial-plans/{planId}`,
+  `UpdateRemedialPlanBody`), `addRemedialPlanNote`
+  (`POST /api/grading/remedial-plans/{planId}/notes`, `AddRemedialPlanNoteBody`), all returning
+  `RemedialPlan` (reviews, timeline `RemedialPlanNote`, `access`, `can_edit`, `can_add_note`);
+  `getSectionRemedialPlans` (`GET /api/grading/sections/{sectionId}/subjects/{subjectId}/remedial-plans`,
+  query `term_id`; `SectionRemedialPlans` with suggestions below the pass line);
+  `getStudentRemedialPlans` (`GET /api/grading/students/{studentId}/remedial-plans`);
+  `getRemedialPlanSettings` / `updateRemedialPlanSettings`
+  (`GET` / `PUT /api/grading/remedial-plan-settings`, `RemedialPlanSettings.family_visible`).
+  Reads `grade:read`; plan writes `grade:update` or `result:finalize`; the setting
+  `academicConfig:read` / `academicConfig:manage`. New problem codes `REMEDIAL_PLAN_DUPLICATE` and
+  `REMEDIAL_PLAN_CLOSED` (409).
 - Subject coordinators (migration 000260; docs/modules/subject-coordinators.md), tag "Academic
   grading". `listSubjectCoordinators` (`GET /api/grading/years/{yearId}/subject-coordinators`,
   `academicConfig:read`), `createSubjectCoordinator` (`POST` same path, `SubjectCoordinatorBody`:

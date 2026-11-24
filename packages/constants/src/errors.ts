@@ -160,6 +160,10 @@ export const ERROR_CODES = {
   SUBJECT_COORDINATOR_DUPLICATE: "SUBJECT_COORDINATOR_DUPLICATE",
   // IB Diploma total (000262): the grade's result is not the points total this year.
   DIPLOMA_TOTAL_DISABLED: "DIPLOMA_TOTAL_DISABLED",
+  // Remedial plans (000268): the student already has an active plan in the subject for that period;
+  // the plan is achieved or closed and can no longer be changed.
+  REMEDIAL_PLAN_DUPLICATE: "REMEDIAL_PLAN_DUPLICATE",
+  REMEDIAL_PLAN_CLOSED: "REMEDIAL_PLAN_CLOSED",
 
   // Enrollment — student-class binding.
   ENROLLMENT_DUPLICATE: "ENROLLMENT_DUPLICATE",

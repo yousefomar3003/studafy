@@ -7,6 +7,7 @@ import '../../../core/api/generated/models/discipline_incident.dart';
 import '../../../design/kit/kit.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
 import '../../custom_lists/presentation/linked_custom_lists_section.dart';
+import '../../remedial_plans/presentation/section_remedial_plans_screen.dart';
 import '../application/teacher_providers.dart';
 import 'class_announcement_composer_screen.dart';
 import 'grade_entry_screen.dart';
@@ -98,6 +99,8 @@ class TeacherClassDetailScreen extends ConsumerWidget {
                   const SizedBox(height: AppSpacing.space8),
                   // IB Diploma classes only: takes no space for any other grade.
                   _DiplomaCoreTile(classId: classId, classCode: classCode),
+                  _RemedialPlansTile(classId: classId, classCode: classCode),
+                  const SizedBox(height: AppSpacing.space8),
                   // The class's rows in the school's custom lists (a bus group, a homeroom); takes
                   // no space when there are none.
                   LinkedCustomListsSection(
@@ -281,6 +284,36 @@ class _DiplomaCoreTile extends ConsumerWidget {
             MaterialPageRoute<void>(
               builder: (_) =>
                   DiplomaCoreScreen(sectionId: sectionId, classCode: classCode),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Opens [TeacherRemedialPlansScreen] for the class's section and subject: the students below the
+/// pass line and their remedial plans (000268). Costs no request until it is tapped.
+class _RemedialPlansTile extends StatelessWidget {
+  const _RemedialPlansTile({required this.classId, required this.classCode});
+
+  final String classId;
+  final String classCode;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: EdgeInsets.zero,
+      child: ListTile(
+        leading: const Icon(Icons.support_outlined),
+        title: Text('remedial.entry'.tr()),
+        subtitle: Text('remedial.entrySubtitle'.tr()),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => TeacherRemedialPlansScreen(
+              classId: classId,
+              classCode: classCode,
             ),
           ),
         ),

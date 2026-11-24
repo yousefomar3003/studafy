@@ -17,6 +17,7 @@ import { GraduationRequirementsTab } from "./GraduationRequirementsTab";
 import { MinistryExportTab } from "./MinistryExportTab";
 import { OverviewTab } from "./OverviewTab";
 import { useGradingOverview } from "./queries";
+import { RemedialPlansTab } from "./RemedialPlansTab";
 import { ReportCardsTab } from "./ReportCardsTab";
 import { ResultsTab } from "./ResultsTab";
 import { ScalesTab } from "./ScalesTab";
@@ -44,6 +45,11 @@ const TABS: readonly TabDef[] = [
   { path: "exam-entries", key: "examEntries", show: (ctx) => ctx.can.manage },
   { path: "graduation-requirements", key: "graduation", show: () => true },
   { path: "coordinators", key: "coordinators", show: () => true },
+  {
+    path: "remedial-plans",
+    key: "remedialPlans",
+    show: (ctx) => ctx.can.manage || ctx.can.finalize,
+  },
   { path: "approvals", key: "approvals", show: (ctx) => ctx.can.review },
   { path: "results", key: "results", show: (ctx) => ctx.can.finalize || ctx.can.certify },
   { path: "top-students", key: "topStudents", show: (ctx) => ctx.can.finalize },
@@ -70,6 +76,8 @@ const TABS: readonly TabDef[] = [
  * - graduation requirements — the credits, subjects, GPA and exams a diploma needs, a check
  *   against a student and the students of a grade not on track (not tied to the year);
  * - coordinators — who coordinates which subject this year, and for which grades;
+ * - remedial plans — the year's plans for struggling students (written by teachers in the app) by
+ *   grade, subject, status and overdue review, with follow-up notes (leadership);
  * - approvals — submitted mark sheets and teacher-proposed assessments;
  * - results — preview, finalize, correct, and certificates; `certificates/:id` prints one.
  * - top students — a grade's best places by class rank for a term or the year (leadership).
@@ -177,6 +185,9 @@ export default function AcademicSetupPage() {
           ) : null}
           <Route path="graduation-requirements" element={<GraduationRequirementsTab ctx={ctx} />} />
           <Route path="coordinators" element={<CoordinatorsTab ctx={ctx} />} />
+          {ctx.can.manage || ctx.can.finalize ? (
+            <Route path="remedial-plans" element={<RemedialPlansTab ctx={ctx} />} />
+          ) : null}
           {ctx.can.review ? <Route path="approvals" element={<ApprovalsTab ctx={ctx} />} /> : null}
           {ctx.can.finalize || ctx.can.certify ? (
             <Route path="results" element={<ResultsTab ctx={ctx} />} />

@@ -141,6 +141,8 @@
   "CERTIFICATE_NOT_FOUND": "لم يتم العثور على الشهادة.",
   "PREDICTED_GRADES_DISABLED": "الدرجات المتوقعة غير مفعّلة لهذا الصف في هذا العام الدراسي.",
   "SUBJECT_COORDINATOR_DUPLICATE": "هذا الشخص منسّق لهذه المادة مسبقاً في هذا العام.",
+  "REMEDIAL_PLAN_DUPLICATE": "لدى الطالب خطة علاجية نشطة في هذه المادة لهذه الفترة.",
+  "REMEDIAL_PLAN_CLOSED": "هذه الخطة العلاجية محققة أو مغلقة ولا يمكن تعديلها.",
   "ENROLLMENT_DUPLICATE": "الطالب مسجّل بالفعل في هذا الفصل.",
   "ENROLLMENT_NOT_ACTIVE": "التسجيل غير نشط.",
   "TIMETABLE_TEACHER_CONFLICT": "هذا المدرّس معين بالفعل على فصل آخر في هذا الوقت",
