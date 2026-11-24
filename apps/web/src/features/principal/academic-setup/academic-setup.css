@@ -770,7 +770,7 @@
   }
 }
 
-/* Arabic + English documents (000263). An Arabic document reads right to left (dir="rtl" on the
+/* Arabic + English documents (000264). An Arabic document reads right to left (dir="rtl" on the
    article); Arabic text prefers Noto Sans Arabic, the face the server PDFs embed, when installed. */
 .ag-certificate:lang(ar),
 .ag-certificate [lang="ar"],
@@ -790,7 +790,7 @@
   }
 }
 
-/* Remedial plans (000268) */
+/* Remedial plans (000269) */
 .ag-remedial-counts {
   margin: 0;
   padding: 0;
@@ -815,7 +815,7 @@
   border-inline-start: 2px solid var(--color-border);
 }
 
-/* Lesson and term plans (000267): a plan's free text keeps the teacher's line breaks. */
+/* Lesson and term plans (000268): a plan's free text keeps the teacher's line breaks. */
 .ag-pre {
   margin-block: 0 var(--space-8);
   white-space: pre-wrap;

@@ -2,7 +2,7 @@
 --
 -- EQUIVALENCY. app.equivalency_rule_sets is one school's rules for ESTIMATING the Jordanian Tawjihi
 -- percentage a foreign qualification converts to: IGCSE / A Level grades (000255 external exam
--- results), the IB Diploma total (000262) or an American GPA and SAT. The Ministry's rules change,
+-- results), the IB Diploma total (000263) or an American GPA and SAT. The Ministry's rules change,
 -- so the rules are the school's own editable settings and the result is always an estimate the
 -- school confirms -- never an official conversion.
 --   source_system  the qualification the set is for (igcse_a_level, ib, american, other): a label
@@ -30,7 +30,7 @@
 -- role-scoped (000037) and would hide a required subject a student has not taken.
 --
 -- Depends on 000006 (tenant helpers), 000009 (subjects), 000147 (grade levels), 000255 (external
--- exams) and 000262 (IB Diploma total).
+-- exams) and 000263 (IB Diploma total).
 
 SELECT set_config('app.school_id', '00000000-0000-0000-0000-000000000000', true);
 
@@ -143,15 +143,15 @@ CREATE INDEX idx_multi_year_result_config_years_grade_fk
   ON app.multi_year_result_config_years (grade_level_id, school_id);
 
 COMMENT ON TABLE app.equivalency_rule_sets IS
-  'A school''s rules for estimating the Tawjihi-equivalent percentage of an IGCSE/A Level, IB or American record (000266). An estimate the school confirms, not an official conversion.';
+  'A school''s rules for estimating the Tawjihi-equivalent percentage of an IGCSE/A Level, IB or American record (000267). An estimate the school confirms, not an official conversion.';
 COMMENT ON COLUMN app.equivalency_rule_sets.parts IS
-  'Ordered weighted parts (exam subjects, diploma total, GPA, exam total), validated by the grading engine (000266).';
+  'Ordered weighted parts (exam subjects, diploma total, GPA, exam total), validated by the grading engine (000267).';
 COMMENT ON TABLE app.equivalency_rule_set_grade_levels IS
-  'The grade levels a Tawjihi equivalency rule set applies to (000266); deleted with the set.';
+  'The grade levels a Tawjihi equivalency rule set applies to (000267); deleted with the set.';
 COMMENT ON TABLE app.multi_year_result_configs IS
-  'A result weighted across several grade levels'' finalized annual results, per subject and overall (000266).';
+  'A result weighted across several grade levels'' finalized annual results, per subject and overall (000267).';
 COMMENT ON TABLE app.multi_year_result_config_years IS
-  'A grade level of a multi-year result and its relative weight (000266); deleted with the configuration.';
+  'A grade level of a multi-year result and its relative weight (000267); deleted with the configuration.';
 
 -- ---------------------------------------------------------------------------------------------------
 -- 3. Grants and RLS

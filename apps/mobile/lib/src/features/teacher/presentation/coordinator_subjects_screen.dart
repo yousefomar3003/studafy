@@ -13,7 +13,7 @@ import 'coordinator_mark_sheet_screen.dart';
 import 'widgets/mark_sheet_common.dart';
 
 /// Opens [CoordinatorSubjectsScreen] from the Classes tab, under the Marks entry. Shown only to a
-/// teacher who coordinates a subject this year (000260): while the overview loads, fails or is
+/// teacher who coordinates a subject this year (000261): while the overview loads, fails or is
 /// empty, it takes no space.
 class CoordinatorEntryTile extends ConsumerWidget {
   const CoordinatorEntryTile({super.key});
@@ -168,7 +168,7 @@ class _SectionCard extends StatelessWidget {
   final CoordinatedSection section;
   final VoidCallback onOpen;
 
-  /// The section's remedial plans for the subject, to follow up (000268).
+  /// The section's remedial plans for the subject, to follow up (000269).
   final VoidCallback onOpenRemedial;
 
   @override

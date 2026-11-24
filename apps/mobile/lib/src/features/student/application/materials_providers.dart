@@ -37,7 +37,7 @@ final materialsClassCodeProvider = FutureProvider.autoDispose.family<String, Str
   return classValue.code;
 });
 
-/// The Arabic name (000263) of a class's subject, through its course, for the section header in
+/// The Arabic name (000264) of a class's subject, through its course, for the section header in
 /// the Arabic app. Best effort: null when there is none or the course can't be read.
 final materialsClassSubjectNameArProvider = FutureProvider.autoDispose.family<String?, String>((
   ref,

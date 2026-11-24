@@ -13,7 +13,7 @@ when it required the `version-bump` label.
 
 ### Added
 
-- Remedial plans (migration 000268; docs/modules/remedial-plans.md), new tag "Remedial plans".
+- Remedial plans (migration 000269; docs/modules/remedial-plans.md), new tag "Remedial plans".
   `listRemedialPlans` (`GET /api/grading/remedial-plans`, query `academic_year_id`,
   `grade_level_id`, `section_id`, `subject_id`, `status`, `overdue`; `RemedialPlanList` with
   `counts` and `truncated`), `createRemedialPlan` (`POST` same path, `CreateRemedialPlanBody`),
@@ -29,7 +29,7 @@ when it required the `version-bump` label.
   Reads `grade:read`; plan writes `grade:update` or `result:finalize`; the setting
   `academicConfig:read` / `academicConfig:manage`. New problem codes `REMEDIAL_PLAN_DUPLICATE` and
   `REMEDIAL_PLAN_CLOSED` (409).
-- Learning outcomes and lesson and term plans (migration 000267;
+- Learning outcomes and lesson and term plans (migration 000268;
   docs/modules/lesson-plans-and-outcomes.md), tags "Learning outcomes" and "Lesson plans".
   `getPlanningSettings` / `updatePlanningSettings` (`/api/grading/planning-settings`:
   achievement scale, `show_outcomes_on_report_cards`, plan due days); `listLearningOutcomes`,
@@ -47,7 +47,7 @@ when it required the `version-bump` label.
   narrowed to the section's teachers, the subject's coordinator and leadership. Additive:
   `FinalizedSubjectResult.outcomes` (`OutcomeAchievementResult[]`, empty unless the school shows
   outcomes on report cards) and `CertificateContentSubject.outcomes` (optional).
-- Tawjihi equivalency estimates and multi-year results (migration 000266;
+- Tawjihi equivalency estimates and multi-year results (migration 000267;
   docs/modules/tawjihi-equivalency.md), tags "Tawjihi equivalency" and "Multi-year results".
   Rule sets: `listEquivalencyRuleSets` (`GET /api/grading/equivalency-rule-sets`,
   `academicConfig:read`), `createEquivalencyRuleSet` (`POST`), `updateEquivalencyRuleSet`
@@ -69,7 +69,7 @@ when it required the `version-bump` label.
   and `getStudentMultiYearResults` (`GET /api/grading/students/{studentId}/multi-year-results`,
   `StudentMultiYearResults`: `MultiYearStatus`, weighted overall and per-subject percentages, each
   year's `MultiYearYearStatus`).
-- Subject coordinators (migration 000260; docs/modules/subject-coordinators.md), tag "Academic
+- Subject coordinators (migration 000261; docs/modules/subject-coordinators.md), tag "Academic
   grading". `listSubjectCoordinators` (`GET /api/grading/years/{yearId}/subject-coordinators`,
   `academicConfig:read`), `createSubjectCoordinator` (`POST` same path, `SubjectCoordinatorBody`:
   `subject_id`, `user_id`, `grade_level_ids`), `updateSubjectCoordinator`
@@ -82,7 +82,7 @@ when it required the `version-bump` label.
   `access` (`SectionSubjectAccess`: `leadership`, `teacher`, `coordinator`); `getMarkSheet` and
   `getSectionPredictedGrades` now also answer the subject's coordinator, read-only
   (`can_edit_marks`, `can_add_assessments` and `editable` false).
-- Ministry results export (migration 000264; docs/modules/ministry-export.md), tag "Ministry
+- Ministry results export (migration 000265; docs/modules/ministry-export.md), tag "Ministry
   export", leadership from web sessions only. Templates: `listMinistryExportTemplates`
   (`GET /api/grading/ministry-export-templates`), `createMinistryExportTemplate` (`POST`),
   `updateMinistryExportTemplate` (`PUT .../{templateId}`) and `deleteMinistryExportTemplate`
@@ -99,7 +99,7 @@ when it required the `version-bump` label.
   the annual results (`MinistryExportRunInput`). A sensitive national ID is masked in the preview
   and opened for the download only with `studentRecord:readSensitive` (403; 503
   `RECORD_KEY_UNAVAILABLE`), audited as a reveal.
-- Exam entries (migration 000261; docs/modules/exam-entries.md), tag "Exam entries". Sessions:
+- Exam entries (migration 000262; docs/modules/exam-entries.md), tag "Exam entries". Sessions:
   `listExamSessions` (`GET /api/grading/external-exam-sessions?exam_id=`, `academicConfig:read`),
   `createExamSession` (`POST`), `updateExamSession` (`PUT .../{sessionId}`) and
   `deleteExamSession` (`DELETE .../{sessionId}`, 409 once it has entries), all
@@ -118,7 +118,7 @@ when it required the `version-bump` label.
   `RecordExternalExamResultBody` / `UpdateExternalExamResultBody` take an optional `entry_id`
   (on update, absent keeps the link and null clears it); `ExternalExamResult` returns `entry_id`.
 
-- IB Diploma total out of 45 (migration 000262; docs/database/academic-grading.md "IB Diploma
+- IB Diploma total out of 45 (migration 000263; docs/database/academic-grading.md "IB Diploma
   total"). `ResultFormat` adds `points_total` (`result_scale_max` up to 1000, 45 for the IB) and
   `RankBasis` adds `points_total` (only on a `points_total` grade, else 400). `GradeProgramBody`
   takes optional `diploma_config` (`DiplomaConfig`: `counted_subjects`, 25-cell `core_matrix` of
@@ -134,7 +134,7 @@ when it required the `version-bump` label.
   `SaveDiplomaCoreBody` with `kind` `final` / `predicted`) and `getStudentDiploma`
   (`GET /api/grading/students/{studentId}/diploma`, `grade:read`) returning `StudentDiploma` with
   the predicted total. New error code `DIPLOMA_TOTAL_DISABLED` (409).
-- Arabic + English documents (migration 000263; docs/modules/bilingual-documents.md). New
+- Arabic + English documents (migration 000264; docs/modules/bilingual-documents.md). New
   `getDocumentLanguageSettings` / `updateDocumentLanguageSettings`
   (`GET/PUT /api/grading/document-language-settings`, `academicConfig:read` / `:manage`) with
   `DocumentLanguageSettings` (`report_card_language`, `certificate_language`,
@@ -149,7 +149,7 @@ when it required the `version-bump` label.
   `*_name_ar` fields, present only on documents issued with them. The student list search and the
   global search also match a student's Arabic name.
 
-- Exam weeks (migration 000265; docs/modules/exam-weeks.md), tag "Exam weeks". Leadership
+- Exam weeks (migration 000266; docs/modules/exam-weeks.md), tag "Exam weeks". Leadership
   (`timetable:manage`): `listExamPeriods` / `createExamPeriod`
   (`GET`/`POST /api/academics/exam-periods`, `?academic_year_id`), `getExamPeriod` /
   `updateExamPeriod` / `deleteExamPeriod` (`.../{periodId}`; `ExamPeriod`, `ExamPeriodInput` with

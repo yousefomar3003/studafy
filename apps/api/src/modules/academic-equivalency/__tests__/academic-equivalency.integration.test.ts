@@ -1,5 +1,5 @@
 /**
- * Tawjihi equivalency and multi-year results (000266) against a real migrated database with RLS
+ * Tawjihi equivalency and multi-year results (000267) against a real migrated database with RLS
  * armed.
  *
  * Grade 12 this year (active, not finalized yet); grade 11 last year (closed, finalized).

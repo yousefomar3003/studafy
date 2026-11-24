@@ -169,7 +169,7 @@ export async function getSectionPredictedGrades(
   subjectId: string,
   termId: string | null,
 ): Promise<SectionPredictedGradesView> {
-  // The subject's coordinator reads them too, never edits (000260).
+  // The subject's coordinator reads them too, never edits (000261).
   const { access } = await assertCanReadSectionSubject(tx, sectionId, subjectId);
   const period = await loadSectionPeriod(tx, schoolId, sectionId, subjectId, termId);
   const studentIds = period.roster.map((student) => student.student_id);

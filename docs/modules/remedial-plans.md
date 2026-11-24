@@ -6,7 +6,7 @@ when it is reviewed, and a timeline of progress and follow-up notes. Teachers wr
 mobile app; the subject's coordinator follows them up in the app; school leadership follows them up
 on the web; the student and parents read a plan in the app only when the school shares it.
 
-- Migration: `db/migrations/000268_remedial_plans.sql`
+- Migration: `db/migrations/000269_remedial_plans.sql`
 - API: `apps/api/src/modules/remedial-plans/` (`service.ts`, `routes.ts`, `schemas.ts`)
 - Web: Academic setup > Remedial plans (`apps/web/src/features/principal/academic-setup/RemedialPlansTab.tsx`)
 - Mobile: `apps/mobile/lib/src/features/remedial_plans/` (teacher class detail > Remedial plans;
@@ -20,7 +20,7 @@ on the web; the student and parents read a plan in the app only when the school 
 | `app.remedial_plans`             | year, optional term (none = the whole year), section, student, subject, reason, targets, actions, status |
 | `app.remedial_plan_reviews`      | the plan's review dates, each done (`completed_at`) or not                                               |
 | `app.remedial_plan_notes`        | the timeline, append-only: notes (`internal` = staff only) and status changes, with the author's access  |
-| `app.remedial_plan_outcomes`     | **extension point, empty**: the learning outcomes a plan targets, for WS-O (000267)                      |
+| `app.remedial_plan_outcomes`     | **extension point, empty**: the learning outcomes a plan targets, for WS-O (000268)                      |
 | `app.school_settings` (+ column) | `remedial_plans_family_visible`: whether plans may be shared with families (default off)                 |
 
 - **Reason**: `below_pass` (current marks below the subject's pass percentage) or `teacher_concern`.
@@ -48,7 +48,7 @@ on the web; the student and parents read a plan in the app only when the school 
 | ------------------------------------ | -------------------------------------------------------------------------------------------- | -------------------------------------- |
 | School leadership                    | every plan, every note                                                                       | opens, edits, moves status, adds notes |
 | The section's teacher of the subject | that section-subject's plans, every note                                                     | opens, edits, moves status, adds notes |
-| The subject's coordinator (000260)   | the plans of the sections and grades they coordinate                                         | adds notes (follow-up), never edits    |
+| The subject's coordinator (000261)   | the plans of the sections and grades they coordinate                                         | adds notes (follow-up), never edits    |
 | Another teacher                      | nothing                                                                                      | nothing                                |
 | The student and linked parents       | a plan only while the school allows sharing **and** the plan is shared; never internal notes | nothing                                |
 

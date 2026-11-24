@@ -2,7 +2,7 @@ import 'package:dio/dio.dart';
 
 import '../domain/coordinator.dart';
 
-/// The subject coordinator's overview (000260). On its own [Dio] like `MarkSheetClient`; a
+/// The subject coordinator's overview (000261). On its own [Dio] like `MarkSheetClient`; a
 /// coordinator opens a section's marks with `MarkSheetClient.fetchMarkSheet`, which the API answers
 /// read-only (`access: coordinator`). Failures surface as the shared `ApiException`.
 class CoordinatorClient {

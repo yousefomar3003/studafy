@@ -406,7 +406,7 @@ export type StudentStatus = z.infer<typeof studentStatusSchema>;
 // Student profile (full — admin / finance-visible)
 // ---------------------------------------------------------------------------
 
-/** Optional Arabic names (000263), shown on Arabic and bilingual documents and in the Arabic app. */
+/** Optional Arabic names (000264), shown on Arabic and bilingual documents and in the Arabic app. */
 const studentArabicNameFields = {
   first_name_ar: z
     .string()

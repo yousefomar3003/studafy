@@ -3,7 +3,7 @@
  * like Noor or eSIS) asks for them.
  *
  * Ministry formats differ from country to country and change from year to year, so nothing here is
- * a hard-coded format. A school keeps export templates (db/migrations/000264): a target label, a
+ * a hard-coded format. A school keeps export templates (db/migrations/000265): a target label, a
  * file type, an encoding, whether a row is one student's result in one subject or their overall
  * result, and an ordered list of columns. Each column takes one known field (the national ID, the
  * admission number, a name, the grade, the mark...) or a fixed text, and may translate the value
@@ -38,7 +38,7 @@ export type MinistryExportRowKind = (typeof MINISTRY_EXPORT_ROW_KINDS)[number];
  * The fields a column can take. Adding one is additive: the API, the database CHECK
  * (ck_ministry_export_columns_field) and the web labels list the same set.
  *
- * EXTENSION POINT (Arabic names, WS-K / 000263): once students and subjects carry Arabic names,
+ * EXTENSION POINT (Arabic names, WS-K / 000264): once students and subjects carry Arabic names,
  * add `first_name_ar`, `middle_name_ar`, `last_name_ar`, `full_name_ar` and `subject_name_ar`
  * here, to the CHECK in a new migration, to the source row below, and to the API's row query.
  */

@@ -1,5 +1,5 @@
 /// IB Diploma core grades of a section (`/api/grading/sections/{sectionId}/diploma-core`, OpenAPI
-/// tag `Results`, 000262): Theory of Knowledge and Extended Essay grades (A–E) and CAS, final or
+/// tag `Results`, 000263): Theory of Knowledge and Extended Essay grades (A–E) and CAS, final or
 /// predicted, entered by the section's teachers (TOK and EE supervisors). Hand-written like
 /// `predicted_grades.dart`; JSON follows the API's `SectionDiplomaCore` schema.
 library;

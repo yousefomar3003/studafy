@@ -100,9 +100,9 @@ CREATE INDEX idx_subject_coordinator_grade_levels_grade_fk
   ON app.subject_coordinator_grade_levels (grade_level_id, school_id);
 
 COMMENT ON TABLE app.subject_coordinators IS
-  'A staff member who coordinates a subject for an academic year: reads every section''s marks, predicted grades and subject results for it (000260).';
+  'A staff member who coordinates a subject for an academic year: reads every section''s marks, predicted grades and subject results for it (000261).';
 COMMENT ON TABLE app.subject_coordinator_grade_levels IS
-  'The grade levels a subject coordinator assignment is limited to; none means every grade taught the subject (000260).';
+  'The grade levels a subject coordinator assignment is limited to; none means every grade taught the subject (000261).';
 
 -- Assignments are configuration, like teacher assignments (000160): tenant isolation only, so a
 -- teacher's app can show who coordinates a subject.

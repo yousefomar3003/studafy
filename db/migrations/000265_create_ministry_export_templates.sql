@@ -180,15 +180,15 @@ CREATE INDEX idx_ministry_export_subject_codes_subject_fk
   ON app.ministry_export_subject_codes (subject_id, school_id);
 
 COMMENT ON TABLE app.ministry_export_templates IS
-  'A school''s ministry results export template: target, file type, encoding, row kind and the national ID''s record field (000264).';
+  'A school''s ministry results export template: target, file type, encoding, row kind and the national ID''s record field (000265).';
 COMMENT ON TABLE app.ministry_export_columns IS
-  'A ministry export template''s columns in order, each a known field or a fixed text (000264); deleted with the template.';
+  'A ministry export template''s columns in order, each a known field or a fixed text (000265); deleted with the template.';
 COMMENT ON TABLE app.ministry_export_value_maps IS
-  'A ministry export column''s value translations, ours -> the ministry''s (000264); deleted with the column.';
+  'A ministry export column''s value translations, ours -> the ministry''s (000265); deleted with the column.';
 COMMENT ON TABLE app.ministry_export_subject_codes IS
-  'The ministry''s code for a school subject in one export template (000264); deleted with the template.';
+  'The ministry''s code for a school subject in one export template (000265); deleted with the template.';
 COMMENT ON COLUMN app.ministry_export_templates.national_id_field_id IS
-  'The student record field the national ID is read from; a sensitive one is opened only for a download by leadership holding studentRecord:readSensitive, and audited (000264, ADR-019).';
+  'The student record field the national ID is read from; a sensitive one is opened only for a download by leadership holding studentRecord:readSensitive, and audited (000265, ADR-019).';
 
 -- ---------------------------------------------------------------------------------------------------
 -- 4. Grants and RLS

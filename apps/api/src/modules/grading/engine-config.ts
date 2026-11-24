@@ -145,7 +145,7 @@ export interface ProgramRow {
   rank_scope: RankScope;
   rank_visibility: RankVisibility;
   /**
-   * IB Diploma rules (000262): set while the result format is points_total, null otherwise. Copied
+   * IB Diploma rules (000263): set while the result format is points_total, null otherwise. Copied
    * into the result snapshot (`program.diploma`) at finalization.
    */
   diploma_config: DiplomaConfigJson | null;
@@ -228,7 +228,7 @@ export interface ConfigSnapshot {
     scale: GradeBand[] | null;
     /** Absent on snapshots taken before result formats existed: those are percentages. */
     result_format?: ResultFormat;
-    /** A points_total grade's diploma rules when finalized (000262); absent otherwise. */
+    /** A points_total grade's diploma rules when finalized (000263); absent otherwise. */
     diploma?: DiplomaConfig;
   };
 }

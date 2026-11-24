@@ -162,7 +162,7 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/grading/exam-structure/apply",
   // Report card notes (000209): each write records its old and new values in the service.
   "PUT /api/grading/report-card-settings",
-  // Document language (000263): the service records old and new values.
+  // Document language (000264): the service records old and new values.
   "PUT /api/grading/document-language-settings",
   "PUT /api/grading/sections/{sectionId}/report-notes",
   "PUT /api/grading/sections/{sectionId}/subjects/{subjectId}/report-comments",
@@ -182,7 +182,7 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/grading/students/{studentId}/external-exam-results",
   "PUT /api/grading/external-exam-results/{resultId}",
   "DELETE /api/grading/external-exam-results/{resultId}",
-  // Exam entries (000261): leadership behind academicConfig:manage; each write records its old
+  // Exam entries (000262): leadership behind academicConfig:manage; each write records its old
   // and new values in the service.
   "POST /api/grading/external-exam-sessions",
   "PUT /api/grading/external-exam-sessions/{sessionId}",
@@ -197,14 +197,14 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/grading/graduation-requirement-sets",
   "PUT /api/grading/graduation-requirement-sets/{setId}",
   "DELETE /api/grading/graduation-requirement-sets/{setId}",
-  // Ministry results export (000264): templates behind academicConfig:manage, previews and
+  // Ministry results export (000265): templates behind academicConfig:manage, previews and
   // downloads behind result:finalize.
   "POST /api/grading/ministry-export-templates",
   "PUT /api/grading/ministry-export-templates/{templateId}",
   "DELETE /api/grading/ministry-export-templates/{templateId}",
   "POST /api/grading/ministry-exports/preview",
   "POST /api/grading/ministry-exports/download",
-  // Exam weeks (000265) and rooms: leadership behind timetable:manage; each write records its
+  // Exam weeks (000266) and rooms: leadership behind timetable:manage; each write records its
   // old and new values in the service.
   "POST /api/academics/rooms",
   "PATCH /api/academics/rooms/{roomId}",
@@ -217,13 +217,13 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/academics/exam-slots/{slotId}/seating",
   "PUT /api/academics/exam-slots/{slotId}/seats/{studentId}",
   "PUT /api/academics/exam-slots/{slotId}/invigilators",
-  // Remedial plans (000268): writes behind grade:update or result:finalize (the setting behind
+  // Remedial plans (000269): writes behind grade:update or result:finalize (the setting behind
   // academicConfig:manage); each records its old and new values in the service.
   "POST /api/grading/remedial-plans",
   "PATCH /api/grading/remedial-plans/{planId}",
   "POST /api/grading/remedial-plans/{planId}/notes",
   "PUT /api/grading/remedial-plan-settings",
-  // Learning outcomes and lesson/term plans (000267): academicConfig:manage for the catalogue and
+  // Learning outcomes and lesson/term plans (000268): academicConfig:manage for the catalogue and
   // settings, grade:update for achievement, lesson:* for teachers' plans, academicConfig:read for
   // reviews (narrowed to the coordinator or leadership); each write is audited in the service.
   "PUT /api/grading/planning-settings",
@@ -243,7 +243,7 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/grading/lesson-plans/{planId}/submit",
   "POST /api/grading/lesson-plans/{planId}/review",
   "PUT /api/grading/lesson-plans/{planId}/reflection",
-  // Tawjihi equivalency and multi-year results (000266): leadership behind academicConfig:manage.
+  // Tawjihi equivalency and multi-year results (000267): leadership behind academicConfig:manage.
   "POST /api/grading/equivalency-rule-sets",
   "PUT /api/grading/equivalency-rule-sets/{setId}",
   "DELETE /api/grading/equivalency-rule-sets/{setId}",

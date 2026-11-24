@@ -1,5 +1,5 @@
 /**
- * IB Diploma total (000262) end to end, against a real migrated database with RLS armed: the
+ * IB Diploma total (000263) end to end, against a real migrated database with RLS armed: the
  * points_total program settings and their defaults, core grade entry and who may do it, the total
  * on previews, finalized results, class rank, certificates and transcripts, a correction picking up
  * changed core grades, the predicted total and its visibility. Later tests build on earlier ones.

@@ -1,5 +1,5 @@
 /// A student's IB Diploma predicted total by year (`GET /api/grading/students/{studentId}/diploma`,
-/// OpenAPI tag `Results`, 000262). Hand-written like `academic_results.dart`; JSON follows the
+/// OpenAPI tag `Results`, 000263). Hand-written like `academic_results.dart`; JSON follows the
 /// API's `StudentDiploma` schema. Students and parents only receive a year's prediction while the
 /// school shows predicted grades to them.
 library;

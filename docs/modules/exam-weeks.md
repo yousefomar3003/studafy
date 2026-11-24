@@ -8,7 +8,7 @@ published, students and parents see the student's exams with room and seat in th
 teachers see their invigilation duties.
 
 - Plan: [`docs/plans/academic-phase2.md`](../plans/academic-phase2.md), WS-M
-- Migration: `db/migrations/000265_create_exam_weeks.sql`
+- Migration: `db/migrations/000266_create_exam_weeks.sql`
 - Rules (pure, unit-tested): `apps/api/src/modules/exam-weeks/seating.ts` (`generateSeating`,
   `orderCandidates`, `planSeatMove`) and `clashes.ts` (`detectExamClashes`)
 - API: `apps/api/src/modules/exam-weeks` (tag "Exam weeks"); rooms in

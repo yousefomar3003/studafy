@@ -37,7 +37,7 @@ export interface PublishedGradeRow {
   course_id: string;
   course_code: string;
   course_name: string;
-  /** The course's subject's Arabic name (000263); null or absent when it has none. */
+  /** The course's subject's Arabic name (000264); null or absent when it has none. */
   subject_name_ar?: string | null;
   credit_hours: string;
   label: string;
@@ -69,7 +69,7 @@ export interface PublishedGradeItem {
   grade_submission_id: string;
   gradebook_id: string;
   class: { id: string; code: string };
-  /** `subject_name_ar` (000263): present only when the course's subject has an Arabic name. */
+  /** `subject_name_ar` (000264): present only when the course's subject has an Arabic name. */
   course: {
     id: string;
     code: string;

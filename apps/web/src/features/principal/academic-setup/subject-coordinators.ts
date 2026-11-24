@@ -10,7 +10,7 @@ export type SubjectCoordinator = Schemas["SubjectCoordinator"];
 export type SubjectCoordinatorBody = Schemas["SubjectCoordinatorBody"];
 
 /**
- * Subject coordinators (000260): who coordinates which subject in an academic year, and for which
+ * Subject coordinators (000261): who coordinates which subject in an academic year, and for which
  * grade levels. A coordinator then reads every covered section's marks, predicted grades and
  * subject results in the mobile app, read-only.
  */

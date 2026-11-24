@@ -56,7 +56,7 @@ export type SectionSubjectAccess = "leadership" | "teacher" | "coordinator";
 
 /**
  * Read-only access to a section's subject: everything {@link assertCanGradeSectionSubject} allows,
- * plus the subject's coordinator for the section's grade (000260). Callers that write must keep
+ * plus the subject's coordinator for the section's grade (000261). Callers that write must keep
  * using {@link assertCanGradeSectionSubject}: a coordinator reads, never writes.
  */
 export async function assertCanReadSectionSubject(
@@ -80,7 +80,7 @@ export async function assertCanReadSectionSubject(
 }
 
 // ---------------------------------------------------------------------------
-// Subject coordinators (000260)
+// Subject coordinators (000261)
 // ---------------------------------------------------------------------------
 
 /** One subject the user coordinates in a year. */

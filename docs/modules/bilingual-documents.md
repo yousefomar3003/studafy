@@ -4,7 +4,7 @@ Schools in Jordan and the region issue report cards, certificates and transcript
 English, or in both. Studafy keeps an optional Arabic spelling beside the English names a school
 already has, and lets the school choose, per document type, the language a document is issued in.
 
-- Migration: `db/migrations/000263_bilingual_names_and_document_language.sql`
+- Migration: `db/migrations/000264_bilingual_names_and_document_language.sql`
 - API: `apps/api/src/modules/grading/document-language-service.ts`,
   `routes/document-language-routes.ts` (tag "Results"); Arabic names on the academics and student
   routes; snapshots in `certificate-service.ts` and `transcript-service.ts`

@@ -13,7 +13,7 @@ import type { Seat, SeatingRoom, SeatingStrategy } from "./seating";
 import type { TransactionSql } from "postgres";
 
 /**
- * Exam weeks (000265): exam periods, their timetable of exam slots, the rooms each slot sits in,
+ * Exam weeks (000266): exam periods, their timetable of exam slots, the rooms each slot sits in,
  * seating and invigilators.
  *
  * School leadership (timetable:manage) builds and reads all of it. Students and linked parents read

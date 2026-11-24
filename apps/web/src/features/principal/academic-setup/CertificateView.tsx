@@ -367,7 +367,7 @@ function DescriptiveSkills({ subjects }: { subjects: CertificateContent["subject
 }
 
 /**
- * Learning outcome achievement as finalized (000267), per subject: present only when the school
+ * Learning outcome achievement as finalized (000268), per subject: present only when the school
  * shows it on report cards. Documents issued before have none.
  */
 function OutcomeAchievement({ subjects }: { subjects: CertificateContent["subjects"] }) {

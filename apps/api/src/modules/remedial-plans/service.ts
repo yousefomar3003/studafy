@@ -27,11 +27,11 @@ import type { ErrorCode } from "@studafy/constants";
 import type { PendingQuery, Row, TransactionSql } from "postgres";
 
 /**
- * Remedial plans (000268): a plan to help a struggling student catch up in one subject, for a term
+ * Remedial plans (000269): a plan to help a struggling student catch up in one subject, for a term
  * or the whole year.
  *
  * Who: the section's teachers of the subject open and change plans (in the mobile app); the
- * subject's coordinator (000260) and school leadership follow them up by reading them and adding
+ * subject's coordinator (000261) and school leadership follow them up by reading them and adding
  * notes; the student and their linked parents read a plan only while the school allows sharing and
  * the plan is shared, and never an internal note. The row filters are the database's
  * (app.can_read_remedial_plan and friends, RLS); this module never widens them, and checks writers

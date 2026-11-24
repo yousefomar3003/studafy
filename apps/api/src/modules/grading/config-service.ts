@@ -613,7 +613,7 @@ export async function listPrograms(
   `;
 }
 
-/** Highest maximum a grade may show its result out of, per format (mirrors 000206, 000262). */
+/** Highest maximum a grade may show its result out of, per format (mirrors 000206, 000263). */
 const RESULT_SCALE_LIMITS = { out_of: 1000, gpa: 10, points_total: 1000 } as const;
 
 /**

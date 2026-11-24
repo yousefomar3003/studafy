@@ -101,7 +101,7 @@ export interface MarkSheetView {
   config_id: string;
   source: string;
   year_status: GradingConfigStatus;
-  /** How the caller reads the sheet; a coordinator's is read-only (000260). */
+  /** How the caller reads the sheet; a coordinator's is read-only (000261). */
   access: SectionSubjectAccess;
   can_edit_marks: boolean;
   can_add_assessments: boolean;
@@ -441,7 +441,7 @@ interface SheetContext {
 
 /**
  * The section subject's rules and roster, after the access check: `write` (the default) for its
- * teachers and leadership; `read` lets the subject's coordinator in as well (000260).
+ * teachers and leadership; `read` lets the subject's coordinator in as well (000261).
  */
 async function sheetContext(
   tx: TransactionSql,
@@ -1615,7 +1615,7 @@ export interface ReleasedSubject {
   subject_id: string;
   subject_code: string;
   subject_name: string;
-  /** The subject's Arabic name (000263); null when it has none. */
+  /** The subject's Arabic name (000264); null when it has none. */
   subject_name_ar: string | null;
   /** When the whole period's mark sheet was approved; null while only single assessments are out. */
   approved_at: string | null;

@@ -9,7 +9,7 @@ import '../domain/academic_plans.dart';
 import 'widgets/academic_plan_common.dart';
 import 'widgets/mark_sheet_common.dart';
 
-/// A term plan (000267): the term, overall notes, and its weeks (unit, notes, outcomes). A new
+/// A term plan (000268): the term, overall notes, and its weeks (unit, notes, outcomes). A new
 /// plan or a draft / returned one is edited and saved or submitted; anything else reads only.
 class TermPlanEditorScreen extends ConsumerWidget {
   const TermPlanEditorScreen({

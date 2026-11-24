@@ -8,7 +8,7 @@ see the entries in the app. Results recorded later can point back at the entry t
 fees are handled here.
 
 - Plan: [`docs/plans/academic-phase2.md`](../plans/academic-phase2.md), WS-I
-- Migration: `db/migrations/000261_create_external_exam_entries.sql`
+- Migration: `db/migrations/000262_create_external_exam_entries.sql`
 - Rules: `packages/grading-engine/src/exam-entries.ts` (`canChangeExamEntryStatus`,
   `nextCandidateNumbers`)
 - API: `apps/api/src/modules/exam-entries` (tag "Exam entries"); the result link in

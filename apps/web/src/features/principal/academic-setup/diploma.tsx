@@ -14,7 +14,7 @@ import type { SetupContext } from "./context";
 import type { DiplomaConfig, DiplomaResult, SectionDiplomaCore } from "./queries";
 
 /**
- * IB Diploma total (points_total grades, 000262): the grade's diploma rules in the program form,
+ * IB Diploma total (points_total grades, 000263): the grade's diploma rules in the program form,
  * the diploma outcome beside a result, and leadership's core grade entry for a section. Every
  * figure comes from the API; nothing is computed here.
  */

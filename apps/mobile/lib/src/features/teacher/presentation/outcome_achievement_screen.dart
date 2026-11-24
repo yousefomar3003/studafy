@@ -10,7 +10,7 @@ import '../domain/academic_plans.dart';
 import 'widgets/academic_plan_common.dart';
 import 'widgets/mark_sheet_common.dart';
 
-/// The subject teacher's learning outcome achievement (000267) for the class's section and
+/// The subject teacher's learning outcome achievement (000268) for the class's section and
 /// subject: pick a period and an outcome, then give each student a level of the school's scale,
 /// saved together. Read-only once the period is finalized or the year is closed.
 ///

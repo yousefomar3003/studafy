@@ -30,7 +30,7 @@ import type { RecordKeyring } from "@studafy/records";
 import type { TransactionSql } from "postgres";
 
 /**
- * Ministry results export (000264): a school's export templates, and running one over finalized
+ * Ministry results export (000265): a school's export templates, and running one over finalized
  * results.
  *
  * School leadership manages templates (academicConfig:manage) and runs them (result:finalize).

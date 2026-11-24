@@ -24,7 +24,7 @@
 --
 -- Plans move draft -> submitted -> approved | returned (with a comment); a returned plan is edited
 -- and submitted again. Teachers of the section and subject write them; the subject's coordinator
--- (000260) or school leadership reviews them. Review history is in app.audit_logs.
+-- (000261) or school leadership reviews them. Review history is in app.audit_logs.
 --
 -- PRIVACY. Plans and draft achievements are staff data: school leadership, a teacher of the section
 -- and subject, or its coordinator (app.can_read_section_subject_work). Students and parents read
@@ -36,7 +36,7 @@
 -- function or policy changes.
 --
 -- Depends on 000009 (years, terms, subjects), 000011 (materials), 000147 (grade levels, sections),
--- 000160 (results, app.teaches_section_subject, app.can_read_student_result) and 000260
+-- 000160 (results, app.teaches_section_subject, app.can_read_student_result) and 000261
 -- (app.coordinates_section_subject, app.coordinates_result_subject).
 
 SET ROLE studafy_admin;
@@ -443,7 +443,7 @@ CREATE INDEX idx_lesson_plan_materials_material_fk
 -- ---------------------------------------------------------------------------------------------------
 
 -- True when the current user is school leadership, teaches the subject in the section, or
--- coordinates it there (000260). Plans and draft achievements are visible to exactly these.
+-- coordinates it there (000261). Plans and draft achievements are visible to exactly these.
 CREATE FUNCTION app.can_read_section_subject_work(target_section_id uuid, target_subject_id uuid)
 RETURNS boolean
 LANGUAGE sql
@@ -555,23 +555,23 @@ CREATE POLICY role_scope_visibility ON app.lesson_plan_materials
   );
 
 COMMENT ON TABLE app.academic_planning_settings IS
-  'Per school: outcome achievement on report cards and when lesson and term plans are due (000267). No row: the defaults.';
+  'Per school: outcome achievement on report cards and when lesson and term plans are due (000268). No row: the defaults.';
 COMMENT ON TABLE app.outcome_achievement_levels IS
-  'The school''s learning outcome achievement scale, 1 = lowest (000267). No rows: the default four.';
+  'The school''s learning outcome achievement scale, 1 = lowest (000268). No rows: the default four.';
 COMMENT ON TABLE app.learning_outcomes IS
-  'Learning outcomes catalogue per subject and grade level (000267).';
+  'Learning outcomes catalogue per subject and grade level (000268).';
 COMMENT ON TABLE app.student_outcome_achievements IS
-  'A student''s achievement level on a learning outcome for a term or the year, entered by the subject teacher (000267).';
+  'A student''s achievement level on a learning outcome for a term or the year, entered by the subject teacher (000268).';
 COMMENT ON TABLE app.finalized_outcome_achievements IS
-  'Append-only snapshot of outcome achievement copied at finalization for report cards (000267).';
+  'Append-only snapshot of outcome achievement copied at finalization for report cards (000268).';
 COMMENT ON TABLE app.term_plans IS
-  'A section and subject''s plan for a term, reviewed by the subject coordinator or leadership (000267).';
-COMMENT ON TABLE app.term_plan_weeks IS 'The weeks of a term plan (000267).';
-COMMENT ON TABLE app.term_plan_week_outcomes IS 'The learning outcomes a term plan week covers (000267).';
+  'A section and subject''s plan for a term, reviewed by the subject coordinator or leadership (000268).';
+COMMENT ON TABLE app.term_plan_weeks IS 'The weeks of a term plan (000268).';
+COMMENT ON TABLE app.term_plan_week_outcomes IS 'The learning outcomes a term plan week covers (000268).';
 COMMENT ON TABLE app.lesson_plans IS
-  'A daily lesson plan for a section and subject, reviewed by the subject coordinator or leadership (000267).';
-COMMENT ON TABLE app.lesson_plan_outcomes IS 'The learning outcomes a lesson plan covers (000267).';
+  'A daily lesson plan for a section and subject, reviewed by the subject coordinator or leadership (000268).';
+COMMENT ON TABLE app.lesson_plan_outcomes IS 'The learning outcomes a lesson plan covers (000268).';
 COMMENT ON TABLE app.lesson_plan_materials IS
-  'The uploaded class materials a lesson plan uses, with the title as linked (000267).';
+  'The uploaded class materials a lesson plan uses, with the title as linked (000268).';
 
 RESET ROLE;

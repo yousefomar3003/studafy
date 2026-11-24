@@ -11,7 +11,7 @@ Arab region ask for both):
 Everything is opt-in: a school that adds no outcomes and writes no plans sees nothing new, and
 report cards only change once leadership switches outcome achievement on.
 
-- Migration: `db/migrations/000267_lesson_plans_and_learning_outcomes.sql`
+- Migration: `db/migrations/000268_lesson_plans_and_learning_outcomes.sql`
 - API: `apps/api/src/modules/academic-planning/` (`settings-service.ts`, `outcome-service.ts`,
   `plan-service.ts`, `report-snapshot.ts`, `outcome-routes.ts`, `plan-routes.ts`); finalization
   calls `snapshotOutcomeAchievements` from `grading/results-service.ts`
@@ -47,7 +47,7 @@ still show where they were used. A repeated code is 409 `LEARNING_OUTCOME_DUPLIC
 | ---------------------------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------- |
 | Leadership (`academicConfig:manage`)           | catalogue, CSV import, scale, settings                       | reads all, approves / returns, coverage view (web)          |
 | Teacher of the section and subject             | records achievement (`grade:update`)                         | writes, submits, deletes drafts, reflection (`lesson:*`)    |
-| The subject's coordinator (000260)             | reads the section's achievement, read-only                   | reads, approves / returns (app), coverage of their subjects |
+| The subject's coordinator (000261)             | reads the section's achievement, read-only                   | reads, approves / returns (app), coverage of their subjects |
 | Another teacher, another subject's coordinator | nothing (403 / empty)                                        | nothing (404)                                               |
 | Student / parent                               | finalized achievement on report cards only, when switched on | nothing                                                     |
 
@@ -55,7 +55,7 @@ RLS: plans, their parts and draft achievement are visible through
 `app.can_read_section_subject_work(section_id, subject_id)` (leadership, `teaches_section_subject`,
 `coordinates_section_subject`); the snapshot follows finalized results
 (`app.can_read_student_result`, plus `app.coordinates_result_subject`). Settings, the scale and the
-catalogue are configuration (tenant isolation only). 000267 changes no existing function or policy.
+catalogue are configuration (tenant isolation only). 000268 changes no existing function or policy.
 
 A reviewer is never the plan's author. Plan reads and reviews are gated on `academicConfig:read`
 (coordinators hold no approval permission) and narrowed by the service.

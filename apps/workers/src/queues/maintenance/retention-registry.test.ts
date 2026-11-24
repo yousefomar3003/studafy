@@ -51,7 +51,7 @@ describe("isPersonalDataColumn", () => {
       "middle_name",
       "last_name",
       "preferred_name",
-      // app.students' Arabic names (000263).
+      // app.students' Arabic names (000264).
       "first_name_ar",
       "middle_name_ar",
       "last_name_ar",
@@ -62,7 +62,7 @@ describe("isPersonalDataColumn", () => {
     }
   });
 
-  test("leaves a catalogue's Arabic label alone (subjects, grades, sections: 000263)", () => {
+  test("leaves a catalogue's Arabic label alone (subjects, grades, sections: 000264)", () => {
     expect(isPersonalDataColumn("name_ar")).toBe(false);
     expect(isPersonalDataColumn("grade_level_name_ar")).toBe(false);
   });

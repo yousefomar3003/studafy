@@ -4,7 +4,7 @@
  * total, or an American GPA and SAT score.
  *
  * The Ministry of Education sets the real conversion and changes it, so nothing here is an official
- * formula. A school keeps its own rules (db/migrations/000266, `equivalency_rule_sets`), starting
+ * formula. A school keeps its own rules (db/migrations/000267, `equivalency_rule_sets`), starting
  * from the clearly labelled {@link EQUIVALENCY_EXAMPLES} if it wants, and the result is always an
  * estimate the school confirms.
  *

@@ -4,7 +4,7 @@ import type { ProgramRow } from "./engine-config";
 import type { CoreGrade, DiplomaConditionType, DiplomaConfig } from "@studafy/grading-engine";
 
 /**
- * A points_total grade's IB Diploma rules (000262) in the API's snake_case shape, as stored in
+ * A points_total grade's IB Diploma rules (000263) in the API's snake_case shape, as stored in
  * app.grade_programs.diploma_config, and their engine form. No other grading module is imported
  * here, so engine-config can use it without an import cycle.
  */

@@ -12,7 +12,7 @@ import 'term_plan_editor_screen.dart';
 import 'widgets/academic_plan_common.dart';
 import 'widgets/mark_sheet_common.dart';
 
-/// The class's term and lesson plans (000267): the teacher writes them here, submits them for
+/// The class's term and lesson plans (000268): the teacher writes them here, submits them for
 /// review, and sees what the coordinator or leadership approved or returned.
 ///
 /// Pushed from [TeacherClassDetailScreen]. The class resolves to its grade section and subject

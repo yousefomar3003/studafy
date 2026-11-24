@@ -188,7 +188,7 @@ export function authoredContentAction(tableName: string): AuthoredContentAction 
  */
 export const PII_COLUMN_PATTERNS: readonly RegExp[] = [
   /^(first|middle|last|preferred|full|legal|display|guardian|contact|emergency)_name$/i,
-  // A student's Arabic names (000263). Only the person-name columns: `name_ar` on subjects,
+  // A student's Arabic names (000264). Only the person-name columns: `name_ar` on subjects,
   // grades, sections and terms is a catalogue label, not personal data.
   /^(first|middle|last)_name_ar$/i,
   /^name$/i,

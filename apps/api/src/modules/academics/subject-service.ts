@@ -15,7 +15,7 @@ export interface SubjectRow {
   school_id: string;
   code: string;
   name: string;
-  /** Arabic name (000263); null falls back to `name`. */
+  /** Arabic name (000264); null falls back to `name`. */
   name_ar: string | null;
   description: string | null;
   status: CatalogStatus;

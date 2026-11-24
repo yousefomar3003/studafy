@@ -98,7 +98,7 @@ const requireCoreWriter: MiddlewareHandler<AppEnv> = async (c, next) => {
   await next();
 };
 
-/** IB Diploma total (000262): core grade entry and the student's diploma prediction. */
+/** IB Diploma total (000263): core grade entry and the student's diploma prediction. */
 export function gradingDiplomaRoutes(database: Database): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 

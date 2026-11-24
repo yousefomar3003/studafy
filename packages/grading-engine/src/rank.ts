@@ -35,7 +35,7 @@ export interface RankCandidate {
   gpa: number | null;
   /** The weighted GPA, stored only when a counted subject carries a boost (000253). */
   weightedGpa: number | null;
-  /** The IB Diploma total of a `points_total` result; null or absent otherwise (000262). */
+  /** The IB Diploma total of a `points_total` result; null or absent otherwise (000263). */
   pointsTotal?: number | null;
 }
 

@@ -1,5 +1,5 @@
 /**
- * Exam entries (000261) against a real migrated database with RLS armed: sessions of catalogue
+ * Exam entries (000262) against a real migrated database with RLS armed: sessions of catalogue
  * exams, bulk entry by section / list / grade, candidate numbers, status changes, the board CSV,
  * a student's and a parent's view, results linked to their entry, and other schools.
  *

@@ -32,7 +32,7 @@ String diplomaConditionText(DiplomaFailingCondition condition) {
   return text == key ? condition.code : text;
 }
 
-/// The IB Diploma part of a result (000262): award status, total out of 45, core points, the TOK,
+/// The IB Diploma part of a result (000263): award status, total out of 45, core points, the TOK,
 /// Extended Essay and CAS used, and why the diploma is not awarded (or what is still missing).
 class DiplomaOutcomeView extends StatelessWidget {
   const DiplomaOutcomeView({required this.diploma, super.key});

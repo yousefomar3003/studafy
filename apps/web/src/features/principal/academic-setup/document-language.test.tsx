@@ -11,7 +11,7 @@ import { sampleContent } from "./DocumentLanguageCard";
 import type { CertificateContent } from "./queries";
 
 /**
- * Arabic + English documents (000263): a document renders in the language it was issued in —
+ * Arabic + English documents (000264): a document renders in the language it was issued in —
  * English, Arabic (right to left) or both — and one issued without a language follows the reader,
  * as every document issued before did.
  */
@@ -80,7 +80,7 @@ describe("CertificateDocument", () => {
     expect(screen.getByRole("rowheader", { name: "Mathematics" })).toBeTruthy();
     cleanup();
 
-    // Issued before 000263 (no language, no Arabic names): exactly as before.
+    // Issued before 000264 (no language, no Arabic names): exactly as before.
     const legacy = content("viewer");
     expect("language" in legacy).toBe(false);
     render(<CertificateDocument content={legacy} voided={false} />);

@@ -32,7 +32,7 @@ const FIELD: Record<DocumentType, keyof Omit<DocumentLanguageSettings, "school_n
 };
 
 /**
- * Arabic + English documents (000263): which language report cards, certificates and transcripts
+ * Arabic + English documents (000264): which language report cards, certificates and transcripts
  * are issued in, the school's Arabic name, and a preview of a sample document in the chosen
  * language. Issued documents keep the language they were issued with.
  */

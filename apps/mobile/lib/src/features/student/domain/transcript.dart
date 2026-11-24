@@ -43,7 +43,7 @@ class TranscriptYear {
   final List<SubjectResult> subjects;
   final OverallResult overall;
 
-  /// The Arabic names at issue (000263); null when there were none.
+  /// The Arabic names at issue (000264); null when there were none.
   final String? academicYearNameAr;
   final String? gradeLevelNameAr;
   final String? sectionNameAr;
@@ -171,7 +171,7 @@ class TranscriptContent {
         for (final row in _list(json['graduation_requirements']))
           TranscriptGraduationRequirement.fromJson(row),
       ],
-      // Arabic + English documents (000263): absent on transcripts issued before.
+      // Arabic + English documents (000264): absent on transcripts issued before.
       language: DocumentLanguage.fromWire(json['language']),
       schoolNameAr: arabicNameOf(_map(json['school'])['name_ar']),
       studentNameAr: studentArabicName(student),

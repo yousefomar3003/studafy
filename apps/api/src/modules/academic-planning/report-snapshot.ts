@@ -3,7 +3,7 @@ import { getPlanningSettings } from "./settings-service";
 import type { TransactionSql } from "postgres";
 
 /**
- * Learning outcome achievement on report cards (000267, ADR-017).
+ * Learning outcome achievement on report cards (000268, ADR-017).
  *
  * When the school shows outcomes on report cards, finalizing a section's period (and every
  * correction, which writes a new finalization version) copies the period's achievement into the
@@ -64,7 +64,7 @@ export async function snapshotOutcomeAchievements(
 
 /**
  * The snapshot for one finalization, keyed by `student_id|subject_id`, each list in catalogue order.
- * Finalizations without a snapshot (the setting was off, or made before 000267) have none.
+ * Finalizations without a snapshot (the setting was off, or made before 000268) have none.
  */
 export async function readOutcomeSnapshot(
   tx: TransactionSql,

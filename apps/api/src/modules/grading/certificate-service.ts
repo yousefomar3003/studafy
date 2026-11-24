@@ -39,11 +39,11 @@ export interface CertificateContent {
   serial_number: string;
   issued_at: string;
   /**
-   * The language the school issued the document in (000263): English, Arabic or both. Absent when
+   * The language the school issued the document in (000264): English, Arabic or both. Absent when
    * the school left it to each reader's language, and on documents issued before.
    */
   language?: DocumentLanguage;
-  /** `name_ar` fields (000263): the Arabic names at issue; absent when there was none. */
+  /** `name_ar` fields (000264): the Arabic names at issue; absent when there was none. */
   school: { id: string; name: string; name_ar?: string };
   academic_year: { id: string; code: string; name: string; name_ar?: string };
   term: { id: string; name: string; name_ar?: string } | null;
@@ -95,7 +95,7 @@ export interface CertificateContent {
       descriptor_label: string | null;
     }[];
     /**
-     * Learning outcome achievement as finalized (000267): present only when the school shows
+     * Learning outcome achievement as finalized (000268): present only when the school shows
      * outcomes on report cards and the student has some. Absent on documents issued before.
      */
     outcomes?: {
@@ -126,7 +126,7 @@ export interface CertificateContent {
      */
     class_rank?: DocumentClassRank;
     /**
-     * The IB Diploma outcome when issued (000262): present only for a points_total grade. Absent
+     * The IB Diploma outcome when issued (000263): present only for a points_total grade. Absent
      * on documents issued before; readers treat absent as none.
      */
     diploma?: DiplomaResultView;

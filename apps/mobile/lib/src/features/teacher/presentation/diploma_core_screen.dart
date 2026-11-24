@@ -8,7 +8,7 @@ import '../application/diploma_core_providers.dart';
 import '../domain/diploma_core.dart';
 import 'widgets/mark_sheet_common.dart';
 
-/// IB Diploma core grades (000262) for the section of a class whose grade uses the Diploma total:
+/// IB Diploma core grades (000263) for the section of a class whose grade uses the Diploma total:
 /// each student's Theory of Knowledge and Extended Essay grade (A–E) and CAS, final or predicted,
 /// saved together. Entered by the section's teachers (TOK and EE supervisors) from the app;
 /// leadership enters them on the web.

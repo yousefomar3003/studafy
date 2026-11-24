@@ -47,7 +47,7 @@ export type TranscriptStaleReason = "corrected" | "new_results";
 export interface TranscriptSubject {
   code: string;
   name: string;
-  /** The subject's Arabic name at issue (000263); absent when it had none. */
+  /** The subject's Arabic name at issue (000264); absent when it had none. */
   name_ar?: string;
   requirement: string;
   marks_obtained: number | null;
@@ -73,7 +73,7 @@ export interface TranscriptSubject {
 }
 
 export interface TranscriptYear {
-  /** `*_ar` fields (000263): the Arabic names at issue; absent when there was none. */
+  /** `*_ar` fields (000264): the Arabic names at issue; absent when there was none. */
   academic_year: { id: string; code: string; name: string; name_ar?: string };
   grade_level_name: string;
   grade_level_name_ar?: string;
@@ -96,7 +96,7 @@ export interface TranscriptYear {
     credits_earned?: number;
     /** The year's class rank when issued (000257); absent without one and on older transcripts. */
     class_rank?: DocumentClassRank;
-    /** The year's IB Diploma outcome when issued (000262); absent otherwise and on older ones. */
+    /** The year's IB Diploma outcome when issued (000263); absent otherwise and on older ones. */
     diploma?: DiplomaResultView;
   };
 }
@@ -128,7 +128,7 @@ export interface TranscriptContent {
   serial_number: string;
   issued_at: string;
   /**
-   * The language the school issued the transcript in (000263). Absent when the school left it to
+   * The language the school issued the transcript in (000264). Absent when the school left it to
    * each reader's language, and on transcripts issued before.
    */
   language?: DocumentLanguage;

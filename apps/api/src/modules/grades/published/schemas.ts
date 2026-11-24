@@ -30,7 +30,7 @@ export const publishedGradeSchema = z
       credit_hours: z.number().positive(),
       subject_name_ar: z.string().optional().openapi({
         description:
-          "The subject's Arabic name (000263), when it has one: apps in Arabic show it for the course.",
+          "The subject's Arabic name (000264), when it has one: apps in Arabic show it for the course.",
       }),
     }),
     label: z.string(),

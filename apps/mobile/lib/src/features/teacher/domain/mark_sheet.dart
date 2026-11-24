@@ -84,7 +84,7 @@ enum MarkStatus {
 }
 
 /// How the caller reads a mark sheet (`access`): as school leadership, one of the section's
-/// teachers, or the subject's coordinator (000260), who only reads.
+/// teachers, or the subject's coordinator (000261), who only reads.
 enum MarkSheetAccess {
   leadership,
   teacher,

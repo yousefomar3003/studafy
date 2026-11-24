@@ -174,11 +174,11 @@ const creditFields = {
     description: "Credits of those subjects that were passed; null when none carries credits.",
   }),
 };
-/** The IB Diploma outcome beside a points_total result (000262). */
+/** The IB Diploma outcome beside a points_total result (000263). */
 const diplomaField = {
   diploma: diplomaResultSchema.nullable().openapi({
     description:
-      "points_total results only: the diploma total, core points and award status. Null for every other format and on results finalized before 000262.",
+      "points_total results only: the diploma total, core points and award status. Null for every other format and on results finalized before 000263.",
   }),
 };
 export const aggregationSchema = z.enum(["weighted_average", "total_points"]);
@@ -801,7 +801,7 @@ export const sectionSubjectAccessSchema = z
   .enum(["leadership", "teacher", "coordinator"])
   .openapi("SectionSubjectAccess", {
     description:
-      "How the caller reads a section's subject: school leadership, one of its teachers, or the subject's coordinator (read-only, 000260).",
+      "How the caller reads a section's subject: school leadership, one of its teachers, or the subject's coordinator (read-only, 000261).",
   });
 const assessmentReleaseStatusSchema = z
   .enum(["draft", "submitted", "approved", "returned"])
@@ -1282,12 +1282,12 @@ const descriptiveSkillSchema = z
   .openapi("DescriptiveSkillResult");
 
 /**
- * Arabic names (000263) on documents: present only when the school had one at issue, and absent on
+ * Arabic names (000264) on documents: present only when the school had one at issue, and absent on
  * documents issued before. Readers fall back to the English name.
  */
 export const nameArField = {
   name_ar: z.string().optional().openapi({
-    description: "The Arabic name at issue, when there was one (000263).",
+    description: "The Arabic name at issue, when there was one (000264).",
   }),
 };
 
@@ -1297,13 +1297,13 @@ export const documentArabicStudentNameFields = {
   last_name_ar: z.string().optional(),
 };
 
-/** A student's Arabic names on live reads (000263): null when the school keeps none. */
+/** A student's Arabic names on live reads (000264): null when the school keeps none. */
 export const arabicStudentNameFields = {
   first_name_ar: z.string().nullable().optional(),
   middle_name_ar: z.string().nullable().optional(),
   last_name_ar: z.string().nullable().optional(),
 };
-/** Learning outcome achievement as finalized (000267). */
+/** Learning outcome achievement as finalized (000268). */
 const outcomeAchievementResultSchema = z
   .object({
     outcome_id: uuidSchema,
@@ -1324,7 +1324,7 @@ const storedSubjectResultSchema = z
     subject_name: z.string(),
     subject_name_ar: z.string().nullable().optional().openapi({
       description:
-        "The subject's Arabic name, when the school has one (absent from servers before 000263).",
+        "The subject's Arabic name, when the school has one (absent from servers before 000264).",
     }),
     status: z.enum(["complete", "incomplete", "exempt"]),
     percentage: z.number().nullable(),
@@ -1380,7 +1380,7 @@ const storedSubjectResultSchema = z
     }),
     outcomes: z.array(outcomeAchievementResultSchema).openapi({
       description:
-        "Learning outcome achievement as finalized, in catalogue order. Empty unless the school shows outcomes on report cards (and on results finalized before 000267).",
+        "Learning outcome achievement as finalized, in catalogue order. Empty unless the school shows outcomes on report cards (and on results finalized before 000268).",
     }),
   })
   .openapi("FinalizedSubjectResult");
@@ -1533,7 +1533,7 @@ export const studentReleasedMarksSchema = z
                 subject_code: z.string(),
                 subject_name: z.string(),
                 subject_name_ar: z.string().nullable().optional().openapi({
-                  description: "The subject's Arabic name, if any (000263).",
+                  description: "The subject's Arabic name, if any (000264).",
                 }),
                 approved_at: dateTimeSchema.nullable().openapi({
                   description:
@@ -1709,7 +1709,7 @@ export const certificateContentSchema = z
     issued_at: dateTimeSchema,
     language: z.enum(["en", "ar", "bilingual"]).optional().openapi({
       description:
-        "The language the school issued the document in (000263). Absent: the document follows each reader's language, as documents issued before did.",
+        "The language the school issued the document in (000264). Absent: the document follows each reader's language, as documents issued before did.",
     }),
     school: z
       .object({ id: uuidSchema, name: z.string(), ...nameArField })
@@ -1800,7 +1800,7 @@ export const certificateContentSchema = z
             .optional()
             .openapi({
               description:
-                "Learning outcome achievement (000267). Absent when the school does not show it, and on older documents.",
+                "Learning outcome achievement (000268). Absent when the school does not show it, and on older documents.",
             }),
         })
         .openapi("CertificateContentSubject"),
@@ -1824,7 +1824,7 @@ export const certificateContentSchema = z
         class_rank: documentClassRankSchema.nullable().optional(),
         diploma: diplomaResultSchema.nullable().optional().openapi({
           description:
-            "The IB Diploma outcome when issued (points_total grades). Absent otherwise and on documents issued before 000262.",
+            "The IB Diploma outcome when issued (points_total grades). Absent otherwise and on documents issued before 000263.",
         }),
         subjects_failed: z.number().int(),
 

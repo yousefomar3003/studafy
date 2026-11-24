@@ -25,7 +25,7 @@ export interface StudentRow {
   middle_name: string | null;
   last_name: string;
   preferred_name: string | null;
-  /** Arabic names (000263); null when the school keeps none. */
+  /** Arabic names (000264); null when the school keeps none. */
   first_name_ar: string | null;
   middle_name_ar: string | null;
   last_name_ar: string | null;

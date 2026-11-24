@@ -34,7 +34,7 @@ export const SEATING_STRATEGIES: readonly SeatingStrategy[] = [
 ];
 
 /**
- * Exam weeks (000265): the school's exam periods, their timetable, rooms, seating, invigilators and
+ * Exam weeks (000266): the school's exam periods, their timetable, rooms, seating, invigilators and
  * clashes. Everything about a period changes together (a slot's rooms change its seating and its
  * clashes), so every write refreshes every exam-weeks query.
  */

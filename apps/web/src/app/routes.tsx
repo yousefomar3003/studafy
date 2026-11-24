@@ -1209,7 +1209,7 @@ export const routes: RouteObject[] = [
             ),
           },
           {
-            // Exam weeks (000265): exam periods, their timetable, rooms, seating, invigilators and
+            // Exam weeks (000266): exam periods, their timetable, rooms, seating, invigilators and
             // the printed sheets. Every read and write behind it requires `timetable:manage`.
             path: "principal/exam-weeks",
             element: (

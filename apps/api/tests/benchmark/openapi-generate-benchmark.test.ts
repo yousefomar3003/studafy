@@ -565,7 +565,7 @@ const EXPECTED_PATHS = [
   "/api/grading/external-exams/{examId}",
   "/api/grading/external-exams/{examId}/archive",
   "/api/grading/external-exams/{examId}/restore",
-  // Exam entries (000261).
+  // Exam entries (000262).
   "/api/grading/external-exam-sessions",
   "/api/grading/external-exam-sessions/{sessionId}",
   "/api/grading/external-exam-sessions/{sessionId}/candidate-numbers",
@@ -586,7 +586,7 @@ const EXPECTED_PATHS = [
   "/api/grading/graduation-requirement-sets/{setId}",
   "/api/grading/graduation-requirement-sets/{setId}/preview",
   "/api/grading/graduation-requirements/report",
-  // Learning outcomes and lesson/term plans (000267).
+  // Learning outcomes and lesson/term plans (000268).
   "/api/grading/learning-outcomes",
   "/api/grading/learning-outcomes/import",
   "/api/grading/learning-outcomes/{outcomeId}",

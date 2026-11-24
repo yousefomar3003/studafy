@@ -3,7 +3,7 @@ import { dateTimeSchema, uuidSchema } from "@studafy/shared-schemas";
 
 import { sheetStatusSchema } from "./schemas";
 
-/** Subject coordinators (000260). */
+/** Subject coordinators (000261). */
 
 export const COORDINATOR_GRADE_LEVELS_MAX = 50;
 

@@ -10,7 +10,7 @@ import type { ExamEntryStatus } from "@studafy/grading-engine";
 import type { TransactionSql } from "postgres";
 
 /**
- * Exam entries (000261): sessions of a catalogue external exam ("IGCSE May/June 2027") and the
+ * Exam entries (000262): sessions of a catalogue external exam ("IGCSE May/June 2027") and the
  * students the school enters for them, with their subjects, tiers, candidate numbers and status.
  *
  * School leadership manages everything here; the routes gate it on academicConfig:manage. A
@@ -1095,7 +1095,7 @@ export async function listStudentExamEntries(
     WHERE school_id = ${schoolId}::uuid AND entry_id = ANY (${rows.map((row) => row.id)}::uuid[])
   `;
   // Subject names through app.external_exam_entry_subjects_of: app.subjects' role scope would hide
-  // a subject the student takes no class in from the student and their parents (000261).
+  // a subject the student takes no class in from the student and their parents (000262).
   const named = await tx<{ subject_id: string; code: string; name: string }[]>`
     SELECT subject_id, code, name FROM app.external_exam_entry_subjects_of(${studentId}::uuid)
   `;

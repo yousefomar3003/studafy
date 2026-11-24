@@ -4,7 +4,7 @@ import { dateSchema, dateTimeSchema, uuidSchema } from "@studafy/shared-schemas"
 import { SEATING_STRATEGIES } from "./seating";
 
 /**
- * Exam weeks (000265). Kept flat for the mobile client generator: no .extend (allOf), no per-field
+ * Exam weeks (000266). Kept flat for the mobile client generator: no .extend (allOf), no per-field
  * description on a referenced enum, no .default on a shared enum (defaults are applied in the
  * service).
  */

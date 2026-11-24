@@ -3,7 +3,7 @@
  * grade 12 60%" -- per subject and overall, as Jordan's two-year Tawjihi and several national
  * systems report it.
  *
- * A school keeps the weights per grade level (db/migrations/000266, `multi_year_result_configs`).
+ * A school keeps the weights per grade level (db/migrations/000267, `multi_year_result_configs`).
  * The API finds, for each listed grade level, the student's current finalized annual result in that
  * grade (a repeated grade: the later year) and hands it here. Everything is pure:
  *

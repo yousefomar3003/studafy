@@ -12,7 +12,7 @@ export type RemedialPlan = Schemas["RemedialPlan"];
 export type RemedialPlanStatus = Schemas["RemedialPlanStatus"];
 
 /**
- * Remedial plans (000268): teachers write them in the mobile app; leadership follows them up here
+ * Remedial plans (000269): teachers write them in the mobile app; leadership follows them up here
  * (the year's list by grade, subject, status and overdue review, a plan's timeline, follow-up
  * notes) and decides whether teachers may share plans with students and parents.
  */

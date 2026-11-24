@@ -17,7 +17,7 @@ export interface ChildTimetableSlot {
   weekday: number;
   period: number;
   class: { id: string; code: string };
-  /** `subject_name_ar` (000263): the course's subject's Arabic name, when it has one. */
+  /** `subject_name_ar` (000264): the course's subject's Arabic name, when it has one. */
   course: { id: string; code: string; name: string; subject_name_ar?: string } | null;
   teacher: { id: string; name: string } | null;
   room: { id: string; name: string } | null;

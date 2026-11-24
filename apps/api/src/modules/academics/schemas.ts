@@ -5,10 +5,10 @@ import { uuidSchema, dateTimeSchema, dateSchema } from "@studafy/shared-schemas"
 // Enums
 // ---------------------------------------------------------------------------
 
-/** An optional Arabic name on a write (000263): omitted keeps it, null or blank clears it. */
+/** An optional Arabic name on a write (000264): omitted keeps it, null or blank clears it. */
 const nameArInput = {
   name_ar: z.string().trim().max(200).nullable().optional().openapi({
-    description: "Arabic name (000263). Omitted: unchanged. null or blank: cleared.",
+    description: "Arabic name (000264). Omitted: unchanged. null or blank: cleared.",
   }),
 };
 
@@ -33,7 +33,7 @@ export const academicYearSchema = z
       .string()
       .openapi({ description: "Human-readable name.", example: "Academic Year 2025-2026" }),
     name_ar: z.string().nullable().optional().openapi({
-      description: "Arabic name (000263); null when there is none, and readers use `name`.",
+      description: "Arabic name (000264); null when there is none, and readers use `name`.",
     }),
     starts_on: dateSchema.openapi({ description: "First day of the academic year." }),
     ends_on: dateSchema.openapi({ description: "Last day of the academic year." }),
@@ -103,7 +103,7 @@ export const termSchema = z
       .openapi({ description: "Short unique code within the academic year.", example: "T1" }),
     name: z.string().openapi({ description: "Human-readable name.", example: "Term 1" }),
     name_ar: z.string().nullable().optional().openapi({
-      description: "Arabic name (000263); null when there is none, and readers use `name`.",
+      description: "Arabic name (000264); null when there is none, and readers use `name`.",
     }),
     sequence_number: z
       .number()
@@ -259,7 +259,7 @@ export const subjectSchema = z
       .openapi({ description: "Short unique code within the school.", example: "MATH" }),
     name: z.string().openapi({ description: "Human-readable name.", example: "Mathematics" }),
     name_ar: z.string().nullable().optional().openapi({
-      description: "Arabic name (000263); null when there is none, and readers use `name`.",
+      description: "Arabic name (000264); null when there is none, and readers use `name`.",
     }),
     description: z
       .string()
@@ -341,7 +341,7 @@ export const courseSchema = z
     name: z.string().openapi({ description: "Human-readable name.", example: "Calculus I" }),
     subject_name_ar: z.string().nullable().optional().openapi({
       description:
-        "The subject's Arabic name (000263), on list and get: apps in Arabic show it for the course. Null when the subject has none.",
+        "The subject's Arabic name (000264), on list and get: apps in Arabic show it for the course. Null when the subject has none.",
     }),
     description: z.string().nullable().openapi({ description: "Optional description." }),
     credit_hours: z.number().positive().openapi({
@@ -595,7 +595,7 @@ export const gradeLevelSchema = z
     school_id: uuidSchema.openapi({ description: "Owning school tenant." }),
     name: z.string().openapi({ description: "Display name.", example: "Grade 10" }),
     name_ar: z.string().nullable().optional().openapi({
-      description: "Arabic name (000263); null when there is none, and readers use `name`.",
+      description: "Arabic name (000264); null when there is none, and readers use `name`.",
     }),
     sort_order: z
       .number()
@@ -661,10 +661,10 @@ export const sectionSchema = z
       .string()
       .nullable()
       .optional()
-      .openapi({ description: "The grade's Arabic name, if any (000263)." }),
+      .openapi({ description: "The grade's Arabic name, if any (000264)." }),
     name: z.string().openapi({ description: "Section name within the grade.", example: "C" }),
     name_ar: z.string().nullable().optional().openapi({
-      description: "Arabic name (000263); null when there is none, and readers use `name`.",
+      description: "Arabic name (000264); null when there is none, and readers use `name`.",
     }),
     student_count: z.number().int().openapi({ description: "Students placed in this section." }),
     archived_at: dateTimeSchema
@@ -932,7 +932,7 @@ export const roomSchema = z
       .openapi({ description: "Maximum occupancy, or null if not tracked." }),
     exam_capacity: z.number().int().nullable().openapi({
       description:
-        "Candidates the room seats in an exam (spaced seating); null: its capacity (000265).",
+        "Candidates the room seats in an exam (spaced seating); null: its capacity (000266).",
     }),
     building: z
       .string()
@@ -969,7 +969,7 @@ export const roomQuerySchema = z
 
 const roomCapacityInput = z.number().int().min(1).max(10000).nullable().optional();
 
-/** A physical room added by leadership (exam weeks, 000265); virtual rooms stay provisioned. */
+/** A physical room added by leadership (exam weeks, 000266); virtual rooms stay provisioned. */
 export const roomCreateBodySchema = z
   .object({
     code: z.string().trim().min(1).max(40),

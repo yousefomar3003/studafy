@@ -3,7 +3,7 @@ import { emitAuditLog } from "../../middleware/auditEmitter";
 import type { TransactionSql } from "postgres";
 
 /**
- * Arabic + English documents (000263): the language each kind of issued document is rendered in,
+ * Arabic + English documents (000264): the language each kind of issued document is rendered in,
  * and the Arabic names copied into a document's content when it is issued.
  *
  * `viewer` (the default) keeps documents as they were: no language is stored, and each reader sees

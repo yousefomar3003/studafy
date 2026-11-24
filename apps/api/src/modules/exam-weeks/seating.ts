@@ -1,5 +1,5 @@
 /**
- * Exam seating (000265): who sits where in one exam slot. Pure -- no database, no clock -- so the
+ * Exam seating (000266): who sits where in one exam slot. Pure -- no database, no clock -- so the
  * rules are unit-tested on their own and the service only loads and saves.
  *
  * A slot's candidates are seated into its rooms in the rooms' filling order, each room from seat 1

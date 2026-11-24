@@ -2,7 +2,7 @@ import 'package:dio/dio.dart';
 
 import '../domain/diploma_core.dart';
 
-/// IB Diploma core grades for one section (OpenAPI tag `Results`, 000262). On its own [Dio] like
+/// IB Diploma core grades for one section (OpenAPI tag `Results`, 000263). On its own [Dio] like
 /// [PredictedGradesClient]; failures surface as the shared `ApiException` (`DIPLOMA_TOTAL_DISABLED`,
 /// `PREDICTED_GRADES_DISABLED`, `ACADEMIC_CONFIG_LOCKED`, `AUTHZ_FORBIDDEN`).
 class DiplomaCoreClient {

@@ -171,7 +171,7 @@ export interface SectionsGradingData {
   choices: Map<string, string>;
   marksByStudent: Map<string, MarkRow[]>;
   sheets: Map<string, { subject_id: string; term_id: string | null; status: string }[]>;
-  /** Final IB Diploma core grades by student (000262); read only by points_total grades. */
+  /** Final IB Diploma core grades by student (000263); read only by points_total grades. */
   diplomaCore: Map<string, DiplomaCoreInput>;
 }
 
@@ -842,7 +842,7 @@ export interface StoredSubjectResult {
   subject_id: string;
   subject_code: string;
   subject_name: string;
-  /** The subject's Arabic name (000263), read live; null when the school has none. */
+  /** The subject's Arabic name (000264), read live; null when the school has none. */
   subject_name_ar: string | null;
   status: "complete" | "incomplete" | "exempt";
   percentage: number | null;
@@ -869,7 +869,7 @@ export interface StoredSubjectResult {
   average_points: number | null;
   /** Descriptive subjects: every skill and the descriptor it was given. */
   skills: DescriptiveSkill[];
-  /** Learning outcome achievement as finalized (000267); empty when the school does not show it. */
+  /** Learning outcome achievement as finalized (000268); empty when the school does not show it. */
   outcomes: OutcomeAchievementView[];
 }
 
@@ -914,7 +914,7 @@ export interface StoredStudentResult {
   student_id: string;
   first_name: string;
   last_name: string;
-  /** The student's Arabic names (000263); null when the school keeps none. */
+  /** The student's Arabic names (000264); null when the school keeps none. */
   first_name_ar: string | null;
   middle_name_ar: string | null;
   last_name_ar: string | null;
@@ -931,7 +931,7 @@ export interface StoredStudentResult {
   /** Credits of the counted complete subjects, and of those passed; null without credits. */
   credits_attempted: number | null;
   credits_earned: number | null;
-  /** The IB Diploma outcome of a points_total result (000262); null otherwise. */
+  /** The IB Diploma outcome of a points_total result (000263); null otherwise. */
   diploma: DiplomaResultView | null;
   subjects_failed: number;
   academic_status: "promoted" | "supplementary" | "retained" | "incomplete";
@@ -1113,7 +1113,7 @@ export async function readFinalizationResults(
 }
 
 /**
- * The Arabic names (000263) of the given subjects, through app.subject_names_ar: students and
+ * The Arabic names (000264) of the given subjects, through app.subject_names_ar: students and
  * parents may not read the app.subjects row behind a result they can read (000037).
  */
 export async function subjectNamesAr(

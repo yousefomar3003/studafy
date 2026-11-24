@@ -10,7 +10,7 @@ import {
 } from "./service";
 
 /**
- * Remedial plans (000268). Enums are named once and referenced plainly (a per-field description or
+ * Remedial plans (000269). Enums are named once and referenced plainly (a per-field description or
  * default on a referenced enum breaks the mobile client generator); defaults are applied in the
  * service.
  */

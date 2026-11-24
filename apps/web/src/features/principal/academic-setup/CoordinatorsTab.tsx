@@ -18,7 +18,7 @@ import type { SetupContext } from "./context";
 import type { SubjectCoordinator } from "./subject-coordinators";
 
 /**
- * Subject coordinators for the selected year (000260): a teacher (or other staff member) who
+ * Subject coordinators for the selected year (000261): a teacher (or other staff member) who
  * coordinates a subject across every section of the grades they cover. Coordinating is not a role:
  * it lets them read those sections' marks, predicted grades and results in the mobile app,
  * read-only. Leadership (academicConfig:manage) assigns, narrows and removes them.

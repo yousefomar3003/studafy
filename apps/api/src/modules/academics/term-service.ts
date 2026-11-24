@@ -16,7 +16,7 @@ export interface TermRow {
   academic_year_id: string;
   code: string;
   name: string;
-  /** Arabic name (000263); null falls back to `name`. */
+  /** Arabic name (000264); null falls back to `name`. */
   name_ar: string | null;
   sequence_number: number;
   starts_on: Date;

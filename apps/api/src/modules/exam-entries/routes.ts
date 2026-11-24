@@ -50,7 +50,7 @@ import type { AppEnv } from "../../middleware/requestId";
 import type { Context } from "hono";
 
 /**
- * Exam entries (000261). School leadership (academicConfig:manage) runs sessions of the school's
+ * Exam entries (000262). School leadership (academicConfig:manage) runs sessions of the school's
  * external exams and enters students; staff who read the catalogue (academicConfig:read) see the
  * sessions; anyone with grade:read sees a student's entries when they may read the student
  * (leadership, the student's teachers, the student, linked parents) -- checked in the service and

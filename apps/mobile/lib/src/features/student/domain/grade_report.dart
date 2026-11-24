@@ -77,7 +77,7 @@ class SubjectGrades {
   final String courseId;
   final String courseName;
 
-  /// The course's subject's Arabic name (000263): shown for the course when the app is in
+  /// The course's subject's Arabic name (000264): shown for the course when the app is in
   /// Arabic. Null when there is none, and from servers before it.
   final String? subjectNameAr;
   final String courseCode;

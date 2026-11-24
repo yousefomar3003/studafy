@@ -17,10 +17,10 @@ import type { PendingQuery, Row, TransactionSql } from "postgres";
 type Fragment = PendingQuery<Row[]>;
 
 /**
- * Term and lesson plans (000267).
+ * Term and lesson plans (000268).
  *
  * A teacher of the section and subject writes them (in the app), and submits them for review; the
- * subject's coordinator (000260, in the app) or school leadership (on the web) approves or returns
+ * subject's coordinator (000261, in the app) or school leadership (on the web) approves or returns
  * them with a comment. A returned plan is edited and submitted again; an approved one is final,
  * except a lesson's reflection, which the teacher writes after teaching it. Every write and review
  * is audited with the old and new status.

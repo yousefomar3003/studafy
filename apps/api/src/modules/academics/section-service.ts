@@ -16,7 +16,7 @@ export interface GradeLevelRow {
   id: string;
   school_id: string;
   name: string;
-  /** Arabic name (000263); null falls back to `name`. */
+  /** Arabic name (000264); null falls back to `name`. */
   name_ar: string | null;
   sort_order: number;
   archived_at: Date | null;
@@ -32,7 +32,7 @@ export interface SectionRow {
   grade_level_name: string;
   grade_level_name_ar: string | null;
   name: string;
-  /** Arabic name (000263); null falls back to `name`. */
+  /** Arabic name (000264); null falls back to `name`. */
   name_ar: string | null;
   student_count: number;
   archived_at: Date | null;
@@ -62,7 +62,7 @@ export interface PlacementResult {
   skipped_class_ids: string[];
 }
 
-/** A trimmed Arabic name, or null for blank: an empty field clears it (000263). */
+/** A trimmed Arabic name, or null for blank: an empty field clears it (000264). */
 export function cleanNameAr(value: string | null | undefined): string | null {
   const trimmed = value?.trim() ?? "";
   return trimmed === "" ? null : trimmed;

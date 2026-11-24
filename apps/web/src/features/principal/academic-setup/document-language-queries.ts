@@ -20,7 +20,7 @@ export const DOCUMENT_LANGUAGE_SETTINGS: readonly DocumentLanguageSetting[] = [
 
 const documentLanguageKey = () => [...GRADING_KEY, "document-language-settings"] as const;
 
-/** The language each document type is issued in, and the school's Arabic name (000263). */
+/** The language each document type is issued in, and the school's Arabic name (000264). */
 export function useDocumentLanguageSettings() {
   return useQuery({
     queryKey: documentLanguageKey(),

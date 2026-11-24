@@ -195,13 +195,13 @@ CREATE INDEX idx_student_external_exam_results_entry_fk
   WHERE entry_id IS NOT NULL;
 
 COMMENT ON TABLE app.external_exam_sessions IS
-  'A series of a catalogue external exam the school enters students for: entry deadline, sitting dates, results date (000261).';
+  'A series of a catalogue external exam the school enters students for: entry deadline, sitting dates, results date (000262).';
 COMMENT ON TABLE app.external_exam_entries IS
-  'A student entered for an external exam session: candidate number, status draft/entered/withdrawn (000261).';
+  'A student entered for an external exam session: candidate number, status draft/entered/withdrawn (000262).';
 COMMENT ON TABLE app.external_exam_entry_subjects IS
-  'A subject an exam entry covers, with its tier and the board''s option code (000261); deleted with the entry.';
+  'A subject an exam entry covers, with its tier and the board''s option code (000262); deleted with the entry.';
 COMMENT ON COLUMN app.student_external_exam_results.entry_id IS
-  'The exam entry this result came from, when known (000261).';
+  'The exam entry this result came from, when known (000262).';
 
 -- ---------------------------------------------------------------------------------------------------
 -- 4. Grants and RLS

@@ -343,7 +343,7 @@ function tenantFrom(c: Context<AppEnv>) {
 }
 
 /**
- * Lesson and term plans (000267). Reads and reviews are behind academicConfig:read (teachers,
+ * Lesson and term plans (000268). Reads and reviews are behind academicConfig:read (teachers,
  * coordinators and leadership hold it) and narrowed per row to the section's teachers, its
  * coordinator and leadership; writing is behind lesson:create / lesson:update / lesson:delete and
  * narrowed to a teacher of the subject in the section.

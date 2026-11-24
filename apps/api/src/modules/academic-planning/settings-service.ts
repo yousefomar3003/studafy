@@ -6,7 +6,7 @@ import { emitAuditLog } from "../../middleware/auditEmitter";
 import type { TransactionSql } from "postgres";
 
 /**
- * Academic planning settings (000267): the outcome achievement scale, whether outcome achievement
+ * Academic planning settings (000268): the outcome achievement scale, whether outcome achievement
  * is shown on report cards (off by default), and when lesson and term plans are due.
  *
  * No settings row means the defaults; no scale rows means {@link DEFAULT_ACHIEVEMENT_LEVELS}. This

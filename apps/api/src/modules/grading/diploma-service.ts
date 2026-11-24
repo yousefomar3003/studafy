@@ -36,7 +36,7 @@ import type {
 import type { TransactionSql } from "postgres";
 
 /**
- * IB Diploma total (000262): the API side of the engine's `points_total` result.
+ * IB Diploma total (000263): the API side of the engine's `points_total` result.
  *
  *  - A grade program whose result format is `points_total` keeps its diploma rules (counted
  *    subjects, TOK x EE matrix, award conditions) in `diploma_config`, in the API's snake_case

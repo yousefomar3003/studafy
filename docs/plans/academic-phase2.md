@@ -41,15 +41,15 @@ Mobile requirements for every workstream:
 
 | WS  | Need (#)                                                  | Migration | Branch                          | Batch |
 | --- | --------------------------------------------------------- | --------- | ------------------------------- | ----- |
-| H   | Subject coordinators (#10)                                | 000260    | `feat/academic-coordinators`    | 1     |
-| I   | Exam entries (#1)                                         | 000261    | `feat/academic-exam-entries`    | 1     |
-| J   | IB Diploma 45-point total (#2)                            | 000262    | `feat/academic-ib-diploma`      | 1     |
-| K   | Arabic + English documents (#4)                           | 000263    | `feat/academic-bilingual-docs`  | 1     |
-| L   | Ministry results export (#5)                              | 000264    | `feat/academic-ministry-export` | 1     |
-| M   | Exam weeks: timetable, rooms, seating, invigilators (#11) | 000265    | `feat/academic-exam-weeks`      | 1     |
-| N   | Tawjihi equivalency (#3) + multi-year results (#6)        | 000266    | `feat/academic-equivalency`     | 2     |
-| O   | Lesson and term plans (#7) + learning outcomes (#8)       | 000267    | `feat/academic-plans-outcomes`  | 2     |
-| P   | Remedial plans (#9)                                       | 000268    | `feat/academic-remedial-plans`  | 2     |
+| H   | Subject coordinators (#10)                                | 000261    | `feat/academic-coordinators`    | 1     |
+| I   | Exam entries (#1)                                         | 000262    | `feat/academic-exam-entries`    | 1     |
+| J   | IB Diploma 45-point total (#2)                            | 000263    | `feat/academic-ib-diploma`      | 1     |
+| K   | Arabic + English documents (#4)                           | 000264    | `feat/academic-bilingual-docs`  | 1     |
+| L   | Ministry results export (#5)                              | 000265    | `feat/academic-ministry-export` | 1     |
+| M   | Exam weeks: timetable, rooms, seating, invigilators (#11) | 000266    | `feat/academic-exam-weeks`      | 1     |
+| N   | Tawjihi equivalency (#3) + multi-year results (#6)        | 000267    | `feat/academic-equivalency`     | 2     |
+| O   | Lesson and term plans (#7) + learning outcomes (#8)       | 000268    | `feat/academic-plans-outcomes`  | 2     |
+| P   | Remedial plans (#9)                                       | 000269    | `feat/academic-remedial-plans`  | 2     |
 
 **Batch 1** runs in parallel. **Batch 2** starts after batch 1 is merged into `feat/academic-phase2`:
 O and P use H's coordinators for review and follow-up, and N converts J's IB total and phase 1's
@@ -214,15 +214,15 @@ services (J and K both touch certificates, report cards and transcripts), i18n f
 
 ## Progress
 
-- [x] WS-H subject coordinators (`feat/academic-coordinators`, migration 000260; `docs/modules/subject-coordinators.md`)
+- [x] WS-H subject coordinators (`feat/academic-coordinators`, migration 000261; `docs/modules/subject-coordinators.md`)
 - [x] WS-I exam entries ([docs/modules/exam-entries.md](../modules/exam-entries.md))
-- [x] WS-J IB Diploma total (`feat/academic-ib-diploma`, migration 000262; docs/database/academic-grading.md "IB Diploma total")
-- [x] WS-K Arabic + English documents (`feat/academic-bilingual-docs`, migration 000263;
+- [x] WS-J IB Diploma total (`feat/academic-ib-diploma`, migration 000263; docs/database/academic-grading.md "IB Diploma total")
+- [x] WS-K Arabic + English documents (`feat/academic-bilingual-docs`, migration 000264;
       [module doc](../modules/bilingual-documents.md))
-- [x] WS-L ministry results export (`feat/academic-ministry-export`, migration 000264; `docs/modules/ministry-export.md`)
-- [x] WS-M exam weeks (`feat/academic-exam-weeks`, migration 000265; `docs/modules/exam-weeks.md`)
+- [x] WS-L ministry results export (`feat/academic-ministry-export`, migration 000265; `docs/modules/ministry-export.md`)
+- [x] WS-M exam weeks (`feat/academic-exam-weeks`, migration 000266; `docs/modules/exam-weeks.md`)
 - [x] Integration of batch 1
-- [x] WS-N Tawjihi equivalency + multi-year results (`feat/academic-equivalency`, migration 000266; [docs/modules/tawjihi-equivalency.md](../modules/tawjihi-equivalency.md))
-- [x] WS-O lesson and term plans + learning outcomes (`feat/academic-plans-outcomes`, migration 000267; `docs/modules/lesson-plans-and-outcomes.md`)
-- [x] WS-P remedial plans (`feat/academic-remedial-plans`, migration 000268; `docs/modules/remedial-plans.md`)
+- [x] WS-N Tawjihi equivalency + multi-year results (`feat/academic-equivalency`, migration 000267; [docs/modules/tawjihi-equivalency.md](../modules/tawjihi-equivalency.md))
+- [x] WS-O lesson and term plans + learning outcomes (`feat/academic-plans-outcomes`, migration 000268; `docs/modules/lesson-plans-and-outcomes.md`)
+- [x] WS-P remedial plans (`feat/academic-remedial-plans`, migration 000269; `docs/modules/remedial-plans.md`)
 - [x] Integration of batch 2 (dev → stage still to do)

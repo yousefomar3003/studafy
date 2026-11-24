@@ -3,7 +3,7 @@ import { EXAM_ENTRY_LIMITS, EXAM_ENTRY_STATUSES } from "@studafy/grading-engine"
 import { dateSchema, dateTimeSchema, uuidSchema } from "@studafy/shared-schemas";
 
 /**
- * Exam entries (000261): sessions of a catalogue external exam and the students entered for them.
+ * Exam entries (000262): sessions of a catalogue external exam and the students entered for them.
  * Shared enums are referenced plainly (no per-field description, no default) so the generated Dart
  * client compiles; defaults are applied in the handlers.
  */

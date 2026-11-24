@@ -45,7 +45,7 @@ import type { AppEnv } from "../../middleware/requestId";
 import type { Context } from "hono";
 
 /**
- * Tawjihi equivalency and multi-year results (000266). School leadership (academicConfig:manage)
+ * Tawjihi equivalency and multi-year results (000267). School leadership (academicConfig:manage)
  * manages the rule sets and configurations and lists a grade level's estimates; teaching staff
  * (academicConfig:read) read them; anyone with grade:read reads a student's estimate or multi-year
  * result when they may read the student (leadership, the student's teachers, the student, linked

@@ -45,7 +45,7 @@ class ChildTimetableSlot {
   final String classCode;
   final String? courseName;
 
-  /// The course's subject's Arabic name (000263); null when there is none.
+  /// The course's subject's Arabic name (000264); null when there is none.
   final String? subjectNameAr;
   final String? teacherId;
   final String? teacherName;

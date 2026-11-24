@@ -20,7 +20,7 @@ export type LessonPlan = Schemas["LessonPlan"];
 export type ReviewDecision = Schemas["AcademicPlanReviewDecision"];
 
 /**
- * Learning outcomes and lesson and term plans (000267). Leadership manages the catalogue, the
+ * Learning outcomes and lesson and term plans (000268). Leadership manages the catalogue, the
  * achievement scale and plan due dates here, reviews submitted plans and reads coverage; teachers
  * write plans and record achievement in the mobile app.
  */

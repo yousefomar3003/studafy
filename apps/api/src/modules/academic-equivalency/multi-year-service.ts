@@ -15,7 +15,7 @@ import type {
 import type { TransactionSql } from "postgres";
 
 /**
- * Multi-year results (000266): a result weighted across several grade levels ("Grade 11 40% +
+ * Multi-year results (000267): a result weighted across several grade levels ("Grade 11 40% +
  * Grade 12 60%"), per subject and overall, worked out on read from each year's current finalized
  * annual result by @studafy/grading-engine. Pending while a year is not finalized.
  *

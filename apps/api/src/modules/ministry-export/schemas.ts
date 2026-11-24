@@ -10,7 +10,7 @@ import {
 import { dateTimeSchema, uuidSchema } from "@studafy/shared-schemas";
 
 /**
- * Ministry results export (000264). What a template may hold is checked by @studafy/grading-engine
+ * Ministry results export (000265). What a template may hold is checked by @studafy/grading-engine
  * (validateMinistryExportTemplate) in the service, so these schemas only bound sizes and types.
  * Shared enums are referenced plainly, with no per-field description or default, and objects are
  * written out rather than extended: the mobile client generator cannot read the alternatives.

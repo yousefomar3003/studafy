@@ -13,7 +13,7 @@ import 'widgets/academic_plan_common.dart';
 import 'widgets/mark_sheet_common.dart';
 
 /// Opens [PlanReviewsScreen] from the Classes tab, beside the Coordinator entry. Shown only to a
-/// teacher who coordinates a subject this year (000260): they review its sections' plans.
+/// teacher who coordinates a subject this year (000261): they review its sections' plans.
 class PlanReviewsEntryTile extends ConsumerWidget {
   const PlanReviewsEntryTile({super.key});
 

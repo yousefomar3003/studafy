@@ -1,5 +1,5 @@
 /**
- * Exam weeks (000265) against a real migrated database with RLS armed.
+ * Exam weeks (000266) against a real migrated database with RLS armed.
  *
  * Grade 10 this year: 10A (Amal, Badr) and 10B (Carim, Dina). Dina is exempt from Physics.
  * Rooms: Hall (exam capacity 3, everyday 40) and Room 1 (capacity 2).

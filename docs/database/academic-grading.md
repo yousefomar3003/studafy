@@ -221,7 +221,7 @@ labels and category names exist in English and Arabic.
 | BTEC                       | Distinction\* 90, Distinction 75, Merit 60, Pass 40, Unclassified                         | percentage | pass 40; assignments 70, practical 30                                                                                           |
 | British Key Stages, IB PYP | descriptors (Greater depth / Expected / Working towards; Exceeding … Beginning)           | percentage | descriptive, one "Attainment" skill per term                                                                                    |
 | IB MYP                     | 1–7 at totals 0, 6, 10, 15, 19, 24, 28 of 32 (as % of 32), GPA points 1–7                 | GPA of 7   | total points; criteria A–D out of 8 per term; max marks 32; pass at grade 3; 3-decimal rounding                                 |
-| IB DP subjects             | 7 80, 6 70, 5 60, 4 50, 3 40, 2 25, 1                                                     | 45 points  | pass 40; internal assessment 25, tests 25, end-of-term exam 50; HL/SL as course levels; IB Diploma rules (000262)               |
+| IB DP subjects             | 7 80, 6 70, 5 60, 4 50, 3 40, 2 25, 1                                                     | 45 points  | pass 40; internal assessment 25, tests 25, end-of-term exam 50; HL/SL as course levels; IB Diploma rules (000263)               |
 | American                   | A+ 97 (4.0) … D 65 (1.0), F (0.0)                                                         | GPA of 4   | pass 65; tests 40, quizzes 20, homework 15, classwork 15, projects 10; 1 credit = coefficient 1; Standard / Honors +0.5 / AP +1 |
 | French                     | Très bien 80, Bien 70, Assez bien 60, Passable 50, Insuffisant                            | out of 20  | max marks 20, pass 50; the school's exam system                                                                                 |
 | Irish Junior Cycle         | Distinction 90, Higher Merit 75, Merit 55, Achieved 40, Partially Achieved 20, Not Graded | percentage | pass 40; the school's exam system                                                                                               |
@@ -315,7 +315,7 @@ Where it shows (`class_rank`: `status` `ranked` / `not_ranked` / `pending`, `bas
   ranks, the rank is visible to students and parents (the documents are issued to them) and the
   student was ranked. Absent otherwise and on documents issued before 000257.
 
-### IB Diploma total (000262)
+### IB Diploma total (000263)
 
 A grade program may show its result as the **IB Diploma total**: `result_format = points_total`
 with `result_scale_max` 45. The rules are pure and unit-tested in
@@ -377,7 +377,7 @@ finalized results).
 **Where it shows**: the result preview, finalized results (`diploma` beside `result_display`,
 which reads "36 / 45"), the student and parent app (total, core points, status with failing
 conditions, and the predicted total), and in report cards, certificates and transcripts as an
-optional `overall.diploma` stored at issue (absent on documents issued before 000262, which render
+optional `overall.diploma` stored at issue (absent on documents issued before 000263, which render
 unchanged). A single subject's mark view of a points_total grade shows its points like a GPA out of
 the scale's top points (7), not out of 45.
 
@@ -423,21 +423,21 @@ new values.
 Predicted grades (000254) are a separate, opt-in table per grade and year that nothing above reads;
 see [`docs/modules/predicted-grades.md`](../modules/predicted-grades.md).
 
-### Subject coordinators (000260)
+### Subject coordinators (000261)
 
 `app.subject_coordinators` (+ `app.subject_coordinator_grade_levels`) names who coordinates a
 subject in a year, optionally for some grade levels. A coordinator reads every covered section's
 marks, predicted grades and subject results, read-only, through `app.coordinates_section_subject`
 and its siblings; see [`docs/modules/subject-coordinators.md`](../modules/subject-coordinators.md).
 
-### Remedial plans (000268)
+### Remedial plans (000269)
 
 `app.remedial_plans` (+ `app.remedial_plan_reviews`, `app.remedial_plan_notes`, and the reserved
 `app.remedial_plan_outcomes`) holds plans for struggling students per student, subject and term or
 year. Nothing above reads them; suggestions reuse the engine's current percentage. See
 [`docs/modules/remedial-plans.md`](../modules/remedial-plans.md).
 
-### Learning outcomes and plans (000267)
+### Learning outcomes and plans (000268)
 
 `app.learning_outcomes` is a catalogue per subject and grade level; `app.student_outcome_achievements`
 holds a teacher's level per student, outcome and period. When a school shows outcomes on report

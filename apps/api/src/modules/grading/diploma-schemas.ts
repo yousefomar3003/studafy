@@ -3,7 +3,7 @@ import { DIPLOMA_LIMITS } from "@studafy/grading-engine";
 import { dateTimeSchema, uuidSchema } from "@studafy/shared-schemas";
 
 /**
- * IB Diploma total (000262): the grade's diploma rules, the diploma outcome on results and
+ * IB Diploma total (000263): the grade's diploma rules, the diploma outcome on results and
  * documents, and core grade entry. Flat objects only (every field present, unused ones null), so
  * the generated web and mobile clients read them as plain classes.
  */

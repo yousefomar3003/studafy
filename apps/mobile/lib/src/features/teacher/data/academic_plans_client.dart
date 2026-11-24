@@ -3,7 +3,7 @@ import 'package:dio/dio.dart';
 import '../domain/academic_plans.dart';
 
 /// Learning outcome achievement and lesson and term plans (OpenAPI tags `Learning outcomes` and
-/// `Lesson plans`, 000267). On its own [Dio] like `PredictedGradesClient`; failures surface as the
+/// `Lesson plans`, 000268). On its own [Dio] like `PredictedGradesClient`; failures surface as the
 /// shared `ApiException` (`RESULTS_ALREADY_FINALIZED`, `CONFLICT_STATE_MISMATCH`,
 /// `CONFLICT_DUPLICATE_ENTRY`, `VALIDATION_FAILED`, `AUTHZ_FORBIDDEN`).
 class AcademicPlansClient {

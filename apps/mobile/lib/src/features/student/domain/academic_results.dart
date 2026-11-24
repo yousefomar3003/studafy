@@ -86,9 +86,9 @@ class SubjectResult {
     credits: _num(json['credits']),
     courseLevel: _text(json['course_level']),
     weightedGpaPoints: _num(json['weighted_gpa_points']),
-    // `subject_name_ar` on results, `name_ar` on documents; absent before 000263.
+    // `subject_name_ar` on results, `name_ar` on documents; absent before 000264.
     nameAr: arabicNameOf(json['subject_name_ar'] ?? json['name_ar']),
-    // Learning outcome achievement as finalized; absent before 000267 and when the school does
+    // Learning outcome achievement as finalized; absent before 000268 and when the school does
     // not show it.
     outcomes: [
       for (final outcome in _list(json['outcomes']))
@@ -239,7 +239,7 @@ class DiplomaFailingCondition {
   final double? points;
 }
 
-/// The IB Diploma outcome of a points_total result (000262): the total out of 45, core points,
+/// The IB Diploma outcome of a points_total result (000263): the total out of 45, core points,
 /// the TOK / Extended Essay / CAS used and whether the diploma is awarded. Also the predicted
 /// total (from predicted grades), which has the same shape.
 class DiplomaOutcome {
@@ -678,7 +678,7 @@ class CertificateContent {
           : null,
       reissueReason: reissue is Map ? reissue['reason'] as String? : null,
       report: ReportNotes.maybe(json['report']),
-      // Arabic + English documents (000263): absent on documents issued before.
+      // Arabic + English documents (000264): absent on documents issued before.
       language: DocumentLanguage.fromWire(json['language']),
       schoolNameAr: arabicNameOf(_map(json['school'])['name_ar']),
       academicYearNameAr: arabicNameOf(_map(json['academic_year'])['name_ar']),

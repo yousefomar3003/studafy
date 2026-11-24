@@ -186,7 +186,7 @@ function tenantFrom(c: Context<AppEnv>) {
   return { schoolId: auth.schoolId, userId: auth.userId, requestId: c.get("requestId") };
 }
 
-/** Learning outcomes and their achievement (000267). */
+/** Learning outcomes and their achievement (000268). */
 export function learningOutcomeRoutes(database: Database): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
   const read = requirePermission(PERMISSIONS.ACADEMIC_CONFIG_READ);

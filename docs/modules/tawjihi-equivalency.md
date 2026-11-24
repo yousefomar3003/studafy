@@ -12,7 +12,7 @@ multi-year result per subject and overall.
 > the app and the API descriptions. Nothing here claims to be the Ministry's formula.
 
 - Plan: [`docs/plans/academic-phase2.md`](../plans/academic-phase2.md), WS-N
-- Migration: `db/migrations/000266_create_equivalency_and_multi_year.sql`
+- Migration: `db/migrations/000267_create_equivalency_and_multi_year.sql`
 - Rules: `packages/grading-engine/src/equivalency.ts` (`estimateTawjihiEquivalency`,
   `validateEquivalencyParts`, `EQUIVALENCY_EXAMPLES`) and `multi-year.ts`
   (`calculateMultiYearResult`, `validateMultiYearYears`)
@@ -52,7 +52,7 @@ A rule set is a list of weighted **parts**; each turns one kind of record into a
 | Part type       | Reads                                                                   | Becomes a percentage by                                 |
 | --------------- | ----------------------------------------------------------------------- | ------------------------------------------------------- |
 | `exam_subjects` | per-subject external exam results ([external exams](external-exams.md)) | a grade → percentage table; the mean of counted results |
-| `diploma_total` | the IB Diploma total of the latest finalized annual result (000262)     | a conversion (table or formula)                         |
+| `diploma_total` | the IB Diploma total of the latest finalized annual result (000263)     | a conversion (table or formula)                         |
 | `gpa`           | the transcript's cumulative GPA, or the weighted GPA                    | a conversion                                            |
 | `exam_total`    | the best total of one external exam (SAT, ACT…)                         | a conversion                                            |
 

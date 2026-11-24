@@ -146,7 +146,7 @@ export const childTimetableSlotSchema = z
         code: z.string(),
         name: z.string(),
         subject_name_ar: z.string().optional().openapi({
-          description: "The subject's Arabic name (000263), when it has one.",
+          description: "The subject's Arabic name (000264), when it has one.",
         }),
       })
       .openapi("ChildTimetableCourse")

@@ -53,7 +53,7 @@ import type { AppEnv } from "../../middleware/requestId";
 import type { Context } from "hono";
 
 /**
- * Exam weeks (000265). School leadership (timetable:manage) builds exam periods, their timetable,
+ * Exam weeks (000266). School leadership (timetable:manage) builds exam periods, their timetable,
  * rooms, seating and invigilators, and reads clashes and the seating lists. A student's exam
  * timetable is read with student:read by whoever may read the student (the student, linked
  * parents, their teachers, leadership); a teacher reads their own invigilation duties. Both only

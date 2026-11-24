@@ -27,7 +27,7 @@ import type { SetupContext } from "./context";
 const ALL = "__all__";
 
 /**
- * Learning outcomes (000267): the school's achievement scale and whether achievement shows on
+ * Learning outcomes (000268): the school's achievement scale and whether achievement shows on
  * report cards, when plans are due, and the outcomes catalogue per subject and grade (add, edit,
  * archive, delete an unused one, import from CSV). Leadership with academicConfig:manage edits;
  * teachers record achievement against these outcomes in the mobile app.

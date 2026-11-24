@@ -415,7 +415,7 @@ describe("structure", () => {
         "/api/grading/external-exams/{examId}",
         "/api/grading/external-exams/{examId}/archive",
         "/api/grading/external-exams/{examId}/restore",
-        // Exam entries (000261).
+        // Exam entries (000262).
         "/api/grading/external-exam-sessions",
         "/api/grading/external-exam-sessions/{sessionId}",
         "/api/grading/external-exam-sessions/{sessionId}/candidate-numbers",
@@ -450,7 +450,7 @@ describe("structure", () => {
         "/api/grading/term-plans/{planId}",
         "/api/grading/term-plans/{planId}/review",
         "/api/grading/term-plans/{planId}/submit",
-        // Tawjihi equivalency and multi-year results (000266).
+        // Tawjihi equivalency and multi-year results (000267).
         "/api/grading/equivalency-rule-sets",
         "/api/grading/equivalency-rule-sets/{setId}",
         "/api/grading/equivalency-rule-sets/{setId}/students",
@@ -1243,7 +1243,7 @@ describe("security", () => {
         "GET /api/academics/classes/{classId}/enrollments",
         "GET /api/academics/classes/{classId}/students/{studentId}/overview",
         "GET /api/academics/rooms",
-        // Exam weeks (000265): timetable:manage for leadership, student:read plus
+        // Exam weeks (000266): timetable:manage for leadership, student:read plus
         // app.can_read_student for a student's exam timetable, a teacher's own duties.
         "GET /api/academics/exam-periods",
         "POST /api/academics/exam-periods",
@@ -1518,7 +1518,7 @@ describe("security", () => {
         "GET /api/grading/sections/{sectionId}/subjects",
         "GET /api/grading/sections/{sectionId}/subjects/{subjectId}/marks",
         "GET /api/grading/sections/{sectionId}/subjects/{subjectId}/predicted-grades",
-        // IB Diploma total (000262): core grades behind grade:read plus the section's teachers or
+        // IB Diploma total (000263): core grades behind grade:read plus the section's teachers or
         // leadership; a student's diploma behind grade:read plus app.can_read_student.
         "GET /api/grading/sections/{sectionId}/diploma-core",
         "GET /api/grading/students/{studentId}/diploma",
@@ -1540,7 +1540,7 @@ describe("security", () => {
         "POST /api/grading/students/{studentId}/external-exam-results",
         "PUT /api/grading/external-exam-results/{resultId}",
         "DELETE /api/grading/external-exam-results/{resultId}",
-        // Exam entries (000261): sessions and entries behind academicConfig:manage (sessions read with
+        // Exam entries (000262): sessions and entries behind academicConfig:manage (sessions read with
         // academicConfig:read), a student's entries behind grade:read plus app.can_read_student.
         "GET /api/grading/external-exam-sessions",
         "POST /api/grading/external-exam-sessions",
@@ -1564,7 +1564,7 @@ describe("security", () => {
         "GET /api/grading/graduation-requirement-sets/{setId}/preview",
         "GET /api/grading/graduation-requirements/report",
         "GET /api/grading/students/{studentId}/graduation-requirements",
-        // Ministry results export (000264): templates behind academicConfig:manage, previews and
+        // Ministry results export (000265): templates behind academicConfig:manage, previews and
         // downloads behind result:finalize.
         "GET /api/grading/ministry-export-examples",
         "GET /api/grading/ministry-export-templates",
@@ -1573,7 +1573,7 @@ describe("security", () => {
         "DELETE /api/grading/ministry-export-templates/{templateId}",
         "POST /api/grading/ministry-exports/preview",
         "POST /api/grading/ministry-exports/download",
-        // Remedial plans (000268): reads behind grade:read with RLS deciding the rows; writes behind
+        // Remedial plans (000269): reads behind grade:read with RLS deciding the rows; writes behind
         // grade:update or result:finalize plus the service's teacher/coordinator/leadership checks;
         // the school's sharing setting behind academicConfig:read/manage.
         "GET /api/grading/remedial-plans",
@@ -1585,7 +1585,7 @@ describe("security", () => {
         "GET /api/grading/students/{studentId}/remedial-plans",
         "GET /api/grading/remedial-plan-settings",
         "PUT /api/grading/remedial-plan-settings",
-        // Learning outcomes and lesson/term plans (000267).
+        // Learning outcomes and lesson/term plans (000268).
         "GET /api/grading/planning-settings",
         "GET /api/grading/learning-outcomes",
         "GET /api/grading/sections/{sectionId}/subjects/{subjectId}/outcome-achievements",
@@ -1613,7 +1613,7 @@ describe("security", () => {
         "POST /api/grading/lesson-plans/{planId}/submit",
         "POST /api/grading/lesson-plans/{planId}/review",
         "PUT /api/grading/lesson-plans/{planId}/reflection",
-        // Tawjihi equivalency and multi-year results (000266): sets and configurations behind
+        // Tawjihi equivalency and multi-year results (000267): sets and configurations behind
         // academicConfig:read/manage, the grade-level list behind academicConfig:manage, a
         // student's estimate or result behind grade:read plus app.can_read_student.
         "GET /api/grading/equivalency-rule-sets",

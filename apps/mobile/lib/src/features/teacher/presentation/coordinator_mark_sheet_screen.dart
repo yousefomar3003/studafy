@@ -9,7 +9,7 @@ import '../domain/mark_sheet.dart';
 import 'mark_sheet_screen.dart' show MarkPreviewBadge;
 import 'widgets/mark_sheet_common.dart';
 
-/// One section's marks in a subject the signed-in teacher coordinates (000260), read-only: one
+/// One section's marks in a subject the signed-in teacher coordinates (000261), read-only: one
 /// period at a time, its mark-sheet status, how many marks each assessment has, and every student's
 /// marks with their live result. Nothing here writes — entering, submitting and releasing marks stay
 /// with the section's teachers, and the API refuses them to a coordinator anyway.

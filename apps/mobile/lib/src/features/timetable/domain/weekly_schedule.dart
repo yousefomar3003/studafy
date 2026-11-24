@@ -71,7 +71,7 @@ class WeeklySchedule {
 /// A lesson's display labels when its source already resolved them (the parent view of a
 /// child's timetable), so the lesson card needn't look any of them up: the card [title] (course
 /// name, else class code), the class / section [classCode], and the optional [teacher] name.
-/// `titleAr`: the subject's Arabic name (000263), shown for the title when the app is in Arabic.
+/// `titleAr`: the subject's Arabic name (000264), shown for the title when the app is in Arabic.
 typedef LessonLabels = ({String title, String? titleAr, String classCode, String? teacher});
 
 /// A grade section a lesson's class belongs to — "Section C" of "Grade 10" — read off the slot's

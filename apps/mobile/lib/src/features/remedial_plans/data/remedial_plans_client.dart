@@ -2,7 +2,7 @@ import 'package:dio/dio.dart';
 
 import '../domain/remedial_plan.dart';
 
-/// Hand-written client for remedial plans (OpenAPI tag `Remedial plans`, 000268), shared by the
+/// Hand-written client for remedial plans (OpenAPI tag `Remedial plans`, 000269), shared by the
 /// teacher and coordinator screens and the student and parent results screen. Failures surface as
 /// the shared `ApiException` (`REMEDIAL_PLAN_DUPLICATE`, `REMEDIAL_PLAN_CLOSED`,
 /// `ACADEMIC_CONFIG_LOCKED`, `VALIDATION_FAILED`, `AUTHZ_FORBIDDEN`).

@@ -20,7 +20,7 @@ export interface StudentImportRecord {
   middle_name: string | null;
   last_name: string;
   preferred_name: string | null;
-  /** Arabic names (000263); null when the file does not provide them. */
+  /** Arabic names (000264); null when the file does not provide them. */
   first_name_ar: string | null;
   middle_name_ar: string | null;
   last_name_ar: string | null;

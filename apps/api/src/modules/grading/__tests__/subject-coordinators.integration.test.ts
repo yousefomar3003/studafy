@@ -1,5 +1,5 @@
 /**
- * Subject coordinators (000260) end to end, against a real migrated database with RLS armed:
+ * Subject coordinators (000261) end to end, against a real migrated database with RLS armed:
  * leadership assigns them, a coordinator reads every covered section's marks, mark sheets,
  * predicted grades and subject results read-only, the grade levels limit it, a coordinator of
  * another subject sees nothing, and another school reaches nothing. Later tests build on earlier

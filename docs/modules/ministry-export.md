@@ -7,7 +7,7 @@ them: a school keeps **export templates** it edits, and exports a year's finaliz
 one, with a preview and a check of what is missing before the file goes out.
 
 - Plan: [`docs/plans/academic-phase2.md`](../plans/academic-phase2.md), WS-L
-- Migration: `db/migrations/000264_create_ministry_export_templates.sql`
+- Migration: `db/migrations/000265_create_ministry_export_templates.sql`
 - Layout and checks: `packages/grading-engine/src/ministry-export.ts` (`buildMinistryExport`,
   `validateMinistryExportTemplate`, the field list and the built-in examples)
 - API: `apps/api/src/modules/ministry-export` (tag "Ministry export"); the file itself is
@@ -63,7 +63,7 @@ RESTRICT`), and the RLS coverage check needs no flexible-column approval. Saving
 A **value map** turns a column's formatted value into the ministry's (`pass = 1`, `B+ = 7`,
 `Annual = 3`); a value it does not list is written as it is. A fixed-text column takes none.
 
-**Arabic names** (WS-K, migration 000263) are not fields yet: once students and subjects carry
+**Arabic names** (WS-K, migration 000264) are not fields yet: once students and subjects carry
 them, add `first_name_ar`, `middle_name_ar`, `last_name_ar`, `full_name_ar` and `subject_name_ar`
 to `MINISTRY_EXPORT_FIELDS`, to `ck_ministry_export_columns_field` in a new migration, to the
 source row and to the API's row query. The extension point is marked in `ministry-export.ts` and in

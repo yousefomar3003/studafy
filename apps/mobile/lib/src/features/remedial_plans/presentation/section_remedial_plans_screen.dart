@@ -12,7 +12,7 @@ import 'remedial_plan_detail_screen.dart';
 import 'remedial_plan_form_screen.dart';
 import 'widgets/remedial_plan_widgets.dart';
 
-/// The subject teacher's remedial plans (000268) for a class: the class resolves to its grade
+/// The subject teacher's remedial plans (000269) for a class: the class resolves to its grade
 /// section and subject first (a class without a section has none), then
 /// [SectionRemedialPlansScreen]. Pushed from `TeacherClassDetailScreen`.
 class TeacherRemedialPlansScreen extends ConsumerWidget {

@@ -22,7 +22,7 @@ const STATUS_TONE: Record<PlanStatus, BadgeTone> = {
 const STATUSES: readonly PlanStatus[] = ["submitted", "returned", "approved", "draft"];
 
 /**
- * Lesson and term plans (000267) for leadership: per-term coverage (the term plan and whether it
+ * Lesson and term plans (000268) for leadership: per-term coverage (the term plan and whether it
  * came in on time, lesson plans by status and timeliness, outcomes the submitted plans cover), and
  * the plans awaiting review, approved or returned with a comment here. Teachers write the plans and
  * coordinators review theirs in the mobile app.

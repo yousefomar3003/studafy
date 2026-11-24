@@ -23,7 +23,7 @@ export interface CourseRow {
   created_at: Date;
   updated_at: Date;
   /**
-   * The subject's Arabic name (000263), on reads only: the Arabic app shows it in place of the
+   * The subject's Arabic name (000264), on reads only: the Arabic app shows it in place of the
    * course name. Null or absent when the subject has none.
    */
   subject_name_ar?: string | null;

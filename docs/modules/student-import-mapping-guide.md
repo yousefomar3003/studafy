@@ -60,7 +60,7 @@ All endpoints require `student:import` (ORG_ADMIN, SUPER_ADMIN) on the web chann
 | `last_name`            | `students`  | yes      |                                                                             |
 | `middle_name`          | `students`  | no       |                                                                             |
 | `preferred_name`       | `students`  | no       |                                                                             |
-| `first_name_ar`        | `students`  | no       | Arabic spelling (000263). Header must say Arabic: "First name (Arabic)".    |
+| `first_name_ar`        | `students`  | no       | Arabic spelling (000264). Header must say Arabic: "First name (Arabic)".    |
 | `middle_name_ar`       | `students`  | no       | Arabic father's name, e.g. "اسم الأب بالعربي".                              |
 | `last_name_ar`         | `students`  | no       | Arabic family name, e.g. "اسم العائلة بالعربي".                             |
 | `date_of_birth`        | `students`  | no       | `YYYY-MM-DD` only; `03/04/2010` is rejected, not guessed.                   |

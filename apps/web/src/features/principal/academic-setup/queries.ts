@@ -320,7 +320,7 @@ export function useMarkSheet(sectionId: string | undefined, subjectId: string | 
 }
 
 /** `termId` null previews the annual result. */
-/** IB Diploma core grades of a section's students (points_total grades, 000262). */
+/** IB Diploma core grades of a section's students (points_total grades, 000263). */
 export function useSectionDiplomaCore(sectionId: string) {
   return useQuery({
     queryKey: gradingKeys.diplomaCore(sectionId),

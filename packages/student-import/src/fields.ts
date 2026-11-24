@@ -109,7 +109,7 @@ export const STUDENT_IMPORT_FIELD_DEFINITIONS: Readonly<
     required: false,
     aliases: ["nickname", "known as", "الاسم المفضل"],
   },
-  // Arabic names (000263). The plain Arabic headers (الاسم الأول...) stay with the English fields,
+  // Arabic names (000264). The plain Arabic headers (الاسم الأول...) stay with the English fields,
   // as before; these match headers that say the column is the Arabic spelling.
   first_name_ar: {
     target: "students",

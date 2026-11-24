@@ -167,7 +167,7 @@ class ReleasedMarkSubject {
   final String code;
   final String name;
 
-  /// The subject's Arabic name, when the school has one (000263).
+  /// The subject's Arabic name, when the school has one (000264).
   final String? nameAr;
 
   /// When the whole period's mark sheet was approved; null while only single assessments are out.

@@ -28,7 +28,7 @@ import type {
 import type { TransactionSql } from "postgres";
 
 /**
- * Tawjihi equivalency (000266): a school's rule sets for ESTIMATING the Tawjihi-equivalent
+ * Tawjihi equivalency (000267): a school's rule sets for ESTIMATING the Tawjihi-equivalent
  * percentage of an IGCSE / A Level, IB or American record, and each student's estimate with its
  * step-by-step breakdown. Every rule is the school's own editable setting; the estimate is one the
  * school confirms, never an official Ministry conversion.
@@ -39,7 +39,7 @@ import type { TransactionSql } from "postgres";
  * parents), and the student and their parents see only the sets shown to them.
  *
  * A student is estimated on read, by @studafy/grading-engine, from their external exam results
- * (000255), the IB Diploma outcome of their latest finalized annual result (000262) and the
+ * (000255), the IB Diploma outcome of their latest finalized annual result (000263) and the
  * cumulative GPA of their finalized annual results (the transcript's, as graduation requirements
  * read it). A set applies to a student when it is active and lists the grade level of their latest
  * placement (without one, of their latest finalized year).
@@ -309,7 +309,7 @@ async function loadSets(
           SELECT id, code, name FROM app.external_exams
           WHERE school_id = ${schoolId}::uuid AND id = ANY (${examIds}::uuid[])
         `;
-  // Through the 000266 helper: app.subjects' role scope would hide a required subject a student has
+  // Through the 000267 helper: app.subjects' role scope would hide a required subject a student has
   // not taken from the student and their parents.
   const subjects = await tx<{ subject_id: string; code: string; name: string }[]>`
     SELECT subject_id, code, name FROM app.equivalency_rule_subject_names(${setIds}::uuid[])
@@ -591,7 +591,7 @@ async function loadEvidence(
     ) AS first_score ON true
     WHERE result.school_id = ${schoolId}::uuid AND result.student_id = ANY (${ids}::uuid[])
   `;
-  // The diploma outcome of the latest finalized annual result that has one (000262).
+  // The diploma outcome of the latest finalized annual result that has one (000263).
   const diplomas = await tx<
     {
       student_id: string;

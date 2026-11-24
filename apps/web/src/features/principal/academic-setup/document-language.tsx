@@ -6,7 +6,7 @@ import { loadCatalogAreasIn, useTranslation } from "../../../lib/i18n";
 import type { ReactNode } from "react";
 
 /**
- * Arabic + English documents (000263). An issued report card, certificate or transcript may carry
+ * Arabic + English documents (000264). An issued report card, certificate or transcript may carry
  * the language the school issued it in:
  *
  * - none (documents issued before, or a school that leaves it to the reader): rendered in the

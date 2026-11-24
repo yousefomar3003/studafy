@@ -54,7 +54,7 @@ ALTER TABLE app.rooms
   ADD CONSTRAINT ck_rooms_exam_capacity CHECK (exam_capacity IS NULL OR exam_capacity > 0);
 
 COMMENT ON COLUMN app.rooms.exam_capacity IS
-  'Candidates the room seats in an exam (spaced seating); NULL: its everyday capacity (000265).';
+  'Candidates the room seats in an exam (spaced seating); NULL: its everyday capacity (000266).';
 
 -- ---------------------------------------------------------------------------------------------------
 -- 2. Periods and the grade levels they cover
@@ -274,21 +274,21 @@ CREATE INDEX idx_exam_period_invigilators_teacher_fk
   ON app.exam_period_invigilators (teacher_id, school_id);
 
 COMMENT ON TABLE app.exam_periods IS
-  'An exam period of an academic year (midterms, finals...), its dates and the grade levels it covers; seen in the apps once published (000265).';
+  'An exam period of an academic year (midterms, finals...), its dates and the grade levels it covers; seen in the apps once published (000266).';
 COMMENT ON TABLE app.exam_period_grade_levels IS
-  'The grade levels an exam period covers (000265); deleted with the period.';
+  'The grade levels an exam period covers (000266); deleted with the period.';
 COMMENT ON TABLE app.exam_period_slots IS
-  'One exam on an exam period''s timetable: a subject for a grade level, its date and school-local start and end times (000265).';
+  'One exam on an exam period''s timetable: a subject for a grade level, its date and school-local start and end times (000266).';
 COMMENT ON TABLE app.exam_period_slot_sections IS
-  'The sections that sit an exam slot (000265); deleted with the slot.';
+  'The sections that sit an exam slot (000266); deleted with the slot.';
 COMMENT ON TABLE app.exam_period_slot_rooms IS
-  'The rooms an exam slot sits in, in filling order (000265); deleted with the slot.';
+  'The rooms an exam slot sits in, in filling order (000266); deleted with the slot.';
 COMMENT ON TABLE app.exam_period_seats IS
-  'A student''s room and seat number in an exam slot (000265); deleted with the slot or the room''s place in it.';
+  'A student''s room and seat number in an exam slot (000266); deleted with the slot or the room''s place in it.';
 COMMENT ON TABLE app.exam_period_invigilators IS
-  'A teacher invigilating one room of an exam slot (000265).';
+  'A teacher invigilating one room of an exam slot (000266).';
 COMMENT ON COLUMN app.exam_period_slots.starts_at IS
-  'The school''s wall-clock start time (app.school_settings.timezone), like the weekly timetable (000265).';
+  'The school''s wall-clock start time (app.school_settings.timezone), like the weekly timetable (000266).';
 
 -- ---------------------------------------------------------------------------------------------------
 -- 5. Grants and RLS

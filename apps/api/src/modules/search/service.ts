@@ -544,7 +544,7 @@ const studentQuery: SectionQuery<RawStudentRow> = ({ tx, schoolId, terms }, mode
             WHERE x.id = c.id AND x.school_id = ${schoolId}::uuid
               AND (
                 x.search_tsv @@ q.query
-                -- The Arabic name (000263), matched on the fly like app.search_scoped_ids does.
+                -- The Arabic name (000264), matched on the fly like app.search_scoped_ids does.
                 OR (
                   (x.first_name_ar IS NOT NULL OR x.last_name_ar IS NOT NULL)
                   AND to_tsvector(

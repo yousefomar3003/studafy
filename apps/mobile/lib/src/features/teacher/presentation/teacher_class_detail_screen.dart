@@ -309,7 +309,7 @@ class _DiplomaCoreTile extends ConsumerWidget {
 }
 
 /// Opens [TeacherRemedialPlansScreen] for the class's section and subject: the students below the
-/// pass line and their remedial plans (000268). Costs no request until it is tapped.
+/// pass line and their remedial plans (000269). Costs no request until it is tapped.
 class _RemedialPlansTile extends StatelessWidget {
   const _RemedialPlansTile({required this.classId, required this.classCode});
 
@@ -339,7 +339,7 @@ class _RemedialPlansTile extends StatelessWidget {
 }
 
 /// A row opening one of the class's section-and-subject screens (lesson plans, learning
-/// outcomes, 000267). Like [_PredictedGradesTile], it costs no request until tapped.
+/// outcomes, 000268). Like [_PredictedGradesTile], it costs no request until tapped.
 class _EntryTile extends StatelessWidget {
   const _EntryTile({
     required this.icon,

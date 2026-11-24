@@ -198,17 +198,17 @@ approved_flexible_columns(table_name, column_name) AS (
     -- and never joined or filtered on; the order is the payload, so a child table would add an
     -- ordinal column to store what the array already guarantees.
     ('external_exam_components', 'allowed_labels'),
-    -- 000262: a points_total grade's IB Diploma rules -- counted subjects, the 25-cell TOK x EE
+    -- 000263: a points_total grade's IB Diploma rules -- counted subjects, the 25-cell TOK x EE
     -- matrix and the award conditions -- validated whole by the API through the grading engine
     -- (a CHECK holds it to an object, and to NULL for other formats), read with the program and
     -- never joined or filtered on. Edited as one unit; a child table per cell and rule would only
     -- scatter one setting.
     ('grade_programs', 'diploma_config'),
-    -- 000262: the diploma outcome as finalized (total, points, TOK/EE/CAS used, failing
+    -- 000263: the diploma outcome as finalized (total, points, TOK/EE/CAS used, failing
     -- conditions), a write-once snapshot like the subject breakdown (ADR-017); the total itself
     -- stays in the normalized result_value column.
     ('student_overall_results', 'diploma_result'),
-    -- 000266: a Tawjihi equivalency rule set's weighted parts (exam subjects with their grade
+    -- 000267: a Tawjihi equivalency rule set's weighted parts (exam subjects with their grade
     -- table, the diploma total, the GPA, an exam total, each with a conversion table or formula),
     -- validated whole by the API through the grading engine (a CHECK holds it to a 1-6 element
     -- array), read with the set and never joined or filtered on. Edited as one unit like

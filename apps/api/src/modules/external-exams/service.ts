@@ -102,7 +102,7 @@ export interface ExternalExamScoreInput {
 
 export interface ExternalExamResultInput {
   subject_id?: string | null | undefined;
-  /** The exam entry (000261) the result came from; on update, absent keeps the current one. */
+  /** The exam entry (000262) the result came from; on update, absent keeps the current one. */
   entry_id?: string | null | undefined;
   sat_on: string;
   note?: string | null | undefined;
@@ -1118,7 +1118,7 @@ export async function deleteExternalExamResult(
 }
 
 // ---------------------------------------------------------------------------
-// Results recorded from an exam entry (000261)
+// Results recorded from an exam entry (000262)
 // ---------------------------------------------------------------------------
 
 /**

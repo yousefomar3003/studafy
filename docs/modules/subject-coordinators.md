@@ -5,7 +5,7 @@ academic year ("head of maths for grades 10–12"): which mark sheets are in, ho
 doing, and the marks behind it. Coordinating is **not a role** (roles are a fixed enum, ADR-002): it
 is an assignment on top of the person's existing staff role, usually `INSTRUCTOR`.
 
-- Migration: `db/migrations/000260_subject_coordinators.sql`
+- Migration: `db/migrations/000261_subject_coordinators.sql`
 - API: `apps/api/src/modules/grading/coordinator-service.ts`, `routes/coordinator-routes.ts`; the
   shared helpers are in `apps/api/src/modules/grading/access.ts`
 - Web: Academic setup > Coordinators (`apps/web/src/features/principal/academic-setup/CoordinatorsTab.tsx`)
@@ -45,7 +45,7 @@ For their subjects, in the sections of the grades they cover, **read-only**:
 
 Overall results, certificates, report notes, attendance and everything else about a student stay
 as they were: a coordinator is not the students' teacher. A coordinator of another subject sees
-none of this subject's rows. Every `CREATE OR REPLACE` in 000260 keeps the function's latest body
+none of this subject's rows. Every `CREATE OR REPLACE` in 000261 keeps the function's latest body
 (000173 for `can_read_student_mark`, 000254 for `can_read_subject`) and only adds a check.
 
 Writing stays where it was: entering marks, adding assessments, submitting and releasing use

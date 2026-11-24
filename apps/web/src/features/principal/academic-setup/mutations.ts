@@ -147,7 +147,7 @@ export function useSaveGradeProgram() {
   );
 }
 
-/** Final or predicted IB Diploma core grades for a section's students (000262). */
+/** Final or predicted IB Diploma core grades for a section's students (000263). */
 export function useSaveDiplomaCore() {
   return useGradingMutation(
     async ({

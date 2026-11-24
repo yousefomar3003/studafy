@@ -22,9 +22,9 @@ import type { SectionSubjectAccess } from "../grading/access";
 import type { TransactionSql } from "postgres";
 
 /**
- * Learning outcomes (000267): the catalogue per subject and grade level, managed by school
+ * Learning outcomes (000268): the catalogue per subject and grade level, managed by school
  * leadership, and each student's achievement per outcome and period, entered by the subject
- * teacher. The subject's coordinator (000260) reads a section's achievement, never edits it.
+ * teacher. The subject's coordinator (000261) reads a section's achievement, never edits it.
  *
  * An outcome that achievement or a plan uses can no longer be deleted, only archived: archived
  * outcomes drop out of pickers but keep showing where they were used.

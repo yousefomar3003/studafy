@@ -98,7 +98,7 @@ describe("header detection and suggested mapping", () => {
     });
   });
 
-  test("Arabic name columns map beside the English ones (000263)", () => {
+  test("Arabic name columns map beside the English ones (000264)", () => {
     const { headers } = readCsvSource(
       "Student number,First name,Last name,First name (Arabic),Father name - Arabic,Last name (Arabic)\n",
     );

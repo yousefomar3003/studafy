@@ -10,7 +10,7 @@ import {
 import { dateTimeSchema, uuidSchema } from "@studafy/shared-schemas";
 
 /**
- * Tawjihi equivalency and multi-year results (000266). What each part or configuration needs is
+ * Tawjihi equivalency and multi-year results (000267). What each part or configuration needs is
  * checked by @studafy/grading-engine (validateEquivalencyParts, validateMultiYearYears) in the
  * services, so the schemas here only bound sizes and types. Shared enums are referenced plainly
  * (no per-field description, no default): the mobile client generator cannot compile the wrappers

@@ -9,7 +9,7 @@ import '../domain/academic_plans.dart';
 import 'widgets/academic_plan_common.dart';
 import 'widgets/mark_sheet_common.dart';
 
-/// A daily lesson plan (000267): date and timetable period, title, objectives, outcomes,
+/// A daily lesson plan (000268): date and timetable period, title, objectives, outcomes,
 /// activities, resources and the class's uploaded materials, homework, and the reflection written
 /// after teaching it. A new plan or a draft / returned one is edited and saved or submitted; the
 /// reflection can be written in any status.

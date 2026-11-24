@@ -1,5 +1,5 @@
 /// Domain model for a subject coordinator's overview (`GET /api/grading/my-coordinated-subjects`,
-/// OpenAPI schema `MyCoordinatedSubjects`, 000260): the subjects the signed-in teacher coordinates
+/// OpenAPI schema `MyCoordinatedSubjects`, 000261): the subjects the signed-in teacher coordinates
 /// this year, each across the sections it covers.
 ///
 /// Parsed defensively like `mark_sheet.dart`: a missing field means an older server, an unknown

@@ -12,7 +12,7 @@ import '../../domain/weekly_schedule.dart';
 import 'schedule_section.dart';
 
 /// A class's display labels: its section code ("SCI101-A") and, when resolvable, its course's
-/// name ("Integrated Science") and its subject's Arabic name (000263).
+/// name ("Integrated Science") and its subject's Arabic name (000264).
 typedef ScheduleClassLabel = ({
   String code,
   String? courseName,

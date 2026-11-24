@@ -1,5 +1,5 @@
 /**
- * Exam timetable clashes (000265), worked out on read from a period's slots. Pure, like seating.ts.
+ * Exam timetable clashes (000266), worked out on read from a period's slots. Pure, like seating.ts.
  *
  * Two slots are "at the same time" when they are on the same date and their times overlap (an exam
  * ending at 11:00 does not overlap one starting at 11:00). Errors:

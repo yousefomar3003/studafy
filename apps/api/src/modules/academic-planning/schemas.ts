@@ -17,7 +17,7 @@ import {
 import { ACHIEVEMENT_LEVELS_MAX, ACHIEVEMENT_LEVELS_MIN } from "./settings-service";
 
 /**
- * Learning outcomes, outcome achievement, and lesson and term plans (000267). Shared enums are
+ * Learning outcomes, outcome achievement, and lesson and term plans (000268). Shared enums are
  * referenced plainly and objects are spelled out (no .extend / allOf), so the mobile client
  * generator produces plain classes.
  */

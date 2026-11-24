@@ -42,7 +42,7 @@ import type { AppEnv } from "../../middleware/requestId";
 import type { Context, MiddlewareHandler } from "hono";
 
 /**
- * Remedial plans (000268). Reads need grade:read; RLS and the service decide which plans. Writes:
+ * Remedial plans (000269). Reads need grade:read; RLS and the service decide which plans. Writes:
  * teachers hold grade:update, principals result:finalize (as for predicted grades); the service
  * then checks who teaches, coordinates or leads. The school's sharing setting is
  * academicConfig:manage.

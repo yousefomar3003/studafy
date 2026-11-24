@@ -22,10 +22,10 @@ import type { MarkSheetStatus } from "./marks-service";
 import type { TransactionSql } from "postgres";
 
 /**
- * Subject coordinators (000260): leadership assigns a staff member to coordinate a subject for a
+ * Subject coordinators (000261): leadership assigns a staff member to coordinate a subject for a
  * year, optionally only some grade levels; the coordinator reads every section's marks, predicted
  * grades and subject results for it, read-only. The row access itself is the database's
- * (app.coordinates_section_subject and the policies 000260 widens); this module manages the
+ * (app.coordinates_section_subject and the policies 000261 widens); this module manages the
  * assignments and builds the coordinator's overview.
  */
 

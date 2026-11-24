@@ -16,15 +16,15 @@
 --                                                     and status changes, append-only. A note marked
 --                                                     internal is for staff only.
 --   app.remedial_plan_outcomes                         EXTENSION POINT, empty for now: the learning
---                                                     outcomes a plan targets, for WS-O (000267).
+--                                                     outcomes a plan targets, for WS-O (000268).
 --
 -- A plan belongs to the section the student was in when it was opened: the section's teachers of the
--- subject write it; the subject's coordinator for that section (000260) and school leadership follow
+-- subject write it; the subject's coordinator for that section (000261) and school leadership follow
 -- it up (read and add notes). Only one plan per student, subject and period is active (open or
 -- in_progress) at a time; achieved and closed plans are history.
 --
 -- Targets are free text for now. app.remedial_plan_outcomes is the reserved extension point for
--- linking the learning outcomes catalogue of WS-O (000267): nothing writes it yet, and outcome_id has
+-- linking the learning outcomes catalogue of WS-O (000268): nothing writes it yet, and outcome_id has
 -- no foreign key because that catalogue does not exist on this branch (WS-O adds the key). A plan with
 -- no rows there simply has no linked outcomes.
 --
@@ -39,7 +39,7 @@
 -- a plan through app.remedial_plan_subject_name rather than a wider app.can_read_subject.
 --
 -- Depends on 000009 (years, terms, subjects), 000039 (school settings), 000037 (role-scope helpers),
--- 000147 (sections, placements), 000160 (app.teaches_section_subject) and 000260
+-- 000147 (sections, placements), 000160 (app.teaches_section_subject) and 000261
 -- (app.coordinates_section_subject).
 
 SET ROLE studafy_admin;
@@ -48,7 +48,7 @@ ALTER TABLE app.school_settings
   ADD COLUMN remedial_plans_family_visible boolean NOT NULL DEFAULT false;
 
 COMMENT ON COLUMN app.school_settings.remedial_plans_family_visible IS
-  'Whether teachers may share remedial plans with the student and linked parents (000268).';
+  'Whether teachers may share remedial plans with the student and linked parents (000269).';
 
 -- ---------------------------------------------------------------------------------------------------
 -- 1. Plans
@@ -136,7 +136,7 @@ CREATE INDEX idx_remedial_plans_created_by_fk ON app.remedial_plans (created_by_
 CREATE INDEX idx_remedial_plans_updated_by_fk ON app.remedial_plans (updated_by_user_id, school_id);
 
 COMMENT ON TABLE app.remedial_plans IS
-  'A remedial plan for a student in a subject, for a term or the year: reason, targets, actions, review dates and status (000268).';
+  'A remedial plan for a student in a subject, for a term or the year: reason, targets, actions, review dates and status (000269).';
 
 CREATE TABLE app.remedial_plan_reviews (
   school_id uuid NOT NULL,
@@ -157,9 +157,9 @@ CREATE INDEX idx_remedial_plan_reviews_pending
   ON app.remedial_plan_reviews (school_id, review_on) WHERE completed_at IS NULL;
 
 COMMENT ON TABLE app.remedial_plan_reviews IS
-  'A remedial plan''s review dates; done once a follow-up note is added on or after the date (000268).';
+  'A remedial plan''s review dates; done once a follow-up note is added on or after the date (000269).';
 
--- EXTENSION POINT for WS-O (000267): the learning outcomes a plan targets. Reserved and empty: the API
+-- EXTENSION POINT for WS-O (000268): the learning outcomes a plan targets. Reserved and empty: the API
 -- does not write it yet. WS-O adds the foreign key from outcome_id to its outcomes catalogue.
 CREATE TABLE app.remedial_plan_outcomes (
   school_id uuid NOT NULL,
@@ -175,7 +175,7 @@ CREATE TABLE app.remedial_plan_outcomes (
 CREATE INDEX idx_remedial_plan_outcomes_plan_fk ON app.remedial_plan_outcomes (plan_id, school_id);
 
 COMMENT ON TABLE app.remedial_plan_outcomes IS
-  'Reserved for WS-O (000267): the learning outcomes a remedial plan targets. Not written yet (000268).';
+  'Reserved for WS-O (000268): the learning outcomes a remedial plan targets. Not written yet (000269).';
 
 -- ---------------------------------------------------------------------------------------------------
 -- 2. Timeline
@@ -220,14 +220,14 @@ CREATE INDEX idx_remedial_plan_notes_author_fk
   ON app.remedial_plan_notes (author_user_id, school_id);
 
 COMMENT ON TABLE app.remedial_plan_notes IS
-  'A remedial plan''s timeline: progress and follow-up notes and status changes, append-only (000268).';
+  'A remedial plan''s timeline: progress and follow-up notes and status changes, append-only (000269).';
 
 -- ---------------------------------------------------------------------------------------------------
 -- 3. Who may read and write
 -- ---------------------------------------------------------------------------------------------------
 
 -- How the current user reaches a section's subject as staff: 'leadership', 'teacher' (teaches the
--- subject there), 'coordinator' (coordinates it for the section's grade, 000260), or NULL.
+-- subject there), 'coordinator' (coordinates it for the section's grade, 000261), or NULL.
 CREATE FUNCTION app.remedial_plan_staff_access(target_section_id uuid, target_subject_id uuid)
 RETURNS text
 LANGUAGE sql

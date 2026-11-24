@@ -76,7 +76,7 @@ COMMENT ON COLUMN app.grade_programs.result_format IS
 COMMENT ON COLUMN app.grade_programs.result_scale_max IS
   'The maximum for out_of (e.g. 20), gpa (4 or 5) or points_total (45); NULL for percentage.';
 COMMENT ON COLUMN app.grade_programs.diploma_config IS
-  'points_total only: counted subjects, the TOK x EE core points matrix and the award conditions (editable; the IB defaults must be checked against the current IB rules). NULL for other formats (000262).';
+  'points_total only: counted subjects, the TOK x EE core points matrix and the award conditions (editable; the IB defaults must be checked against the current IB rules). NULL for other formats (000263).';
 COMMENT ON COLUMN app.grade_programs.rank_basis IS
   'What students are ranked by: average (overall average percentage), gpa or weighted_gpa (the plain GPA for a student without boosted subjects), or points_total (the IB Diploma total). gpa and weighted_gpa need result_format gpa; points_total needs result_format points_total.';
 
@@ -91,7 +91,7 @@ ALTER TABLE app.student_overall_results
   );
 
 COMMENT ON COLUMN app.student_overall_results.diploma_result IS
-  'points_total results: the diploma outcome as finalized (total, subject and core points, TOK/EE/CAS used, status, failing conditions). NULL otherwise and before 000262.';
+  'points_total results: the diploma outcome as finalized (total, subject and core points, TOK/EE/CAS used, status, failing conditions). NULL otherwise and before 000263.';
 
 CREATE TABLE app.student_diploma_core_grades (
   id uuid DEFAULT gen_random_uuid() CONSTRAINT pk_student_diploma_core_grades PRIMARY KEY,
@@ -139,7 +139,7 @@ CREATE INDEX idx_student_diploma_core_grades_entered_by_fk
   ON app.student_diploma_core_grades (entered_by_user_id, school_id);
 
 COMMENT ON TABLE app.student_diploma_core_grades IS
-  'IB Diploma core per student and year (000262): TOK and Extended Essay grades (A-E) and CAS completion, final or predicted. History is in app.audit_logs.';
+  'IB Diploma core per student and year (000263): TOK and Extended Essay grades (A-E) and CAS completion, final or predicted. History is in app.audit_logs.';
 
 -- ---------------------------------------------------------------------------------------------------
 -- Who may read core grades

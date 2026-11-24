@@ -1,7 +1,7 @@
 import { z } from "@hono/zod-openapi";
 
 /**
- * Document language settings (000263). The enums are spelled inline on each field, not shared as
+ * Document language settings (000264). The enums are spelled inline on each field, not shared as
  * a referenced component: the Dart client generator cannot compile a described or defaulted
  * referenced enum (docs/plans/academic-phase2.md, "The mobile rule").
  */

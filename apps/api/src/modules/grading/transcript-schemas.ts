@@ -160,7 +160,7 @@ export const transcriptContentSchema = z
     issued_at: dateTimeSchema,
     language: z.enum(["en", "ar", "bilingual"]).optional().openapi({
       description:
-        "The language the school issued the transcript in (000263). Absent: it follows each reader's language, as transcripts issued before did.",
+        "The language the school issued the transcript in (000264). Absent: it follows each reader's language, as transcripts issued before did.",
     }),
     school: z
       .object({ id: uuidSchema, name: z.string(), ...nameArField })

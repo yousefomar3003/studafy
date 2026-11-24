@@ -6,7 +6,7 @@ import '../../../../design/tokens/app_spacing_tokens.dart';
 import '../../domain/academic_plans.dart';
 import 'mark_sheet_common.dart';
 
-/// Shared pieces of the outcome achievement and plan screens (000267).
+/// Shared pieces of the outcome achievement and plan screens (000268).
 
 /// A plan's review status as a pill; an unknown status reads neutrally.
 class PlanStatusPill extends StatelessWidget {

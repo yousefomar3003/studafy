@@ -37,7 +37,7 @@ import type { RecordKeyring } from "@studafy/records";
 import type { Context } from "hono";
 
 /**
- * Ministry results export (000264). School leadership, from the web app only: templates behind
+ * Ministry results export (000265). School leadership, from the web app only: templates behind
  * academicConfig:manage, previews and downloads behind result:finalize. Reading the national ID
  * also needs studentRecord:read, and opening a sensitive one studentRecord:readSensitive (checked
  * in the service, which knows the template's field).
