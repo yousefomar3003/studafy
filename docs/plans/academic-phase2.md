@@ -221,7 +221,7 @@ services (J and K both touch certificates, report cards and transcripts), i18n f
 - [x] WS-L ministry results export (`feat/academic-ministry-export`, migration 000264; `docs/modules/ministry-export.md`)
 - [ ] WS-M exam weeks
 - [ ] Integration of batch 1
-- [ ] WS-N Tawjihi equivalency + multi-year results
+- [x] WS-N Tawjihi equivalency + multi-year results (`feat/academic-equivalency`, migration 000266; [docs/modules/tawjihi-equivalency.md](../modules/tawjihi-equivalency.md))
 - [ ] WS-O lesson and term plans + learning outcomes
 - [ ] WS-P remedial plans
 - [ ] Integration of batch 2, then dev → stage
