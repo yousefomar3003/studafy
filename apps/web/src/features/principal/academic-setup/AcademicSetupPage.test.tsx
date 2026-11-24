@@ -610,6 +610,25 @@ const GET_RESPONSES: Record<string, unknown> = {
     ],
   },
   "/api/grading/certificates": { certificates: [] },
+  "/api/grading/sections/{sectionId}/diploma-core": {
+    section_id: "sec-10c",
+    section_name: "C",
+    grade_level_name: "Grade 10",
+    academic_year_id: "year-1",
+    enabled: true,
+    predicted_enabled: false,
+    editable: true,
+    students: [
+      {
+        student_id: "s-1",
+        first_name: "Lina",
+        last_name: "Haddad",
+        admission_number: "ADM-s-1",
+        final: { tok_grade: "B", ee_grade: null, cas_complete: true, updated_at: STAMP.updated_at },
+        predicted: null,
+      },
+    ],
+  },
   "/api/grading/years/{yearId}/proposed-assessments": { assessments: [] },
   "/api/grading/years/{yearId}/assessment-releases": {
     releases: [
@@ -880,6 +899,59 @@ describe("AcademicSetupPage", () => {
       rank_basis: "average",
       rank_scope: "grade_level",
       rank_visibility: "students_and_parents",
+    });
+  });
+
+  test("a grade can show its result as the IB Diploma total, with the IB rules as editable defaults", async () => {
+    await renderAt("/subjects");
+
+    fireEvent.click(await screen.findByRole("combobox", { name: "Final result shown as" }));
+    fireEvent.click(
+      screen.getByRole("option", { name: "IB Diploma points total (e.g. out of 45)" }),
+    );
+    const max = screen.getByRole("spinbutton", { name: /Total out of/ }) as HTMLInputElement;
+    expect(max.value).toBe("45");
+    // The defaults are labelled as editable IB values the school must check.
+    expect(screen.getByText(/stored as editable defaults/)).toBeTruthy();
+    const counted = screen.getByRole("spinbutton", {
+      name: /Subjects counted/,
+    }) as HTMLInputElement;
+    expect(counted.value).toBe("6");
+    fireEvent.change(screen.getByRole("spinbutton", { name: "D / D" }), {
+      target: { value: "1" },
+    });
+    putMock.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "Save policies" }));
+
+    await waitFor(() => expect(putMock).toHaveBeenCalledTimes(1));
+    const [, init] = putMock.mock.calls[0]! as [
+      string,
+      { body: { diploma_config: { core_matrix: { tok: string; ee: string; points: number }[] } } },
+    ];
+    expect(init.body).toMatchObject({ result_format: "points_total", result_scale_max: 45 });
+    expect(init.body.diploma_config).toMatchObject({ counted_subjects: 6 });
+    expect(init.body.diploma_config.core_matrix).toHaveLength(25);
+    expect(init.body.diploma_config.core_matrix).toContainEqual({ tok: "D", ee: "D", points: 1 });
+    expect(init.body.diploma_config.core_matrix).toContainEqual({ tok: "A", ee: "A", points: 3 });
+  });
+
+  test("leadership enters a section's IB Diploma core grades", async () => {
+    await renderAt("/results");
+
+    const heading = await screen.findByRole("heading", { name: "IB Diploma core grades" });
+    const panel = heading.closest("section")!;
+    const row = within(panel).getByText("ADM-s-1").closest("tr")!;
+    fireEvent.click(within(row).getByRole("combobox", { name: "Extended Essay" }));
+    fireEvent.click(screen.getByRole("option", { name: "A" }));
+    putMock.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "Save core grades" }));
+
+    await waitFor(() => expect(putMock).toHaveBeenCalledTimes(1));
+    const [path, init] = putMock.mock.calls[0]! as [string, { body: Record<string, unknown> }];
+    expect(path).toBe("/api/grading/sections/{sectionId}/diploma-core");
+    expect(init.body).toEqual({
+      kind: "final",
+      grades: [{ student_id: "s-1", tok_grade: "B", ee_grade: "A", cas_complete: true }],
     });
   });
 
