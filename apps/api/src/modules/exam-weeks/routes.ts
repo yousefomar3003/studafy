@@ -360,6 +360,12 @@ export function examWeekRoutes(database: Database): OpenAPIHono<AppEnv> {
     auditAction("update", "exam_period_invigilators"),
   );
   routes.use("/api/academics/students/:studentId/exam-timetable", readStudent);
+  // Like /api/grading/my-assignments: staff who read the academic configuration; the rows are the
+  // caller's own invigilation duties. Students and parents have no duties to read.
+  routes.use(
+    "/api/academics/me/invigilation-duties",
+    requirePermission(PERMISSIONS.ACADEMIC_CONFIG_READ),
+  );
 
   routes.openapi(listPeriodsRoute, async (c) => {
     const { academic_year_id } = c.req.valid("query");

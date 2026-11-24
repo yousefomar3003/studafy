@@ -674,9 +674,8 @@ describeDb("exam weeks", () => {
     expect(second.body.duties.map((d) => [d.subject.name, d.room.id])).toEqual([
       ["Math", ids.room1],
     ]);
-    const student = await call<{ duties: InvigilationDutyView[] }>("GET", DUTIES, amalAuth());
-    expect(student.status).toBe(200);
-    expect(student.body.duties).toEqual([]);
+    // Students and parents hold no academicConfig:read: they have no duties to read.
+    expect((await call("GET", DUTIES, amalAuth())).status).toBe(403);
   });
 
   test("another school sees nothing and changes nothing", async () => {
