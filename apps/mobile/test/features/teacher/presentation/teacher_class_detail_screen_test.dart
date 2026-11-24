@@ -36,6 +36,11 @@ class _NoLinkedRows implements CustomListsClient {
 }
 
 Future<void> _pump(WidgetTester tester, ProviderScope scope) {
+  // The class screen carries several entry tiles (predicted grades, IB core, remedial plans,
+  // lesson plans, outcomes) above the roster: a tall surface keeps every roster row built.
+  tester.view.physicalSize = const Size(1080, 4000);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
   return tester.pumpWidget(wrapWithLocalization(scope));
 }
 

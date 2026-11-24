@@ -320,6 +320,24 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "student and linked parents.",
     },
     {
+      name: "Learning outcomes",
+      description:
+        "The learning outcomes catalogue per subject and grade level (code, English and Arabic " +
+        "text, strand), managed and imported from CSV by leadership (academicConfig:manage); the " +
+        "school's achievement scale; and each student's achievement per outcome and term, entered " +
+        "by the subject teacher and read by the subject's coordinator. Shown on report cards only " +
+        "when the school switches it on, from the finalized snapshot.",
+    },
+    {
+      name: "Lesson plans",
+      description:
+        "Term plans (weeks, units, outcomes, notes) and daily lesson plans (date and timetable " +
+        "period, objectives, outcomes, activities, linked class materials, homework, reflection) " +
+        "per section and subject. Teachers of the subject write and submit them; the subject's " +
+        "coordinator or leadership approves or returns them with a comment; leadership sees " +
+        "coverage per term. Staff-only: students and parents never read plans.",
+    },
+    {
       name: "Graduation requirements",
       description:
         "Graduation requirements checker: a school's requirement sets (total credits, credits in a " +

@@ -223,6 +223,6 @@ services (J and K both touch certificates, report cards and transcripts), i18n f
 - [x] WS-M exam weeks (`feat/academic-exam-weeks`, migration 000265; `docs/modules/exam-weeks.md`)
 - [x] Integration of batch 1
 - [ ] WS-N Tawjihi equivalency + multi-year results
-- [ ] WS-O lesson and term plans + learning outcomes
+- [x] WS-O lesson and term plans + learning outcomes (`feat/academic-plans-outcomes`, migration 000267; `docs/modules/lesson-plans-and-outcomes.md`)
 - [x] WS-P remedial plans (`feat/academic-remedial-plans`, migration 000268; `docs/modules/remedial-plans.md`)
 - [ ] Integration of batch 2, then dev → stage

@@ -24,6 +24,7 @@ import {
   accountDeletionGuard,
   legalAcceptanceGuard,
 } from "./middleware";
+import { academicPlanRoutes, learningOutcomeRoutes } from "./modules/academic-planning";
 import {
   academicYearRoutes,
   termRoutes,
@@ -1240,6 +1241,9 @@ export function createApp({
     app.route("/", examWeekRoutes(database));
     // Remedial plans for struggling students: plans, follow-up and suggestions (000268).
     app.route("/", remedialPlanRoutes(database));
+    // Learning outcomes and their achievement; lesson and term plans with review (000267).
+    app.route("/", learningOutcomeRoutes(database));
+    app.route("/", academicPlanRoutes(database));
   }
 
   // Gradebook configuration (ST-112). Weighted assessment categories per gradebook and

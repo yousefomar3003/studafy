@@ -318,6 +318,8 @@ export const SEARCH_DESTINATIONS: readonly SearchDestination[] = [
     alsoRequires: [P.ACADEMIC_CONFIG_MANAGE],
   }),
   entry("academic-graduation", "page", `${SETUP}/graduation-requirements`, ACADEMIC),
+  entry("academic-outcomes", "page", `${SETUP}/learning-outcomes`, ACADEMIC),
+  entry("academic-plans", "page", `${SETUP}/plans`, ACADEMIC),
   entry("academic-approvals", "page", `${SETUP}/approvals`, {
     ...ACADEMIC,
     alsoRequires: [P.APPROVAL_REVIEW],

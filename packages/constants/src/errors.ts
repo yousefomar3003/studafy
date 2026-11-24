@@ -164,6 +164,10 @@ export const ERROR_CODES = {
   // the plan is achieved or closed and can no longer be changed.
   REMEDIAL_PLAN_DUPLICATE: "REMEDIAL_PLAN_DUPLICATE",
   REMEDIAL_PLAN_CLOSED: "REMEDIAL_PLAN_CLOSED",
+  // Learning outcomes (000267): the code is taken for the subject and grade level, or the outcome
+  // is used by achievement or plans and can only be archived.
+  LEARNING_OUTCOME_DUPLICATE: "LEARNING_OUTCOME_DUPLICATE",
+  LEARNING_OUTCOME_IN_USE: "LEARNING_OUTCOME_IN_USE",
 
   // Enrollment — student-class binding.
   ENROLLMENT_DUPLICATE: "ENROLLMENT_DUPLICATE",

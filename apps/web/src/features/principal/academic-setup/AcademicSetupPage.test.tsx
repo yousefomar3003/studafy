@@ -617,7 +617,128 @@ const MATH_COORDINATOR = {
   ...STAMP,
 };
 
+const PLANNING_SETTINGS = {
+  show_outcomes_on_report_cards: false,
+  lesson_plan_lead_days: 1,
+  term_plan_due_days: 7,
+  achievement_levels: [
+    { level: 1, label: "Beginning", label_ar: null },
+    { level: 2, label: "Developing", label_ar: null },
+    { level: 3, label: "Meeting", label_ar: null },
+    { level: 4, label: "Exceeding", label_ar: null },
+  ],
+  achievement_levels_default: true,
+};
+
+const FRACTIONS_OUTCOME = {
+  id: "outcome-1",
+  subject_id: "sub-math",
+  subject_code: "MTH",
+  subject_name: "Mathematics",
+  grade_level_id: "grade-10",
+  grade_level_name: "Grade 10",
+  code: "M10.1",
+  text: "Adds fractions",
+  text_ar: "يجمع الكسور",
+  strand: "Number",
+  sort_order: 1,
+  archived: false,
+  in_use: true,
+  ...STAMP,
+};
+
+const PLAN_HEADER = {
+  academic_year_id: "year-1",
+  term_id: "term-1",
+  term_name: "Term 1",
+  section_id: "sec-10c",
+  section_name: "C",
+  grade_level_id: "grade-10",
+  grade_level_name: "Grade 10",
+  subject_id: "sub-math",
+  subject_name: "Mathematics",
+  author_user_id: "user-2",
+  author_name: "Omar Aziz",
+  status: "submitted",
+  first_submitted_at: "2026-09-12T08:00:00.000Z",
+  submitted_at: "2026-09-12T08:00:00.000Z",
+  reviewed_at: null,
+  reviewed_by_user_id: null,
+  reviewed_by_name: null,
+  review_comment: null,
+  due_on: "2026-09-08",
+  on_time: false,
+  ...STAMP,
+};
+
+const TERM_PLAN = {
+  ...PLAN_HEADER,
+  id: "plan-1",
+  can_edit: false,
+  can_submit: false,
+  can_delete: false,
+  can_review: true,
+  notes: "Number first",
+  weeks: [
+    {
+      week_number: 1,
+      starts_on: null,
+      unit: "Fractions",
+      notes: null,
+      outcomes: [
+        { id: "outcome-1", code: "M10.1", text: "Adds fractions", text_ar: null, strand: null },
+      ],
+    },
+  ],
+};
+
+const PLAN_COVERAGE = {
+  academic_year_id: "year-1",
+  term_id: "term-1",
+  term_name: "Term 1",
+  rows: [
+    {
+      section_id: "sec-10c",
+      section_name: "C",
+      grade_level_name: "Grade 10",
+      subject_id: "sub-math",
+      subject_name: "Mathematics",
+      teacher_names: ["Omar Aziz"],
+      term_plan: {
+        id: "plan-1",
+        status: "submitted",
+        submitted_at: "2026-09-12T08:00:00.000Z",
+        on_time: false,
+      },
+      term_plan_due_on: "2026-09-08",
+      lesson_plans: {
+        total: 4,
+        draft: 1,
+        submitted: 1,
+        approved: 2,
+        returned: 0,
+        on_time: 2,
+        late: 1,
+        overdue: 1,
+      },
+      outcomes: { total: 6, covered: 3 },
+    },
+  ],
+};
+
 const GET_RESPONSES: Record<string, unknown> = {
+  "/api/grading/planning-settings": PLANNING_SETTINGS,
+  "/api/grading/learning-outcomes": { outcomes: [FRACTIONS_OUTCOME] },
+  "/api/grading/plan-coverage": PLAN_COVERAGE,
+  "/api/grading/plan-reviews": {
+    academic_year_id: "year-1",
+    status: "submitted",
+    term_plans: [
+      { ...PLAN_HEADER, id: "plan-1", week_count: 1, outcome_count: 1, can_review: true },
+    ],
+    lesson_plans: [],
+  },
+  "/api/grading/term-plans/{planId}": TERM_PLAN,
   "/api/grading/years/{yearId}/subject-coordinators": { coordinators: [MATH_COORDINATOR] },
   "/api/grading/graduation-requirement-sets": { sets: [DIPLOMA] },
   "/api/grading/graduation-requirements/report": GRADUATION_REPORT,
@@ -1662,6 +1783,104 @@ describe("AcademicSetupPage", () => {
         },
       }),
     );
+  });
+
+  test("learning outcomes: the scale, the catalogue, a new outcome and a checked CSV import", async () => {
+    RESPONSES_BY_PATH.set("/api/academics/subjects", {
+      subjects: [{ id: "sub-math", code: "MTH", name: "Mathematics", ...STAMP }],
+      total: 1,
+    });
+    try {
+      const { container } = await renderAt("/learning-outcomes");
+      const row = (await screen.findByText("Adds fractions")).closest("tr")!;
+      expect(within(row).getByText("M10.1")).toBeTruthy();
+      // Used by achievement or plans: archive only, no delete.
+      expect(within(row).queryByRole("button", { name: "Delete outcome M10.1" })).toBeNull();
+      expect(screen.getByLabelText("Level 4")).toBeTruthy();
+      await expectNoA11yViolations(container);
+
+      fireEvent.click(screen.getByRole("button", { name: "Add outcome" }));
+      const dialog = await screen.findByRole("dialog");
+      fireEvent.click(within(dialog).getByRole("combobox", { name: /^Subject/ }));
+      fireEvent.click(await within(dialog).findByRole("option", { name: "Mathematics" }));
+      fireEvent.click(within(dialog).getByRole("combobox", { name: /^Grade/ }));
+      fireEvent.click(await within(dialog).findByRole("option", { name: "Grade 10" }));
+      fireEvent.change(within(dialog).getByLabelText(/^Code/), { target: { value: "M10.2" } });
+      fireEvent.change(within(dialog).getByLabelText(/^Outcome \(English\)/), {
+        target: { value: "Ratios" },
+      });
+      fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+      await waitFor(() => expect(postMock).toHaveBeenCalledTimes(1));
+      const [path, init] = postMock.mock.calls[0] as [string, { body: unknown }];
+      expect(path).toBe("/api/grading/learning-outcomes");
+      expect(init.body).toEqual({
+        subject_id: "sub-math",
+        grade_level_id: "grade-10",
+        code: "M10.2",
+        text: "Ratios",
+        text_ar: null,
+        strand: null,
+        sort_order: 0,
+      });
+      postMock.mockClear();
+
+      postMock.mockImplementation(() =>
+        Promise.resolve<unknown>({
+          data: { applied: false, created: 1, updated: 0, unchanged: 0, errors: [] },
+        }),
+      );
+      fireEvent.click(await screen.findByRole("button", { name: "Import CSV" }));
+      const importDialog = await screen.findByRole("dialog");
+      const apply = within(importDialog).getByRole("button", { name: "Import" });
+      expect((apply as HTMLButtonElement).disabled).toBe(true);
+      fireEvent.change(within(importDialog).getByLabelText(/^Or paste the CSV/), {
+        target: { value: "subject,grade,code,text\nMTH,Grade 10,M10.3,Percentages" },
+      });
+      fireEvent.click(within(importDialog).getByRole("button", { name: "Check" }));
+      expect(await within(importDialog).findByText("1 new, 0 changed, 0 unchanged.")).toBeTruthy();
+      expect(
+        (postMock.mock.calls[0] as [string, { body: { dry_run: boolean } }])[1].body.dry_run,
+      ).toBe(true);
+      await waitFor(() => expect((apply as HTMLButtonElement).disabled).toBe(false));
+    } finally {
+      RESPONSES_BY_PATH.set("/api/academics/subjects", { subjects: [], total: 0 });
+      postMock.mockReset();
+      postMock.mockImplementation((path: string) => {
+        if (path === "/api/grading/finalizations/{finalizationId}/certificates") {
+          return Promise.resolve<unknown>({ data: { issued: ["cert-1"], skipped: [] } });
+        }
+        return Promise.resolve<unknown>({ data: MATH_CONFIG });
+      });
+    }
+  });
+
+  test("plans: term coverage, and a submitted plan returned only with a comment", async () => {
+    const { container } = await renderAt("/plans");
+    const coverageRow = (await screen.findByText("2 approved", { exact: false })).closest("tr")!;
+    expect(within(coverageRow).getByText("3 of 6")).toBeTruthy();
+    expect(within(coverageRow).getByText("Late")).toBeTruthy();
+    await expectNoA11yViolations(container);
+
+    fireEvent.click(screen.getByRole("button", { name: "Open Term plan: Term 1" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByText("Adds fractions")).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Return" }));
+    expect(
+      await within(dialog).findByText("Say what to change before returning the plan."),
+    ).toBeTruthy();
+    expect(postMock).not.toHaveBeenCalled();
+    fireEvent.change(within(dialog).getByLabelText(/^Comment for the teacher/), {
+      target: { value: "Add week 2" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Return" }));
+    await waitFor(() => expect(postMock).toHaveBeenCalledTimes(1));
+    expect(postMock.mock.calls[0]).toEqual([
+      "/api/grading/term-plans/{planId}/review",
+      {
+        params: { path: { planId: "plan-1" } },
+        body: { decision: "return", comment: "Add week 2" },
+      },
+    ]);
   });
 
   test("has no accessibility violations on the report cards screen", async () => {

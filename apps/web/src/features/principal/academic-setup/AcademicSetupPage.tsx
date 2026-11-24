@@ -14,8 +14,10 @@ import { CoordinatorsTab } from "./CoordinatorsTab";
 import { ExamEntriesTab } from "./ExamEntriesTab";
 import { ExternalExamsTab } from "./ExternalExamsTab";
 import { GraduationRequirementsTab } from "./GraduationRequirementsTab";
+import { LearningOutcomesTab } from "./LearningOutcomesTab";
 import { MinistryExportTab } from "./MinistryExportTab";
 import { OverviewTab } from "./OverviewTab";
+import { PlansTab } from "./PlansTab";
 import { useGradingOverview } from "./queries";
 import { RemedialPlansTab } from "./RemedialPlansTab";
 import { ReportCardsTab } from "./ReportCardsTab";
@@ -50,6 +52,8 @@ const TABS: readonly TabDef[] = [
     key: "remedialPlans",
     show: (ctx) => ctx.can.manage || ctx.can.finalize,
   },
+  { path: "learning-outcomes", key: "outcomes", show: () => true },
+  { path: "plans", key: "plans", show: () => true },
   { path: "approvals", key: "approvals", show: (ctx) => ctx.can.review },
   { path: "results", key: "results", show: (ctx) => ctx.can.finalize || ctx.can.certify },
   { path: "top-students", key: "topStudents", show: (ctx) => ctx.can.finalize },
@@ -78,6 +82,8 @@ const TABS: readonly TabDef[] = [
  * - coordinators — who coordinates which subject this year, and for which grades;
  * - remedial plans — the year's plans for struggling students (written by teachers in the app) by
  *   grade, subject, status and overdue review, with follow-up notes (leadership);
+ * - learning outcomes — the outcomes catalogue, the achievement scale and plan due dates;
+ * - plans — lesson and term plan coverage per term, and the plans awaiting review;
  * - approvals — submitted mark sheets and teacher-proposed assessments;
  * - results — preview, finalize, correct, and certificates; `certificates/:id` prints one.
  * - top students — a grade's best places by class rank for a term or the year (leadership).
@@ -188,6 +194,8 @@ export default function AcademicSetupPage() {
           {ctx.can.manage || ctx.can.finalize ? (
             <Route path="remedial-plans" element={<RemedialPlansTab ctx={ctx} />} />
           ) : null}
+          <Route path="learning-outcomes" element={<LearningOutcomesTab ctx={ctx} />} />
+          <Route path="plans" element={<PlansTab ctx={ctx} />} />
           {ctx.can.review ? <Route path="approvals" element={<ApprovalsTab ctx={ctx} />} /> : null}
           {ctx.can.finalize || ctx.can.certify ? (
             <Route path="results" element={<ResultsTab ctx={ctx} />} />

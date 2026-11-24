@@ -391,5 +391,7 @@
   "MANUAL_GRANT_NOT_FOUND": "No such grant in this school",
   "MANUAL_GRANT_ALREADY_REVOKED": "This grant was already revoked",
   "MANUAL_GRANT_TIER_INVALID": "This person can't hold that tier: choose an active tier for their role (student, teacher or parent)",
-  "DIPLOMA_TOTAL_DISABLED": "This grade does not use the IB Diploma total this year."
+  "DIPLOMA_TOTAL_DISABLED": "This grade does not use the IB Diploma total this year.",
+  "LEARNING_OUTCOME_DUPLICATE": "A learning outcome with this code already exists for this subject and grade.",
+  "LEARNING_OUTCOME_IN_USE": "This learning outcome is used by achievement or plans; archive it instead."
 }

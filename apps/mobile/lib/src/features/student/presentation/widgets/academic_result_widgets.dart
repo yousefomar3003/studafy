@@ -221,9 +221,16 @@ class ReportNotesSection extends StatelessWidget {
       for (final subject in subjects)
         if (subject.comment != null) subject,
     ];
-    if ((notes == null || notes.isEmpty) && commented.isEmpty) {
+    final withOutcomes = [
+      for (final subject in subjects)
+        if (subject.outcomes.isNotEmpty) subject,
+    ];
+    if ((notes == null || notes.isEmpty) &&
+        commented.isEmpty &&
+        withOutcomes.isEmpty) {
       return const SizedBox.shrink();
     }
+    final arabic = context.locale.languageCode == 'ar';
     final conduct = notes?.conductFor(context.locale.languageCode);
     final attendance = notes?.attendance;
 
@@ -253,6 +260,41 @@ class ReportNotesSection extends StatelessWidget {
                     ),
                   ),
                   Text(subject.comment!, style: theme.textTheme.bodyMedium),
+                ],
+              ),
+            ),
+        ],
+        if (withOutcomes.isNotEmpty) ...[
+          heading('academicResults.report.outcomes'),
+          for (final subject in withOutcomes)
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.space8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    subject.name,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  for (final outcome in subject.outcomes)
+                    Text(
+                      'academicResults.report.outcomeLine'.tr(
+                        namedArgs: {
+                          'code': outcome.code,
+                          'text':
+                              (arabic ? outcome.textAr : null) ?? outcome.text,
+                          'level':
+                              (arabic ? outcome.labelAr : null) ??
+                              outcome.label ??
+                              (outcome.level == null
+                                  ? '—'
+                                  : '${outcome.level}'),
+                        },
+                      ),
+                      style: theme.textTheme.bodyMedium,
+                    ),
                 ],
               ),
             ),

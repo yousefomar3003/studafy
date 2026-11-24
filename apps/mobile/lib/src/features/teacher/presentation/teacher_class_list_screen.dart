@@ -8,6 +8,7 @@ import '../application/teacher_providers.dart';
 import '../domain/teacher_class.dart';
 import 'coordinator_subjects_screen.dart';
 import 'grading_assignments_screen.dart';
+import 'plan_reviews_screen.dart';
 import 'teacher_class_detail_screen.dart';
 import '../../../design/layout/bottom_inset_padding.dart';
 
@@ -96,14 +97,19 @@ class _ClassTile extends StatelessWidget {
   }
 }
 
-/// The Marks entry, and the Coordinator entry for a teacher who coordinates a subject.
+/// The Marks entry, and the Coordinator and plan review entries for a teacher who coordinates a
+/// subject.
 class _GradingEntries extends StatelessWidget {
   const _GradingEntries();
 
   @override
   Widget build(BuildContext context) => const Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [MarksEntryTile(), CoordinatorEntryTile()],
+    children: [
+      MarksEntryTile(),
+      CoordinatorEntryTile(),
+      PlanReviewsEntryTile(),
+    ],
   );
 }
 

@@ -226,6 +226,7 @@ function CertificateBody({ content, voided }: { content: CertificateContent; voi
       </table>
 
       <DescriptiveSkills subjects={content.subjects} />
+      <OutcomeAchievement subjects={content.subjects} />
 
       <dl className="ag-certificate__facts ag-certificate__overall">
         <div>
@@ -356,6 +357,46 @@ function DescriptiveSkills({ subjects }: { subjects: CertificateContent["subject
                 <td>{skill.category_name}</td>
                 <td>{skill.term_name ?? t("academicGrading.descriptive.annual")}</td>
                 <td>{skill.descriptor_label ?? "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ))}
+    </section>
+  );
+}
+
+/**
+ * Learning outcome achievement as finalized (000267), per subject: present only when the school
+ * shows it on report cards. Documents issued before have none.
+ */
+function OutcomeAchievement({ subjects }: { subjects: CertificateContent["subjects"] }) {
+  const { t, i18n } = useTranslation();
+  const arabic = i18n.language.startsWith("ar");
+  const withOutcomes = subjects.filter((subject) => (subject.outcomes?.length ?? 0) > 0);
+  if (withOutcomes.length === 0) return null;
+  return (
+    <section className="ag-certificate__skills" aria-labelledby="ag-certificate-outcomes-heading">
+      <h3 id="ag-certificate-outcomes-heading">{t("academicGrading.outcomes.reportHeading")}</h3>
+      {withOutcomes.map((subject) => (
+        <table key={subject.code} className="ag-certificate__table">
+          <caption>{subject.name}</caption>
+          <thead>
+            <tr>
+              <th scope="col">{t("academicGrading.outcomes.columns.code")}</th>
+              <th scope="col">{t("academicGrading.outcomes.columns.text")}</th>
+              <th scope="col">{t("academicGrading.outcomes.reportLevel")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {subject.outcomes!.map((outcome) => (
+              <tr key={outcome.code}>
+                <th scope="row">{outcome.code}</th>
+                <td>{(arabic && outcome.text_ar) || outcome.text}</td>
+                <td>
+                  {outcome.level}
+                  {outcome.label ? ` · ${(arabic && outcome.label_ar) || outcome.label}` : ""}
+                </td>
               </tr>
             ))}
           </tbody>
