@@ -142,6 +142,7 @@ import {
 import {
   gradingConfigRoutes,
   gradingCurriculumTemplateRoutes,
+  gradingDiplomaRoutes,
   gradingMarksRoutes,
   gradingPredictedGradesRoutes,
   gradingReportCardRoutes,
@@ -1214,6 +1215,8 @@ export function createApp({
     app.route("/", externalExamRoutes(database));
     // Predicted grades (000254).
     app.route("/", gradingPredictedGradesRoutes(database));
+    // IB Diploma total: core grades and the predicted total (000262).
+    app.route("/", gradingDiplomaRoutes(database));
     // Curriculum templates (IGCSE, IB, American...) applied to a year's grades.
     app.route("/", gradingCurriculumTemplateRoutes(database));
     // Graduation requirements: the credits, subjects, GPA and exams a diploma needs (000258).

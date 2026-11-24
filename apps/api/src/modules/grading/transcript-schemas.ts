@@ -4,6 +4,7 @@ import { dateTimeSchema, uuidSchema } from "@studafy/shared-schemas";
 import { transcriptExternalExamSchema } from "../external-exams/schemas";
 import { transcriptGraduationRequirementSchema } from "../graduation-requirements/schemas";
 
+import { diplomaResultSchema } from "./diploma-schemas";
 import { documentClassRankSchema, resultDisplaySchema } from "./schemas";
 
 /**
@@ -91,6 +92,10 @@ const transcriptYearSchema = z
         class_rank: documentClassRankSchema.nullable().optional().openapi({
           description:
             "The year's class rank when issued; absent without one and on older transcripts.",
+        }),
+        diploma: diplomaResultSchema.nullable().optional().openapi({
+          description:
+            "The year's IB Diploma outcome when issued (points_total grades); absent otherwise and on older transcripts.",
         }),
       })
       .openapi("TranscriptYearOverall"),

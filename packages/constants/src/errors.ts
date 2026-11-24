@@ -156,6 +156,8 @@ export const ERROR_CODES = {
   CERTIFICATE_NOT_FOUND: "CERTIFICATE_NOT_FOUND",
   // Predicted grades (000254): the grade's program for the year has them switched off.
   PREDICTED_GRADES_DISABLED: "PREDICTED_GRADES_DISABLED",
+  // IB Diploma total (000262): the grade's result is not the points total this year.
+  DIPLOMA_TOTAL_DISABLED: "DIPLOMA_TOTAL_DISABLED",
 
   // Enrollment — student-class binding.
   ENROLLMENT_DUPLICATE: "ENROLLMENT_DUPLICATE",

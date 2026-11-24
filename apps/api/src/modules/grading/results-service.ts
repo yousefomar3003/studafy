@@ -6,6 +6,7 @@ import { emitAuditLog } from "../../middleware/auditEmitter";
 
 import { requireYear } from "./access";
 import { attachClassRanks } from "./class-rank-service";
+import { diplomaView, loadFinalDiplomaCore, storedDiploma } from "./diploma-service";
 import {
   buildSnapshot,
   effectiveSubjects,
@@ -23,6 +24,7 @@ import {
 import { readReportNotes, snapshotReportNotes } from "./report-card-service";
 
 import type { ClassRank, RankAudience } from "./class-rank-service";
+import type { DiplomaResultView } from "./diploma-service";
 import type {
   ConfigDetails,
   ConfigSnapshot,
@@ -34,6 +36,7 @@ import type {
 } from "./engine-config";
 import type { ReportNotes } from "./report-card-service";
 import type {
+  DiplomaCoreInput,
   FailReason,
   MarkInput,
   OverallResult,
@@ -98,23 +101,33 @@ export interface FinalizationRow {
 // Computing a section
 // ---------------------------------------------------------------------------
 
-function overallFor(subjects: StudentSubjectComputation[]): OverallResult {
+/**
+ * A student's overall result from their subjects. `core` is the student's final IB Diploma core
+ * grades (TOK, EE, CAS); only a points_total grade reads them (see diploma-service).
+ */
+function overallFor(subjects: StudentSubjectComputation[], core?: DiplomaCoreInput): OverallResult {
   const outcomes: SubjectOutcomeForOverall[] = subjects.map((subject) => ({
     subjectId: subject.subject_id,
     requirement: subject.snapshot.requirement,
     includeInAverage: subject.snapshot.include_in_average,
     averageWeight: subject.snapshot.average_weight,
     credits: subject.snapshot.credits ?? null,
+    courseLevel: subject.snapshot.course_level ?? null,
     exempt: subject.exempt,
     result: subject.result,
   }));
   const first = subjects[0]?.snapshot.program;
-  return calculateOverallResult(outcomes, {
-    rounding: first?.rounding ?? { decimals: 2, mode: "half_up" },
-    maxFailedSubjectsForSupplementary: first?.max_failed_subjects_for_supplementary ?? 0,
-    scale: first?.scale ?? null,
-    resultFormat: first?.result_format,
-  });
+  return calculateOverallResult(
+    outcomes,
+    {
+      rounding: first?.rounding ?? { decimals: 2, mode: "half_up" },
+      maxFailedSubjectsForSupplementary: first?.max_failed_subjects_for_supplementary ?? 0,
+      scale: first?.scale ?? null,
+      resultFormat: first?.result_format,
+      ...(first?.diploma ? { diploma: first.diploma } : {}),
+    },
+    core,
+  );
 }
 
 /**
@@ -153,6 +166,8 @@ export interface SectionsGradingData {
   choices: Map<string, string>;
   marksByStudent: Map<string, MarkRow[]>;
   sheets: Map<string, { subject_id: string; term_id: string | null; status: string }[]>;
+  /** Final IB Diploma core grades by student (000262); read only by points_total grades. */
+  diplomaCore: Map<string, DiplomaCoreInput>;
 }
 
 /**
@@ -195,9 +210,10 @@ export async function loadSectionsGradingData(
   const assessmentIds = details.assessments
     .filter((assessment) => assessment.status === "active")
     .map((assessment) => assessment.id);
-  const [choices, marks] = await Promise.all([
+  const [choices, marks, diplomaCore] = await Promise.all([
     loadSubjectChoices(tx, schoolId, yearId, studentIds),
     loadMarks(tx, schoolId, assessmentIds, studentIds),
+    loadFinalDiplomaCore(tx, schoolId, yearId, studentIds),
   ]);
   const marksByStudent = new Map<string, MarkRow[]>();
   for (const mark of marks) {
@@ -214,7 +230,7 @@ export async function loadSectionsGradingData(
     if (list) list.push(sheet);
     else sheets.set(section_id, [sheet]);
   }
-  return { configs, details, placements, choices, marksByStudent, sheets };
+  return { configs, details, placements, choices, marksByStudent, sheets, diplomaCore };
 }
 
 /** {@link computeSection} over loaded data: no queries. */
@@ -316,7 +332,7 @@ export function computeLoadedSection(
           admission_number: student.admission_number,
         },
         subjects: subjectsOfStudent,
-        overall: overallFor(subjectsOfStudent),
+        overall: overallFor(subjectsOfStudent, data.diplomaCore.get(student.student_id)),
       };
     }),
   };
@@ -431,23 +447,27 @@ async function storeComputation(
     weighted_result_value: student.overall.weightedGpa,
     credits_attempted: student.overall.creditsAttempted,
     credits_earned: student.overall.creditsEarned,
+    diploma_result: student.overall.diploma ?? null,
   }));
   for (const chunk of chunks(overallRows, STORE_CHUNK * 5)) {
     await tx`
       INSERT INTO app.student_overall_results (
         school_id, finalization_id, student_id, status, average_percentage, total_obtained,
         total_max, grade_label, subjects_failed, academic_status, result_format,
-        result_scale_max, result_value, weighted_result_value, credits_attempted, credits_earned
+        result_scale_max, result_value, weighted_result_value, credits_attempted, credits_earned,
+        diploma_result
       )
       SELECT ${schoolId}::uuid, ${finalizationId}::uuid, x.student_id, x.status,
              x.average_percentage, x.total_obtained, x.total_max, x.grade_label,
              x.subjects_failed, x.academic_status, x.result_format, x.result_scale_max,
-             x.result_value, x.weighted_result_value, x.credits_attempted, x.credits_earned
+             x.result_value, x.weighted_result_value, x.credits_attempted, x.credits_earned,
+             x.diploma_result
       FROM jsonb_to_recordset(${tx.json(chunk as never)}::jsonb) AS x(
         student_id uuid, status text, average_percentage numeric, total_obtained numeric,
         total_max numeric, grade_label text, subjects_failed int, academic_status text,
         result_format text, result_scale_max numeric, result_value numeric,
-        weighted_result_value numeric, credits_attempted numeric, credits_earned numeric
+        weighted_result_value numeric, credits_attempted numeric, credits_earned numeric,
+        diploma_result jsonb
       )
     `;
   }
@@ -735,6 +755,14 @@ export async function correctFinalization(
     assessmentIds,
     students.map((student) => student.id),
   );
+  // Core grades, like marks, are read as they are now: a correction is how a TOK/EE grade or CAS
+  // recorded after finalization reaches the diploma total.
+  const diplomaCore = await loadFinalDiplomaCore(
+    tx,
+    schoolId,
+    old.academic_year_id,
+    students.map((student) => student.id),
+  );
   const recomputed: StudentComputation[] = students.map((student) => {
     const subjects: StudentSubjectComputation[] = stored
       .filter((row) => row.student_id === student.id)
@@ -761,7 +789,7 @@ export async function correctFinalization(
         };
       })
       .sort((a, b) => a.subject_name.localeCompare(b.subject_name));
-    return { student, subjects, overall: overallFor(subjects) };
+    return { student, subjects, overall: overallFor(subjects, diplomaCore.get(student.id)) };
   });
 
   const incomplete = incompleteSummary(recomputed);
@@ -888,6 +916,8 @@ export interface StoredStudentResult {
   /** Credits of the counted complete subjects, and of those passed; null without credits. */
   credits_attempted: number | null;
   credits_earned: number | null;
+  /** The IB Diploma outcome of a points_total result (000262); null otherwise. */
+  diploma: DiplomaResultView | null;
   subjects_failed: number;
   academic_status: "promoted" | "supplementary" | "retained" | "incomplete";
   subjects: StoredSubjectResult[];
@@ -952,13 +982,15 @@ export async function readFinalizationResults(
       weighted_result_value: string | null;
       credits_attempted: string | null;
       credits_earned: string | null;
+      diploma_result: unknown;
     }[]
   >`
     SELECT overall.student_id, student.first_name, student.last_name, student.admission_number,
            overall.status, overall.average_percentage, overall.total_obtained, overall.total_max,
            overall.grade_label, overall.subjects_failed, overall.academic_status,
            overall.result_format, overall.result_scale_max, overall.result_value,
-           overall.weighted_result_value, overall.credits_attempted, overall.credits_earned
+           overall.weighted_result_value, overall.credits_attempted, overall.credits_earned,
+           overall.diploma_result
     FROM app.student_overall_results AS overall
     JOIN app.students AS student ON student.id = overall.student_id AND student.school_id = overall.school_id
     WHERE overall.school_id = ${schoolId}::uuid AND overall.finalization_id = ${finalizationId}::uuid
@@ -1014,6 +1046,7 @@ export async function readFinalizationResults(
     weighted_gpa: n(row.weighted_result_value),
     credits_attempted: n(row.credits_attempted),
     credits_earned: n(row.credits_earned),
+    diploma: diplomaView(storedDiploma(row.diploma_result)),
     subjects_failed: row.subjects_failed,
     academic_status: row.academic_status,
     subjects: subjects
@@ -1191,6 +1224,7 @@ export function computationView(computation: SectionComputation) {
       weighted_gpa: student.overall.weightedGpa,
       credits_attempted: student.overall.creditsAttempted,
       credits_earned: student.overall.creditsEarned,
+      diploma: diplomaView(student.overall.diploma),
       subjects_failed: student.overall.subjectsFailed,
       academic_status: student.overall.academicStatus,
       subjects: student.subjects.map((subject) => ({

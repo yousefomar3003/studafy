@@ -259,6 +259,8 @@ const EXPECTED_MUTATING_ROUTES = [
   "DELETE /api/grading/external-exam-results/{resultId}",
   // Predicted grades (000254): the service records each student's old and new label and note.
   "PUT /api/grading/sections/{sectionId}/subjects/{subjectId}/predicted-grades",
+  // IB Diploma core grades (000262): the service records each student's old and new grades.
+  "PUT /api/grading/sections/{sectionId}/diploma-core",
   // Graduation requirements (000258): leadership behind academicConfig:manage; each write records
   // its old and new values in the service.
   "POST /api/grading/graduation-requirement-sets",
