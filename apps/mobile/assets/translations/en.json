@@ -1839,6 +1839,33 @@
       "readOnly": "This year is closed, so predicted grades can no longer change.",
       "invalid": "A grade isn't on this subject's grading scale.",
       "noStudents": "No students take this subject in this section."
+    },
+    "coordinator": {
+      "open": "Coordinator",
+      "openSubtitle": "Every section of {subjects}: mark sheets, averages and marks",
+      "title": "Subjects I coordinate",
+      "error": "Couldn't load the subjects you coordinate.",
+      "empty": "You don't coordinate a subject this year. Your school assigns coordinators in Academic setup.",
+      "readOnlyNote": "You can see these sections’ marks and results; only their teachers enter marks.",
+      "allGrades": "Every grade that takes it",
+      "grades": "Grades: {grades}",
+      "noSections": "No section takes this subject yet.",
+      "noTeacher": "No teacher assigned",
+      "students": "{count} students · {complete} complete",
+      "average": "Current average: {percentage}%",
+      "noAverage": "No marks yet",
+      "finalAverage": "{period} final average: {percentage}%",
+      "sheet": {
+        "readOnly": "Read only — you coordinate this subject",
+        "outOf": "Out of {max}",
+        "noStudents": "No students take this subject in this section.",
+        "status": {
+          "absent": "Absent",
+          "excused": "Excused",
+          "notApplicable": "Not applicable",
+          "graded": "Graded"
+        }
+      }
     }
   },
   "parent": {
