@@ -5,17 +5,20 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:studafy_mobile/src/core/localization/app_locales.dart';
 import 'package:studafy_mobile/src/design/theme/app_theme.dart';
 import 'package:studafy_mobile/src/features/student/application/academic_results_providers.dart';
+import 'package:studafy_mobile/src/features/student/application/diploma_providers.dart';
 import 'package:studafy_mobile/src/features/student/application/external_exam_results_providers.dart';
 import 'package:studafy_mobile/src/features/student/application/predicted_grades_providers.dart';
 import 'package:studafy_mobile/src/features/student/application/graduation_requirements_providers.dart';
 import 'package:studafy_mobile/src/features/student/application/student_context_providers.dart';
 import 'package:studafy_mobile/src/features/student/application/transcript_providers.dart';
 import 'package:studafy_mobile/src/features/student/data/academic_results_client.dart';
+import 'package:studafy_mobile/src/features/student/data/diploma_client.dart';
 import 'package:studafy_mobile/src/features/student/data/external_exam_results_client.dart';
 import 'package:studafy_mobile/src/features/student/data/graduation_requirements_client.dart';
 import 'package:studafy_mobile/src/features/student/data/predicted_grades_client.dart';
 import 'package:studafy_mobile/src/features/student/data/transcript_client.dart';
 import 'package:studafy_mobile/src/features/student/domain/academic_results.dart';
+import 'package:studafy_mobile/src/features/student/domain/diploma_prediction.dart';
 import 'package:studafy_mobile/src/features/student/domain/external_exam_results.dart';
 import 'package:studafy_mobile/src/features/student/domain/graduation_requirements.dart';
 import 'package:studafy_mobile/src/features/student/domain/predicted_grades.dart';
@@ -237,6 +240,17 @@ class _FakePredictedClient implements StudentPredictedGradesClient {
       parsePredictedGradeYears(json);
 }
 
+/// The IB Diploma prediction as the API hands it to a student or parent.
+class _FakeDiplomaClient implements StudentDiplomaClient {
+  _FakeDiplomaClient([this.json]);
+
+  final Map<String, Object?>? json;
+
+  @override
+  Future<List<DiplomaPredictionYear>> fetch(String studentId) async =>
+      parseDiplomaPredictions(json);
+}
+
 /// A graduation checklist as the API sends it (parsed with the app's own parser).
 class _FakeGraduationClient implements GraduationRequirementsClient {
   _FakeGraduationClient([this.body = const {'sets': <Object?>[]}]);
@@ -257,6 +271,7 @@ Future<void> _pump(
   String? currentStudentId = 'st-1',
   Locale locale = AppLocales.fallback,
   _FakePredictedClient? predicted,
+  _FakeDiplomaClient? diploma,
 }) async {
   tester.view.physicalSize = const Size(1080, 4000);
   tester.view.devicePixelRatio = 1;
@@ -273,6 +288,9 @@ Future<void> _pump(
           ),
           studentPredictedGradesClientProvider.overrideWithValue(
             predicted ?? _FakePredictedClient(),
+          ),
+          studentDiplomaClientProvider.overrideWithValue(
+            diploma ?? _FakeDiplomaClient(),
           ),
           graduationRequirementsClientProvider.overrideWithValue(
             graduation ?? _FakeGraduationClient(),
@@ -640,6 +658,110 @@ void main() {
     expect(find.text('A*'), findsOneWidget);
     expect(find.text('2025–2026'), findsNothing);
     expect(find.textContaining('Broken'), findsNothing);
+  });
+
+  testWidgets(
+    'an IB Diploma result shows the total out of 45, core points and why it is not awarded',
+    (tester) async {
+      final annual = _result(
+        id: 'fin-annual',
+        display: {'format': 'points_total', 'value': 23, 'max': 45},
+      );
+      (annual['result']! as Map<String, Object?>)['diploma'] = {
+        'status': 'not_awarded',
+        'total': 23,
+        'max': 45,
+        'subject_points': 22,
+        'core_points': 1,
+        'counted_subject_ids': <Object?>[],
+        'tok_grade': 'C',
+        'ee_grade': 'C',
+        'cas_complete': true,
+        'failing_conditions': [
+          {
+            'code': 'MIN_TOTAL',
+            'required': 24,
+            'actual': 23,
+            'component': null,
+            'grade': null,
+            'level': null,
+            'points': null,
+          },
+          // A condition this build does not know shows its code rather than breaking.
+          {'code': 'NEW_RULE'},
+        ],
+        'pending_reasons': <Object?>[],
+      };
+      await _pump(tester, _FakeResultsClient(results: [annual]));
+
+      expect(find.text('23 / 45'), findsOneWidget);
+      expect(find.text('IB Diploma'), findsOneWidget);
+      expect(find.text('Not awarded'), findsOneWidget);
+      expect(find.text('23 / 45 points · Core points: 1'), findsOneWidget);
+      expect(
+        find.text('TOK C · Extended Essay C · CAS complete'),
+        findsOneWidget,
+      );
+      expect(find.text('• Total 23 is below 24'), findsOneWidget);
+      expect(find.text('• NEW_RULE'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'the predicted IB Diploma total shows when the school shares it',
+    (tester) async {
+      await _pump(
+        tester,
+        _FakeResultsClient(),
+        diploma: _FakeDiplomaClient({
+          'student_id': 'st-1',
+          'years': [
+            {
+              'academic_year_name': '2026–2027',
+              'grade_level_name': 'DP2',
+              'section_name': 'A',
+              'final': null,
+              'predicted': null,
+              'predicted_result': {
+                'status': 'pending',
+                'total': null,
+                'max': 45,
+                'subject_points': 38,
+                'core_points': null,
+                'tok_grade': 'A',
+                'ee_grade': null,
+                'cas_complete': null,
+                'failing_conditions': <Object?>[],
+                'pending_reasons': ['core_grades_missing', 'cas_not_recorded'],
+              },
+            },
+            // A year without a visible prediction takes no space.
+            {'academic_year_name': '2025–2026', 'predicted_result': null},
+          ],
+        }),
+      );
+
+      expect(find.text('Predicted IB Diploma total'), findsOneWidget);
+      expect(find.text('2026–2027 · DP2 A'), findsOneWidget);
+      expect(find.text('Pending'), findsOneWidget);
+      expect(find.text('Total pending · Core points: —'), findsOneWidget);
+      expect(
+        find.text('• TOK or Extended Essay grade missing'),
+        findsOneWidget,
+      );
+      expect(find.text('2025–2026'), findsNothing);
+    },
+  );
+
+  test('diploma outcomes parse defensively', () {
+    expect(DiplomaOutcome.fromJson(null), isNull);
+    expect(DiplomaOutcome.fromJson('awarded'), isNull);
+    final odd = DiplomaOutcome.fromJson({'status': 'deferred'})!;
+    expect(odd.status, DiplomaStatus.unknown);
+    expect(odd.max, 45);
+    expect(odd.failingConditions, isEmpty);
+    expect(ResultFormat.fromWire('points_total'), ResultFormat.pointsTotal);
+    expect(ResultFormat.fromWire('points_total_v2'), isNull);
   });
 
   testWidgets('no predicted grades section when none are shared', (

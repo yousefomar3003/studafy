@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../design/layout/bottom_inset_padding.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
 import '../application/academic_results_providers.dart';
+import '../application/diploma_providers.dart';
 import '../application/external_exam_results_providers.dart';
 import '../application/predicted_grades_providers.dart';
 import '../application/graduation_requirements_providers.dart';
@@ -13,6 +14,7 @@ import '../application/student_context_providers.dart';
 import '../domain/academic_results.dart';
 import 'certificate_detail_screen.dart';
 import 'widgets/academic_result_widgets.dart';
+import 'widgets/diploma_widgets.dart';
 import 'widgets/graduation_requirements_section.dart';
 import 'widgets/test_scores_section.dart';
 import 'widgets/predicted_grades_section.dart';
@@ -83,6 +85,7 @@ class _ResultsBody extends ConsumerWidget {
           ..invalidate(studentTranscriptsProvider(studentId))
           ..invalidate(studentExternalExamResultsProvider(studentId))
           ..invalidate(studentPredictedGradesProvider(studentId))
+          ..invalidate(studentDiplomaPredictionProvider(studentId))
           ..invalidate(studentGraduationChecklistProvider(studentId));
         await ref.read(studentResultsProvider(studentId).future);
       },
@@ -128,6 +131,7 @@ class _ResultsBody extends ConsumerWidget {
                 const SizedBox(height: AppSpacing.space8),
               ],
               PredictedGradesSection(studentId: studentId),
+              DiplomaPredictionSection(studentId: studentId),
               const SizedBox(height: AppSpacing.space8),
               Text(
                 'academicResults.certificates'.tr(),

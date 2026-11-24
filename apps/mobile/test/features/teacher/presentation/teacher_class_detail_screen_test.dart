@@ -9,6 +9,7 @@ import 'package:studafy_mobile/src/features/custom_lists/domain/custom_list.dart
 import 'package:studafy_mobile/src/features/custom_lists/presentation/student_custom_lists_screen.dart';
 import 'package:studafy_mobile/src/features/messaging/application/messaging_providers.dart';
 import 'package:studafy_mobile/src/features/shell/application/shell_providers.dart';
+import 'package:studafy_mobile/src/features/teacher/application/diploma_core_providers.dart';
 import 'package:studafy_mobile/src/features/teacher/application/student_overview_providers.dart';
 import 'package:studafy_mobile/src/features/teacher/application/teacher_providers.dart';
 import 'package:studafy_mobile/src/features/teacher/domain/student_overview.dart';
@@ -77,6 +78,31 @@ void main() {
     expect(find.text('Mathematics'), findsOneWidget);
     // The predicted grades entry costs nothing until it is tapped.
     expect(find.text('Predicted grades'), findsOneWidget);
+    // Not an IB Diploma class: no core grade entry.
+    expect(find.text('IB Diploma core'), findsNothing);
+  });
+
+  testWidgets('an IB Diploma class offers core grade entry', (tester) async {
+    await _pump(
+      tester,
+      ProviderScope(
+        overrides: [
+          sessionRolesProvider.overrideWithValue(const <String>[]),
+          classCourseNameProvider(
+            'class-1',
+          ).overrideWith((ref) => 'Theory of Knowledge'),
+          classRosterProvider('class-1').overrideWith((ref) => <Enrollment>[]),
+          classDiplomaSectionProvider(
+            'class-1',
+          ).overrideWith((ref) async => 'sec-dp2'),
+        ],
+        child: _detailApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('IB Diploma core'), findsOneWidget);
+    expect(find.text('TOK, Extended Essay and CAS'), findsOneWidget);
   });
 
   testWidgets('renders one row per active enrolment', (tester) async {
