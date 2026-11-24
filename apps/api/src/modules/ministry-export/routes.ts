@@ -5,8 +5,10 @@ import { withTenantTx } from "../../db/tenant-tx";
 import { auditAction } from "../../middleware/auditEmitter";
 import { requireAuth } from "../../middleware/authContext";
 import { requirePermission } from "../../middleware/authz";
+import { requireChannel } from "../../middleware/channelGuard";
 import { openApiValidationHook } from "../../openapi/hook";
 import { requestIdHeaders, standardResponses } from "../../openapi/responses";
+import { AUTH_CHANNELS } from "../auth/channels";
 
 import { contentTypeFor, exportFileName, renderCsv, renderXlsx } from "./file";
 import {
@@ -35,7 +37,7 @@ import type { RecordKeyring } from "@studafy/records";
 import type { Context } from "hono";
 
 /**
- * Ministry results export (000264). School leadership only: templates behind
+ * Ministry results export (000264). School leadership, from the web app only: templates behind
  * academicConfig:manage, previews and downloads behind result:finalize. Reading the national ID
  * also needs studentRecord:read, and opening a sensitive one studentRecord:readSensitive (checked
  * in the service, which knows the template's field).
@@ -183,35 +185,43 @@ export function ministryExportRoutes(
 ): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
+  // A leadership feature of the web app, and a download can open sensitive national IDs: like the
+  // records reveal, browser sessions only.
+  const web = requireChannel(AUTH_CHANNELS.WEB);
   const manage = requirePermission(PERMISSIONS.ACADEMIC_CONFIG_MANAGE);
   const run = requirePermission(PERMISSIONS.RESULT_FINALIZE);
 
-  routes.use("/api/grading/ministry-export-examples", manage);
+  routes.use("/api/grading/ministry-export-examples", web, manage);
   routes.use(
     "/api/grading/ministry-export-templates",
+    web,
     manage,
     auditAction("insert", "ministry_export_templates"),
   );
   routes.on(
     "PUT",
     "/api/grading/ministry-export-templates/:templateId",
+    web,
     manage,
     auditAction("update", "ministry_export_templates"),
   );
   routes.on(
     "DELETE",
     "/api/grading/ministry-export-templates/:templateId",
+    web,
     manage,
     auditAction("delete", "ministry_export_templates"),
   );
   // The preview writes nothing; it declares what its download audits.
   routes.use(
     "/api/grading/ministry-exports/preview",
+    web,
     run,
     auditAction("export", "ministry_export_templates"),
   );
   routes.use(
     "/api/grading/ministry-exports/download",
+    web,
     run,
     auditAction("export", "ministry_export_templates"),
   );

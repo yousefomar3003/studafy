@@ -362,6 +362,14 @@ describeDb("ministry results export", () => {
     );
     expect((await call("POST", PREVIEW, teacherAuth(), run())).status).toBe(403);
     expect((await call("POST", DOWNLOAD, teacherAuth(), run())).status).toBe(403);
+    // Browser sessions only, like the records reveal.
+    const mobile = await call<{ code: string }>(
+      "POST",
+      DOWNLOAD,
+      { ...adminAuth(), channel: "mobile" },
+      run(),
+    );
+    expect([mobile.status, mobile.body.code]).toEqual([403, "CHANNEL_NOT_AUTHORIZED"]);
     expect(
       (await call("GET", "/api/grading/ministry-export-examples", auth(ids.amal!, "STUDENT")))
         .status,

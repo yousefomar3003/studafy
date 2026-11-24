@@ -336,7 +336,8 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "without a byte-order mark, per-subject or overall rows, ordered columns mapped to known " +
         "fields with optional value maps, the ministry's subject codes) and running one over the " +
         "finalized results of a year and term, with a preview and a validation report. " +
-        "Leadership only: templates behind academicConfig:manage, exports behind result:finalize. " +
+        "Leadership, from web sessions only: templates behind academicConfig:manage, exports " +
+        "behind result:finalize. " +
         "A sensitive national ID is masked in previews and opened for a download only with " +
         "studentRecord:readSensitive, audited.",
     },
