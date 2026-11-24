@@ -202,6 +202,13 @@ const EXPECTED_MUTATING_ROUTES = [
   "DELETE /api/grading/ministry-export-templates/{templateId}",
   "POST /api/grading/ministry-exports/preview",
   "POST /api/grading/ministry-exports/download",
+  // Tawjihi equivalency and multi-year results (000266): leadership behind academicConfig:manage.
+  "POST /api/grading/equivalency-rule-sets",
+  "PUT /api/grading/equivalency-rule-sets/{setId}",
+  "DELETE /api/grading/equivalency-rule-sets/{setId}",
+  "POST /api/grading/multi-year-result-configs",
+  "PUT /api/grading/multi-year-result-configs/{configId}",
+  "DELETE /api/grading/multi-year-result-configs/{configId}",
   // Transcripts (000207): issue, reissue and revoke behind academicCertificate:issue.
   "POST /api/grading/students/{studentId}/transcripts",
   "POST /api/grading/transcripts/{transcriptId}/reissue",

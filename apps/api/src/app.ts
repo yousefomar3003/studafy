@@ -24,6 +24,7 @@ import {
   accountDeletionGuard,
   legalAcceptanceGuard,
 } from "./middleware";
+import { academicEquivalencyRoutes } from "./modules/academic-equivalency";
 import {
   academicYearRoutes,
   termRoutes,
@@ -1231,6 +1232,8 @@ export function createApp({
     // Ministry results export: configurable templates over finalized results (000264).
     // `recordKeyring` opens a sensitive national ID for a download (ADR-019).
     app.route("/", ministryExportRoutes(database, recordKeyring));
+    // Tawjihi equivalency estimates and multi-year results (000266).
+    app.route("/", academicEquivalencyRoutes(database));
   }
 
   // Gradebook configuration (ST-112). Weighted assessment categories per gradebook and

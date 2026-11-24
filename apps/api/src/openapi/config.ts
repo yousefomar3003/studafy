@@ -342,6 +342,27 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "studentRecord:readSensitive, audited.",
     },
     {
+      name: "Tawjihi equivalency",
+      description:
+        "Tawjihi equivalency ESTIMATES: a school's own editable rule sets (IGCSE / A Level grades, " +
+        "the IB Diploma total, an American GPA and SAT, as weighted parts with grade tables, " +
+        "conversion tables or formulas) and each student's estimated Tawjihi-equivalent " +
+        "percentage with a step-by-step breakdown and missing-data reasons. An estimate the " +
+        "school confirms, never an official Ministry of Education conversion. Leadership " +
+        "(academicConfig:manage) manages the sets and lists a grade level; an estimate is read by " +
+        "leadership, the student's teachers, and the student and linked parents when the set is " +
+        "shown to them.",
+    },
+    {
+      name: "Multi-year results",
+      description:
+        "Multi-year results: a result weighted across several grade levels (grade 11 40% + grade " +
+        "12 60%), per subject and overall, from each year's current finalized annual result; " +
+        "pending while a year is not finalized. Leadership (academicConfig:manage) manages the " +
+        "configurations; a student's result is read by leadership, the student's teachers, and " +
+        "the student and linked parents when the configuration is shown to them.",
+    },
+    {
       name: "Exam entries",
       description:
         "Entering students for external exams: sessions of a catalogue exam (series, entry " +

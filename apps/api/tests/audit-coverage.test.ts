@@ -288,6 +288,14 @@ const EXPECTED_MUTATING_ROUTES = [
   "DELETE /api/grading/ministry-export-templates/{templateId}",
   "POST /api/grading/ministry-exports/preview",
   "POST /api/grading/ministry-exports/download",
+  // Tawjihi equivalency and multi-year results (000266): leadership behind academicConfig:manage;
+  // each write records its old and new values in the service.
+  "POST /api/grading/equivalency-rule-sets",
+  "PUT /api/grading/equivalency-rule-sets/{setId}",
+  "DELETE /api/grading/equivalency-rule-sets/{setId}",
+  "POST /api/grading/multi-year-result-configs",
+  "PUT /api/grading/multi-year-result-configs/{configId}",
+  "DELETE /api/grading/multi-year-result-configs/{configId}",
   // Timetable (ST-101). Version lifecycle + slot CRUD with conflict detection.
   "POST /api/academics/timetable-versions",
   "PATCH /api/academics/timetable-versions/{versionId}",

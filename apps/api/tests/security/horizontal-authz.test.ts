@@ -128,6 +128,8 @@ const STUDENT_SCOPED: {
   { path: (s) => `/api/grading/students/${s}/predicted-grades` },
   { path: (s) => `/api/grading/students/${s}/diploma` },
   { path: (s) => `/api/grading/students/${s}/graduation-requirements` },
+  { path: (s) => `/api/grading/students/${s}/equivalency` },
+  { path: (s) => `/api/grading/students/${s}/multi-year-results` },
   { path: (s) => `/api/grades/published/students/${s}/terms/${a?.termId ?? ":termId"}` },
   {
     path: (s) => `/api/attendance/students/${s}/records?start_date=2026-01-01&end_date=2026-12-31`,
