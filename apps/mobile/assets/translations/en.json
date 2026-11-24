@@ -2815,5 +2815,36 @@
       "retry": "Try again",
       "noPreview": "This file opens in your phone's app for it."
     }
+  },
+  "examWeeks": {
+    "schoolTime": "Times are school time ({timezone}).",
+    "floor": "floor {floor}",
+    "kinds": {
+      "midterm": "Midterm exams",
+      "final": "Final exams",
+      "monthly": "Monthly exams",
+      "mock": "Mock exams",
+      "other": "Exams",
+      "unknown": "Exams"
+    },
+    "timetable": {
+      "title": "Exam timetable",
+      "entry": "Exam timetable",
+      "entrySubtitle": "Exam days, times, rooms and seat numbers",
+      "unavailable": "The exam timetable isn't available for this account.",
+      "error": "Couldn't load the exam timetable. Pull down to try again.",
+      "empty": "No exam timetable has been published yet.",
+      "notSeated": "Room and seat not given yet",
+      "roomAndSeat": "{room} · seat {seat}"
+    },
+    "duties": {
+      "title": "Invigilation duties",
+      "error": "Couldn't load your invigilation duties. Pull down to try again.",
+      "empty": "You have no invigilation duties.",
+      "noneUpcoming": "No invigilation duties coming up.",
+      "past": "Past duties",
+      "room": "Room: {room}",
+      "next": "Next: {exam}, {when}, {room}"
+    }
   }
 }
