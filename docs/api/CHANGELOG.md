@@ -13,6 +13,23 @@ when it required the `version-bump` label.
 
 ### Added
 
+- Exam weeks (migration 000265; docs/modules/exam-weeks.md), tag "Exam weeks". Leadership
+  (`timetable:manage`): `listExamPeriods` / `createExamPeriod`
+  (`GET`/`POST /api/academics/exam-periods`, `?academic_year_id`), `getExamPeriod` /
+  `updateExamPeriod` / `deleteExamPeriod` (`.../{periodId}`; `ExamPeriod`, `ExamPeriodInput` with
+  `ExamPeriodKind` and `ExamPeriodStatus` `draft`/`published`), `createExamSlot`
+  (`POST .../{periodId}/slots`), `updateExamSlot` / `deleteExamSlot`
+  (`/api/academics/exam-slots/{slotId}`; `ExamSlot`, `ExamSlotInput`), `generateExamSeating`
+  (`POST .../{slotId}/seating`, `ExamSeatingStrategy` `by_section`/`alphabetical`/`mixed`,
+  `keep_existing`; `ExamSeatingResult`), `moveExamSeat` (`PUT .../{slotId}/seats/{studentId}`;
+  409 when another exam uses the seat), `setExamInvigilators` (`PUT .../{slotId}/invigilators`),
+  `getExamPeriodSeating` (`GET .../{periodId}/seating`) and `getExamPeriodClashes`
+  (`GET .../{periodId}/clashes`, `ExamClash`). Apps: `getStudentExamTimetable`
+  (`GET /api/academics/students/{studentId}/exam-timetable`, `student:read` + row scope;
+  published periods only, with room, seat and the school's timezone) and `getMyInvigilationDuties`
+  (`GET /api/academics/me/invigilation-duties`). Rooms: `createRoom` (`POST /api/academics/rooms`)
+  and `updateRoom` (`PATCH /api/academics/rooms/{roomId}`), both `timetable:manage`; `Room` adds
+  `exam_capacity` (nullable).
 - Class rank and percentile (migration 000257; docs/database/academic-grading.md "Class rank and
   percentile"). New `listTopStudents`
   (`GET /api/grading/years/{yearId}/programs/{gradeLevelId}/top-students`, `result:finalize`;
