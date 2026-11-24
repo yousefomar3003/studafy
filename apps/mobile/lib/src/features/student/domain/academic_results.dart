@@ -8,6 +8,8 @@
 /// `CertificateContent`).
 library;
 
+import '../../../core/localization/localized_name.dart';
+
 /// A student's year-end standing, as finalized.
 enum AcademicStatus {
   promoted,
@@ -42,6 +44,7 @@ class SubjectResult {
     this.credits,
     this.courseLevel,
     this.weightedGpaPoints,
+    this.nameAr,
   });
 
   factory SubjectResult.fromJson(Map<String, Object?> json) => SubjectResult(
@@ -82,11 +85,16 @@ class SubjectResult {
     credits: _num(json['credits']),
     courseLevel: _text(json['course_level']),
     weightedGpaPoints: _num(json['weighted_gpa_points']),
+    // `subject_name_ar` on results, `name_ar` on documents; absent before 000263.
+    nameAr: arabicNameOf(json['subject_name_ar'] ?? json['name_ar']),
   );
 
   final String subjectId;
   final String code;
   final String name;
+
+  /// The subject's Arabic name, when the school has one (see `localized_name.dart`).
+  final String? nameAr;
 
   /// `complete`, `incomplete` or `exempt`.
   final String status;
@@ -480,6 +488,13 @@ class CertificateContent {
     required this.reissueOfSerial,
     required this.reissueReason,
     this.report,
+    this.language,
+    this.schoolNameAr,
+    this.academicYearNameAr,
+    this.termNameAr,
+    this.studentNameAr,
+    this.gradeLevelNameAr,
+    this.sectionNameAr,
   });
 
   factory CertificateContent.fromJson(Map<String, Object?> json) {
@@ -516,6 +531,14 @@ class CertificateContent {
           : null,
       reissueReason: reissue is Map ? reissue['reason'] as String? : null,
       report: ReportNotes.maybe(json['report']),
+      // Arabic + English documents (000263): absent on documents issued before.
+      language: DocumentLanguage.fromWire(json['language']),
+      schoolNameAr: arabicNameOf(_map(json['school'])['name_ar']),
+      academicYearNameAr: arabicNameOf(_map(json['academic_year'])['name_ar']),
+      termNameAr: term is Map ? arabicNameOf(term['name_ar']) : null,
+      studentNameAr: studentArabicName(student),
+      gradeLevelNameAr: arabicNameOf(json['grade_level_name_ar']),
+      sectionNameAr: arabicNameOf(json['section_name_ar']),
     );
   }
 
@@ -541,6 +564,17 @@ class CertificateContent {
 
   /// Comments, conduct and attendance as printed; null on certificates issued before them.
   final ReportNotes? report;
+
+  /// The language it was issued in; null follows the app's language.
+  final DocumentLanguage? language;
+
+  /// The Arabic names at issue; null when there were none.
+  final String? schoolNameAr;
+  final String? academicYearNameAr;
+  final String? termNameAr;
+  final String? studentNameAr;
+  final String? gradeLevelNameAr;
+  final String? sectionNameAr;
 }
 
 class AcademicCertificate {

@@ -8,6 +8,8 @@
 /// `grading/schemas.ts` (`StudentReleasedMarks`).
 library;
 
+import '../../../core/localization/localized_name.dart';
+
 /// How one attempt at an assessment was marked.
 enum ReleasedMarkStatus {
   graded,
@@ -143,6 +145,7 @@ class ReleasedMarkSubject {
     required this.approvedAt,
     required this.categories,
     this.periodApproved = true,
+    this.nameAr,
   });
 
   factory ReleasedMarkSubject.fromJson(Map<String, Object?> json) =>
@@ -150,6 +153,7 @@ class ReleasedMarkSubject {
         id: json['subject_id'] as String? ?? '',
         code: json['subject_code'] as String? ?? '',
         name: json['subject_name'] as String? ?? '',
+        nameAr: arabicNameOf(json['subject_name_ar']),
         approvedAt: DateTime.tryParse(json['approved_at'] as String? ?? ''),
         // An older API only ever released whole approved periods.
         periodApproved: json['period_approved'] as bool? ?? true,
@@ -162,6 +166,9 @@ class ReleasedMarkSubject {
   final String id;
   final String code;
   final String name;
+
+  /// The subject's Arabic name, when the school has one (000263).
+  final String? nameAr;
 
   /// When the whole period's mark sheet was approved; null while only single assessments are out.
   final DateTime? approvedAt;

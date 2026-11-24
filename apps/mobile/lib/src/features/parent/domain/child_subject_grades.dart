@@ -28,6 +28,7 @@ List<SubjectGrades> groupChildSubjects(List<PublishedGrade> grades) {
       SubjectGrades(
         courseId: first.course.id,
         courseName: first.course.name,
+        subjectNameAr: first.course.subjectNameAr,
         courseCode: first.course.code,
         classCode: first.classValue.code,
         creditHours: first.course.creditHours,
@@ -36,6 +37,8 @@ List<SubjectGrades> groupChildSubjects(List<PublishedGrade> grades) {
       ),
     );
   }
-  subjects.sort((a, b) => a.courseName.toLowerCase().compareTo(b.courseName.toLowerCase()));
+  subjects.sort(
+    (a, b) => a.courseName.toLowerCase().compareTo(b.courseName.toLowerCase()),
+  );
   return subjects;
 }

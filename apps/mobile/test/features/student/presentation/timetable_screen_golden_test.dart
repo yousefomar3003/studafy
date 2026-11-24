@@ -45,8 +45,8 @@ Future<void> _pumpGolden(WidgetTester tester, Locale locale) async {
             scheduleClockProvider.overrideWithValue(() => scheduleMonday),
             scheduleClassLabelProvider.overrideWith(
               (ref, classId) async => classId == 'sci'
-                  ? (code: 'SCI101-A', courseName: 'Integrated Science')
-                  : (code: 'MATH101-A', courseName: 'Algebra Foundations'),
+                  ? (code: 'SCI101-A', courseName: 'Integrated Science', subjectNameAr: null)
+                  : (code: 'MATH101-A', courseName: 'Algebra Foundations', subjectNameAr: null),
             ),
           ],
           child: Builder(

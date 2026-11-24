@@ -71,10 +71,15 @@ class SubjectGrades {
     required this.creditHours,
     required this.entries,
     required this.weightedAverage,
+    this.subjectNameAr,
   });
 
   final String courseId;
   final String courseName;
+
+  /// The course's subject's Arabic name (000263): shown for the course when the app is in
+  /// Arabic. Null when there is none, and from servers before it.
+  final String? subjectNameAr;
   final String courseCode;
   final String classCode;
   final num creditHours;
@@ -110,6 +115,7 @@ GradeReport assembleGradeReport({
       SubjectGrades(
         courseId: first.course.id,
         courseName: first.course.name,
+        subjectNameAr: first.course.subjectNameAr,
         courseCode: first.course.code,
         classCode: first.classValue.code,
         creditHours: first.course.creditHours,
@@ -118,7 +124,9 @@ GradeReport assembleGradeReport({
       ),
     );
   }
-  subjects.sort((a, b) => a.courseName.toLowerCase().compareTo(b.courseName.toLowerCase()));
+  subjects.sort(
+    (a, b) => a.courseName.toLowerCase().compareTo(b.courseName.toLowerCase()),
+  );
 
   return GradeReport(
     term: term,

@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/localization/localized_name.dart';
 import '../../../../design/kit/kit.dart';
 import '../../../../design/layout/bottom_inset_padding.dart';
 import '../../../../design/tokens/app_spacing_tokens.dart';
@@ -250,7 +251,10 @@ class _LatestMarkHero extends StatelessWidget {
       title: entry.assessment.name,
       subtitle: 'releasedMarks.subjectInPeriod'.tr(
         namedArgs: {
-          'subject': entry.subject.name,
+          'subject': context.localizedName(
+            entry.subject.name,
+            entry.subject.nameAr,
+          ),
           'period': _periodName(entry.period),
         },
       ),
@@ -278,7 +282,7 @@ class _SubjectMarksCard extends StatelessWidget {
     final approvedAt = subject.approvedAt;
 
     return AppSectionCard(
-      title: subject.name,
+      title: context.localizedName(subject.name, subject.nameAr),
       icon: visual.icon,
       accent: visual.accent,
       subtitle: subject.periodApproved && approvedAt != null
@@ -351,7 +355,10 @@ class ReleasedMarkEntryTile extends StatelessWidget {
       accent: accent,
       subtitle: 'releasedMarks.subjectInPeriod'.tr(
         namedArgs: {
-          'subject': entry.subject.name,
+          'subject': context.localizedName(
+            entry.subject.name,
+            entry.subject.nameAr,
+          ),
           'period': _periodName(entry.period),
         },
       ),

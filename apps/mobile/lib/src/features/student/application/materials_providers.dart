@@ -8,6 +8,7 @@ import '../../../core/api/generated/models/class.dart';
 import '../../../core/api/generated/models/material.dart';
 import '../../../core/api/storage_download_client.dart';
 import '../../../core/auth/auth_providers.dart';
+import '../../../core/localization/localized_name.dart';
 import '../../../core/offline/cached_value.dart';
 import '../../../core/offline/material_file_cache.dart';
 import '../../../core/offline/offline_providers.dart';
@@ -34,6 +35,24 @@ final materialsClassCodeProvider = FutureProvider.autoDispose.family<String, Str
 ) async {
   final classValue = await ref.watch(materialsClassProvider(classId).future);
   return classValue.code;
+});
+
+/// The Arabic name (000263) of a class's subject, through its course, for the section header in
+/// the Arabic app. Best effort: null when there is none or the course can't be read.
+final materialsClassSubjectNameArProvider = FutureProvider.autoDispose.family<String?, String>((
+  ref,
+  classId,
+) async {
+  final classValue = await ref.watch(materialsClassProvider(classId).future);
+  try {
+    final course = await ref
+        .watch(apiClientProvider)
+        .academics
+        .getCourse(courseId: classValue.courseId);
+    return arabicNameOf(course.subjectNameAr);
+  } on Object {
+    return null;
+  }
 });
 
 /// A freshly-minted pre-signed download URL for [materialId].
