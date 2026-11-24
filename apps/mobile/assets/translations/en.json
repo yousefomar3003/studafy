@@ -2826,6 +2826,61 @@
       },
       "missing": "Still to pass: {subjects}"
     },
+    "equivalency": {
+      "title": "Tawjihi equivalency (estimate)",
+      "notice": "An estimate under the school's own rules, which the school confirms. It is not an official Ministry of Education conversion.",
+      "estimate": "Estimated {percentage}",
+      "status": {
+        "estimated": "Estimated",
+        "incomplete": "Missing data",
+        "notEligible": "No estimate",
+        "unknown": "Not available"
+      },
+      "partShare": "{percentage} ({share} of the estimate)",
+      "partStatus": {
+        "missing": "Missing data",
+        "skipped": "Not counted",
+        "notEligible": "No estimate"
+      },
+      "source": "From {value}",
+      "sourceOf": "From {value} / {max}",
+      "subjectStep": "{subject}: {grade} → {percentage}",
+      "notCounted": "not counted",
+      "issue": {
+        "noExamResults": "{part}: no exam results recorded yet.",
+        "tooFewSubjects": "{part}: {actual} of {required} subjects needed.",
+        "requiredSubjectMissing": "{part}: no result yet in {subject}, which must count.",
+        "unmappedGrade": "{part}: grade {grade} in {subject} has no percentage and does not count.",
+        "noDiplomaResult": "{part}: no IB Diploma result yet.",
+        "diplomaPending": "{part}: the IB Diploma result is not final yet.",
+        "diplomaNotAwarded": "{part}: the IB Diploma was not awarded.",
+        "noGpa": "{part}: no cumulative GPA yet.",
+        "noExamTotal": "{part}: no exam total recorded yet.",
+        "belowConversionTable": "{part}: {actual} is below the lowest value converted ({required}).",
+        "currentYearPending": "{part}: this year's results are not final yet, so the GPA can still change.",
+        "optionalPartSkipped": "{part} is optional and was left out.",
+        "noParts": "Nothing could be counted yet.",
+        "unknown": "Some information is missing."
+      }
+    },
+    "multiYear": {
+      "title": "Multi-year result",
+      "overall": "Overall {percentage}",
+      "status": {
+        "complete": "Complete",
+        "pending": "Pending",
+        "incomplete": "Incomplete",
+        "unknown": "Not available"
+      },
+      "yearStatus": {
+        "finalized": "Final",
+        "incomplete": "Incomplete result",
+        "pending": "Not final yet",
+        "missing": "No result"
+      },
+      "yearWeight": "{grade} ({share})",
+      "subjects": "Subjects"
+    },
     "diploma": {
       "title": "IB Diploma",
       "total": "{value} / {max} points",

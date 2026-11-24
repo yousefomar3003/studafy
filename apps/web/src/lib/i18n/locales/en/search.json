@@ -659,6 +659,16 @@
       "title": "Lesson plans",
       "where": "Principal › Academic setup › Lesson plans",
       "keywords": "lesson plans, term plans, unit plans, weekly plans, plan review, approve plans, return plans, plan coverage, submitted on time, outcomes covered"
+    },
+    "academic-equivalency": {
+      "title": "Tawjihi equivalency (estimate)",
+      "where": "Principal › Academic setup › Tawjihi equivalency",
+      "keywords": "tawjihi equivalency, equivalence, igcse equivalency, a level equivalency, ib equivalency, american diploma, gpa to percentage, sat, ministry equivalency, estimate"
+    },
+    "academic-multi-year": {
+      "title": "Multi-year results",
+      "where": "Principal › Academic setup › Multi-year results",
+      "keywords": "multi-year results, two-year tawjihi, grade 11 and grade 12, weighted result, cumulative result, years weighting"
     }
   }
 }

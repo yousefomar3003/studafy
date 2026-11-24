@@ -47,6 +47,28 @@ when it required the `version-bump` label.
   narrowed to the section's teachers, the subject's coordinator and leadership. Additive:
   `FinalizedSubjectResult.outcomes` (`OutcomeAchievementResult[]`, empty unless the school shows
   outcomes on report cards) and `CertificateContentSubject.outcomes` (optional).
+- Tawjihi equivalency estimates and multi-year results (migration 000266;
+  docs/modules/tawjihi-equivalency.md), tags "Tawjihi equivalency" and "Multi-year results".
+  Rule sets: `listEquivalencyRuleSets` (`GET /api/grading/equivalency-rule-sets`,
+  `academicConfig:read`), `createEquivalencyRuleSet` (`POST`), `updateEquivalencyRuleSet`
+  (`PUT .../{setId}`) and `deleteEquivalencyRuleSet` (`DELETE .../{setId}`), writes
+  `academicConfig:manage`, with `EquivalencyRuleSet` / `EquivalencyRuleSetInput`
+  (`EquivalencySourceSystem`, grade levels, ordered weighted `EquivalencyPart`s of an
+  `EquivalencyPartType` — `exam_subjects`, `diploma_total`, `gpa`, `exam_total` — with a grade
+  table or an `EquivalencyConversion` table/formula); a duplicate name is 409
+  `CONFLICT_DUPLICATE_ENTRY`. `listEquivalencyStudents`
+  (`GET /api/grading/equivalency-rule-sets/{setId}/students?academic_year_id=&grade_level_id=`,
+  `academicConfig:manage`, `EquivalencyStudentList`) and `getStudentEquivalency`
+  (`GET /api/grading/students/{studentId}/equivalency`, `grade:read` + `app.can_read_student`,
+  `StudentEquivalency`: per set an `EquivalencyStatus`, the estimated percentage, each
+  `EquivalencyPartResult` and `EquivalencyIssue`s). Estimates under the school's own rules, not
+  official conversions; students and parents see only sets shown to them. Multi-year:
+  `listMultiYearResultConfigs` / `createMultiYearResultConfig` / `updateMultiYearResultConfig` /
+  `deleteMultiYearResultConfig` (`/api/grading/multi-year-result-configs[/{configId}]`,
+  `MultiYearResultConfig` / `MultiYearResultConfigInput`: 2–6 grade levels with relative weights)
+  and `getStudentMultiYearResults` (`GET /api/grading/students/{studentId}/multi-year-results`,
+  `StudentMultiYearResults`: `MultiYearStatus`, weighted overall and per-subject percentages, each
+  year's `MultiYearYearStatus`).
 - Subject coordinators (migration 000260; docs/modules/subject-coordinators.md), tag "Academic
   grading". `listSubjectCoordinators` (`GET /api/grading/years/{yearId}/subject-coordinators`,
   `academicConfig:read`), `createSubjectCoordinator` (`POST` same path, `SubjectCoordinatorBody`:

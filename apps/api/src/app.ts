@@ -24,6 +24,7 @@ import {
   accountDeletionGuard,
   legalAcceptanceGuard,
 } from "./middleware";
+import { academicEquivalencyRoutes } from "./modules/academic-equivalency";
 import { academicPlanRoutes, learningOutcomeRoutes } from "./modules/academic-planning";
 import {
   academicYearRoutes,
@@ -1244,6 +1245,8 @@ export function createApp({
     // Learning outcomes and their achievement; lesson and term plans with review (000267).
     app.route("/", learningOutcomeRoutes(database));
     app.route("/", academicPlanRoutes(database));
+    // Tawjihi equivalency estimates and multi-year results (000266).
+    app.route("/", academicEquivalencyRoutes(database));
   }
 
   // Gradebook configuration (ST-112). Weighted assessment categories per gradebook and

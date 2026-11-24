@@ -2849,6 +2849,61 @@
       },
       "missing": "لم يتم النجاح بعد في: {subjects}"
     },
+    "equivalency": {
+      "title": "معادلة التوجيهي (تقديرية)",
+      "notice": "تقدير وفق قواعد المدرسة نفسها، وتؤكده المدرسة. ليس معادلة رسمية من وزارة التربية والتعليم.",
+      "estimate": "المعدل التقديري {percentage}",
+      "status": {
+        "estimated": "تقديري",
+        "incomplete": "بيانات ناقصة",
+        "notEligible": "لا يوجد تقدير",
+        "unknown": "غير متاح"
+      },
+      "partShare": "{percentage} ({share} من التقدير)",
+      "partStatus": {
+        "missing": "بيانات ناقصة",
+        "skipped": "غير محتسب",
+        "notEligible": "لا يوجد تقدير"
+      },
+      "source": "من {value}",
+      "sourceOf": "من {value} / {max}",
+      "subjectStep": "{subject}: {grade} ← {percentage}",
+      "notCounted": "غير محتسبة",
+      "issue": {
+        "noExamResults": "{part}: لا توجد نتائج امتحانات مسجلة بعد.",
+        "tooFewSubjects": "{part}: {actual} من {required} مواد مطلوبة.",
+        "requiredSubjectMissing": "{part}: لا توجد نتيجة بعد في {subject}، وهي مادة يجب احتسابها.",
+        "unmappedGrade": "{part}: الدرجة {grade} في {subject} ليس لها نسبة ولا تُحتسب.",
+        "noDiplomaResult": "{part}: لا توجد نتيجة لدبلوم البكالوريا الدولية بعد.",
+        "diplomaPending": "{part}: نتيجة دبلوم البكالوريا الدولية غير نهائية بعد.",
+        "diplomaNotAwarded": "{part}: لم يُمنح دبلوم البكالوريا الدولية.",
+        "noGpa": "{part}: لا يوجد معدل تراكمي بعد.",
+        "noExamTotal": "{part}: لا يوجد مجموع امتحان مسجل بعد.",
+        "belowConversionTable": "{part}: {actual} أقل من أدنى قيمة في جدول المعادلة ({required}).",
+        "currentYearPending": "{part}: نتائج هذا العام غير نهائية بعد، لذا قد يتغير المعدل التراكمي.",
+        "optionalPartSkipped": "{part} اختياري ولم يُحتسب.",
+        "noParts": "لم يُحتسب شيء بعد.",
+        "unknown": "بعض المعلومات ناقصة."
+      }
+    },
+    "multiYear": {
+      "title": "النتيجة متعددة السنوات",
+      "overall": "المعدل العام {percentage}",
+      "status": {
+        "complete": "مكتملة",
+        "pending": "قيد الانتظار",
+        "incomplete": "غير مكتملة",
+        "unknown": "غير متاح"
+      },
+      "yearStatus": {
+        "finalized": "نهائية",
+        "incomplete": "نتيجة غير مكتملة",
+        "pending": "غير نهائية بعد",
+        "missing": "لا توجد نتيجة"
+      },
+      "yearWeight": "{grade} ({share})",
+      "subjects": "المواد"
+    },
     "diploma": {
       "title": "دبلوم البكالوريا الدولية",
       "total": "{value} / {max} نقطة",

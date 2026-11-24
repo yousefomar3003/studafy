@@ -11,11 +11,13 @@ import { CertificateView } from "./CertificateView";
 import { YearStatusBadge } from "./components";
 import { SETUP_BASE } from "./context";
 import { CoordinatorsTab } from "./CoordinatorsTab";
+import { EquivalencyTab } from "./EquivalencyTab";
 import { ExamEntriesTab } from "./ExamEntriesTab";
 import { ExternalExamsTab } from "./ExternalExamsTab";
 import { GraduationRequirementsTab } from "./GraduationRequirementsTab";
 import { LearningOutcomesTab } from "./LearningOutcomesTab";
 import { MinistryExportTab } from "./MinistryExportTab";
+import { MultiYearTab } from "./MultiYearTab";
 import { OverviewTab } from "./OverviewTab";
 import { PlansTab } from "./PlansTab";
 import { useGradingOverview } from "./queries";
@@ -46,6 +48,8 @@ const TABS: readonly TabDef[] = [
   { path: "external-exams", key: "externalExams", show: () => true },
   { path: "exam-entries", key: "examEntries", show: (ctx) => ctx.can.manage },
   { path: "graduation-requirements", key: "graduation", show: () => true },
+  { path: "multi-year-results", key: "multiYear", show: () => true },
+  { path: "tawjihi-equivalency", key: "equivalency", show: () => true },
   { path: "coordinators", key: "coordinators", show: () => true },
   {
     path: "remedial-plans",
@@ -79,6 +83,9 @@ const TABS: readonly TabDef[] = [
  *   withdrawals and the list for the exam board (leadership);
  * - graduation requirements — the credits, subjects, GPA and exams a diploma needs, a check
  *   against a student and the students of a grade not on track (not tied to the year);
+ * - multi-year results — a result weighted across grade levels (grade 11 40% + grade 12 60%);
+ * - tawjihi equivalency — the school's rules for ESTIMATING a Tawjihi-equivalent percentage from
+ *   IGCSE / A Level, IB or American records, and a grade's estimates with a CSV export;
  * - coordinators — who coordinates which subject this year, and for which grades;
  * - remedial plans — the year's plans for struggling students (written by teachers in the app) by
  *   grade, subject, status and overdue review, with follow-up notes (leadership);
@@ -190,6 +197,8 @@ export default function AcademicSetupPage() {
             <Route path="exam-entries" element={<ExamEntriesTab ctx={ctx} />} />
           ) : null}
           <Route path="graduation-requirements" element={<GraduationRequirementsTab ctx={ctx} />} />
+          <Route path="multi-year-results" element={<MultiYearTab ctx={ctx} />} />
+          <Route path="tawjihi-equivalency" element={<EquivalencyTab ctx={ctx} />} />
           <Route path="coordinators" element={<CoordinatorsTab ctx={ctx} />} />
           {ctx.can.manage || ctx.can.finalize ? (
             <Route path="remedial-plans" element={<RemedialPlansTab ctx={ctx} />} />
