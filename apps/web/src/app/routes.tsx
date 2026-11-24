@@ -400,6 +400,11 @@ const SchoolYearsPage = lazyWithCatalogs(
   PRINCIPAL_CATALOGS,
   () => import("../features/principal/years/SchoolYearsPage"),
 );
+// Exam weeks reuses academic setup's blocks and their strings (academicGrading).
+const ExamWeeksPage = lazyWithCatalogs(
+  [...PRINCIPAL_CATALOGS, "academicGrading", "examWeeks"],
+  () => import("../features/principal/exam-weeks/ExamWeeksPage"),
+);
 // Loads the principal catalog too: it names sections the way the grades & sections page does.
 const AcademicSetupPage = lazyWithCatalogs(
   [...PRINCIPAL_CATALOGS, "academicGrading"],
@@ -1200,6 +1205,16 @@ export const routes: RouteObject[] = [
             element: (
               <RequirePermission permission={PERMISSIONS.TIMETABLE_MANAGE}>
                 <SubjectsCoursesPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // Exam weeks (000265): exam periods, their timetable, rooms, seating, invigilators and
+            // the printed sheets. Every read and write behind it requires `timetable:manage`.
+            path: "principal/exam-weeks",
+            element: (
+              <RequirePermission permission={PERMISSIONS.TIMETABLE_MANAGE}>
+                <ExamWeeksPage />
               </RequirePermission>
             ),
           },

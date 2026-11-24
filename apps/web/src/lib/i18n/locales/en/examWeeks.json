@@ -1,0 +1,226 @@
+{
+  "title": "Exam weeks",
+  "description": "Plan the school's exam periods: the exam timetable, the rooms each exam sits in, who sits where and who invigilates. Students, parents and invigilating teachers see a period in the app once you publish it.",
+  "yearLabel": "Academic year",
+  "noYears": "Add an academic year first.",
+  "loading": "Loading…",
+  "common": {
+    "edit": "Edit",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "close": "Close"
+  },
+  "kinds": {
+    "midterm": "Midterm",
+    "final": "Final",
+    "monthly": "Monthly",
+    "mock": "Mock",
+    "other": "Other"
+  },
+  "status": {
+    "draft": "Draft",
+    "published": "Published"
+  },
+  "periods": {
+    "heading": "Exam periods",
+    "caption": "The year's exam periods",
+    "help": "An exam period is a run of exam days, such as the first term finals, for the grades it covers.",
+    "add": "Add exam period",
+    "addTitle": "Add exam period",
+    "editTitle": "Edit exam period",
+    "empty": "No exam periods this year yet.",
+    "open": "Open",
+    "openLabel": "Open {{name}}",
+    "editLabel": "Edit {{name}}",
+    "deleteLabel": "Delete {{name}}",
+    "deleteTitle": "Delete {{name}}?",
+    "deleteDescription": "Its timetable, seating and invigilators are deleted with it.",
+    "deleted": "Exam period deleted.",
+    "deleteFailed": "The exam period could not be deleted.",
+    "save": "Save exam period",
+    "saved": "Exam period saved.",
+    "datesInvalid": "The last day must be on or after the first day.",
+    "columns": {
+      "name": "Exam period",
+      "dates": "Dates",
+      "grades": "Grades",
+      "exams": "Exams",
+      "actions": "Actions"
+    },
+    "fields": {
+      "name": "Name",
+      "kind": "Kind",
+      "term": "Term",
+      "wholeYear": "Not tied to a term",
+      "startsOn": "First day",
+      "endsOn": "Last day",
+      "grades": "Grades it covers"
+    }
+  },
+  "detail": {
+    "back": "← All exam periods",
+    "editPeriod": "Edit period",
+    "publish": "Publish",
+    "unpublish": "Unpublish",
+    "published": "Published. Students, parents and invigilators now see this timetable.",
+    "unpublished": "Unpublished. The timetable is hidden from the app again.",
+    "publishFailed": "The exam period could not be updated.",
+    "printLists": "Print seating lists",
+    "printDoors": "Print door sheets",
+    "draftHelp": "Draft: only school leadership sees this timetable. Publish it when it is ready.",
+    "publishedHelp": "Published: students and parents see their exams with room and seat, and teachers their invigilation duties."
+  },
+  "clashes": {
+    "heading": "Clashes",
+    "none": "No clashes: every exam is seated and watched, and nobody is in two places at once.",
+    "summary": "Problems: {{errors}}. Warnings: {{warnings}}.",
+    "otherPeriod": "an exam in another period",
+    "types": {
+      "teacher_double_booked": "{{teacher}} invigilates two rooms at once ({{room}}): {{exams}}.",
+      "student_double_booked": "{{number}} students have two exams at once: {{exams}}. {{students}}.",
+      "room_over_capacity": "{{room}} has {{seated}} students seated for {{capacity}} seats: {{exams}}.",
+      "seat_double_booked": "Seat {{seat}} in {{room}} is given twice: {{exams}}.",
+      "room_without_capacity": "{{room}} has no exam capacity, so nobody can be seated in it: {{exams}}.",
+      "insufficient_capacity": "{{number}} students sit {{exams}} but its rooms seat {{capacity}}.",
+      "unseated_students": "{{number}} students have no seat yet: {{exams}}.",
+      "no_invigilator": "Nobody invigilates {{room}}: {{exams}}.",
+      "on_holiday": "{{exams}} is on a school holiday ({{holiday}})."
+    }
+  },
+  "slots": {
+    "heading": "Exam timetable",
+    "caption": "Exams by date and time",
+    "add": "Add exam",
+    "addTitle": "Add exam",
+    "editTitle": "Edit exam",
+    "empty": "No exams on this timetable yet.",
+    "save": "Save exam",
+    "saved": "Exam saved.",
+    "timesInvalid": "The exam must end after it starts.",
+    "assessment": "Gradebook: {{name}}",
+    "noRooms": "No rooms yet",
+    "noInvigilator": "No invigilator",
+    "roomFill": "{{seated}} of {{capacity}} seats",
+    "seatedOf": "{{seated}} of {{candidates}} seated",
+    "seating": "Seating",
+    "seatingLabel": "Seating for {{name}}",
+    "invigilators": "Invigilators",
+    "invigilatorsLabel": "Invigilators for {{name}}",
+    "editLabel": "Edit {{name}}",
+    "deleteLabel": "Delete {{name}}",
+    "deleteTitle": "Delete the {{name}} exam?",
+    "deleteDescription": "Its seating and invigilators are deleted with it.",
+    "deleted": "Exam deleted.",
+    "deleteFailed": "The exam could not be deleted.",
+    "columns": {
+      "when": "Date and time",
+      "exam": "Exam",
+      "rooms": "Rooms and invigilators",
+      "seated": "Seated",
+      "actions": "Actions"
+    },
+    "fields": {
+      "grade": "Grade",
+      "subject": "Subject",
+      "subjectPlaceholder": "Choose a subject",
+      "date": "Date",
+      "startsAt": "Starts",
+      "endsAt": "Ends",
+      "assessment": "Gradebook assessment",
+      "noAssessment": "None",
+      "sections": "Sections sitting it",
+      "noSections": "This grade has no sections this year.",
+      "rooms": "Rooms",
+      "roomsHelp": "Seats are given in the order you tick the rooms. The number is each room's exam capacity. Taking a room off unseats its students.",
+      "notes": "Notes"
+    }
+  },
+  "seating": {
+    "title": "Seating: {{name}}",
+    "strategy": "Seat students",
+    "strategies": {
+      "by_section": "By section",
+      "alphabetical": "Alphabetically",
+      "mixed": "Mixed sections"
+    },
+    "strategyHelp": {
+      "by_section": "Section by section, each section in name order.",
+      "alphabetical": "Everyone in name order, whatever their section.",
+      "mixed": "One student from each section in turn, so neighbours are from different sections."
+    },
+    "keepExisting": "Keep the seats already given (only seat students without one)",
+    "generate": "Generate seating",
+    "generated": "{{seated}} seated, {{unseated}} without a seat.",
+    "generateFailed": "The seating could not be generated.",
+    "caption": "Seating",
+    "empty": "Nobody is seated yet.",
+    "unseated": "Without a seat ({{number}}): add a room or raise a room's exam capacity.",
+    "move": "Move",
+    "moveLabel": "Move {{name}}",
+    "moveTitle": "Move {{name}}",
+    "moveHelp": "Choose the room and seat. If a student of this exam sits there, the two swap seats.",
+    "moveSave": "Move student",
+    "moved": "Seat changed.",
+    "columns": {
+      "room": "Room",
+      "seat": "Seat",
+      "student": "Student",
+      "section": "Section",
+      "actions": "Actions"
+    }
+  },
+  "invigilators": {
+    "title": "Invigilators: {{name}}",
+    "help": "Choose who watches each room. A teacher in two rooms at once shows up under Clashes.",
+    "pick": "{{teacher}} in {{room}}",
+    "save": "Save invigilators",
+    "saved": "Invigilators saved."
+  },
+  "rooms": {
+    "heading": "Rooms",
+    "caption": "The school's rooms",
+    "help": "Each room's exam capacity is how many students sit an exam there, spaced out. When it is empty, the room's everyday capacity is used.",
+    "add": "Add room",
+    "addTitle": "Add room",
+    "editTitle": "Edit room",
+    "editLabel": "Edit {{name}}",
+    "empty": "No rooms yet.",
+    "inactive": "Not in use",
+    "floor": "Floor {{floor}}",
+    "sameAsCapacity": "Same as capacity",
+    "save": "Save room",
+    "saved": "Room saved.",
+    "columns": {
+      "room": "Room",
+      "building": "Building",
+      "capacity": "Capacity",
+      "examCapacity": "Exam capacity",
+      "actions": "Actions"
+    },
+    "fields": {
+      "code": "Code",
+      "name": "Name",
+      "building": "Building",
+      "floor": "Floor",
+      "capacity": "Capacity",
+      "examCapacity": "Exam capacity",
+      "examCapacityHelp": "Students in an exam. Leave empty to use the capacity.",
+      "active": "In use"
+    }
+  },
+  "print": {
+    "back": "← Back to the exam period",
+    "print": "Print",
+    "noSeat": "No seat",
+    "emptyRoom": "Nobody is seated in this room yet.",
+    "invigilators": "Invigilators: {{names}}",
+    "columns": {
+      "student": "Student",
+      "admission": "Admission no.",
+      "section": "Section",
+      "room": "Room",
+      "seat": "Seat",
+      "exam": "Exam"
+    }
+  }
+}

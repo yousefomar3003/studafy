@@ -106,6 +106,7 @@ import { invitationRoutes } from "./modules/auth/invitation/route";
 import { customListRoutes } from "./modules/custom-lists";
 import { disciplineRoutes, evaluationRoutes } from "./modules/discipline";
 import { examEntryRoutes } from "./modules/exam-entries";
+import { examWeekRoutes } from "./modules/exam-weeks";
 import { externalExamRoutes } from "./modules/external-exams";
 import { createFeatureService, featureRoutes, provideFeatures } from "./modules/features";
 import {
@@ -1234,6 +1235,8 @@ export function createApp({
     // Ministry results export: configurable templates over finalized results (000264).
     // `recordKeyring` opens a sensitive national ID for a download (ADR-019).
     app.route("/", ministryExportRoutes(database, recordKeyring));
+    // Exam weeks: exam periods, their timetable, rooms, seating and invigilators (000265).
+    app.route("/", examWeekRoutes(database));
   }
 
   // Gradebook configuration (ST-112). Weighted assessment categories per gradebook and

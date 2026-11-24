@@ -295,6 +295,11 @@
       "where": "Principal › Classes",
       "keywords": "classes, courses, class list, class teachers, rosters, subjects taught"
     },
+    "exam-weeks": {
+      "title": "Exam weeks",
+      "where": "Principal › Exam weeks",
+      "keywords": "exam timetable, exam schedule, exam period, finals, midterms, exam rooms, seating plan, seat numbers, invigilators, invigilation, door sheets"
+    },
     "grades-sections": {
       "title": "Grades & sections",
       "where": "Principal › Grades & sections",

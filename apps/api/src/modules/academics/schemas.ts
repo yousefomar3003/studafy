@@ -930,6 +930,10 @@ export const roomSchema = z
       .int()
       .nullable()
       .openapi({ description: "Maximum occupancy, or null if not tracked." }),
+    exam_capacity: z.number().int().nullable().openapi({
+      description:
+        "Candidates the room seats in an exam (spaced seating); null: its capacity (000265).",
+    }),
     building: z
       .string()
       .nullable()
@@ -962,6 +966,40 @@ export const roomQuerySchema = z
     room_type: roomTypeSchema.optional(),
   })
   .openapi("RoomQuery");
+
+const roomCapacityInput = z.number().int().min(1).max(10000).nullable().optional();
+
+/** A physical room added by leadership (exam weeks, 000265); virtual rooms stay provisioned. */
+export const roomCreateBodySchema = z
+  .object({
+    code: z.string().trim().min(1).max(40),
+    name: z.string().trim().min(1).max(120),
+    building: z.string().trim().min(1).max(120),
+    floor: z.string().trim().min(1).max(40).nullable().optional(),
+    capacity: roomCapacityInput,
+    exam_capacity: roomCapacityInput,
+  })
+  .openapi("RoomCreateInput");
+
+export const roomUpdateBodySchema = z
+  .object({
+    name: z.string().trim().min(1).max(120).optional(),
+    building: z.string().trim().min(1).max(120).optional(),
+    floor: z.string().trim().min(1).max(40).nullable().optional(),
+    capacity: roomCapacityInput,
+    exam_capacity: roomCapacityInput,
+    is_active: z.boolean().optional(),
+  })
+  .openapi("RoomUpdateInput");
+
+export const roomIdParamSchema = z
+  .object({
+    roomId: z
+      .string()
+      .uuid()
+      .openapi({ param: { name: "roomId", in: "path" }, description: "Room UUID." }),
+  })
+  .openapi("RoomIdParam");
 
 // ---------------------------------------------------------------------------
 // Enrollments

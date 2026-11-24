@@ -204,6 +204,19 @@ const EXPECTED_MUTATING_ROUTES = [
   "DELETE /api/grading/ministry-export-templates/{templateId}",
   "POST /api/grading/ministry-exports/preview",
   "POST /api/grading/ministry-exports/download",
+  // Exam weeks (000265) and rooms: leadership behind timetable:manage; each write records its
+  // old and new values in the service.
+  "POST /api/academics/rooms",
+  "PATCH /api/academics/rooms/{roomId}",
+  "POST /api/academics/exam-periods",
+  "PUT /api/academics/exam-periods/{periodId}",
+  "DELETE /api/academics/exam-periods/{periodId}",
+  "POST /api/academics/exam-periods/{periodId}/slots",
+  "PUT /api/academics/exam-slots/{slotId}",
+  "DELETE /api/academics/exam-slots/{slotId}",
+  "POST /api/academics/exam-slots/{slotId}/seating",
+  "PUT /api/academics/exam-slots/{slotId}/seats/{studentId}",
+  "PUT /api/academics/exam-slots/{slotId}/invigilators",
   // Transcripts (000207): issue, reissue and revoke behind academicCertificate:issue.
   "POST /api/grading/students/{studentId}/transcripts",
   "POST /api/grading/transcripts/{transcriptId}/reissue",

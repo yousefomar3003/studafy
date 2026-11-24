@@ -351,6 +351,16 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "leadership, the student's teachers, the student and linked parents.",
     },
     {
+      name: "Exam weeks",
+      description:
+        "Exam weeks: a school's exam periods (midterms, finals...), their timetable of exams, the " +
+        "rooms each exam sits in, generated and hand-adjusted seating, invigilators and clashes " +
+        "(a teacher in two rooms, a student with two exams at once, a room over capacity). " +
+        "Leadership (timetable:manage) builds them; once a period is published students and " +
+        "linked parents read the student's exam timetable with room and seat, and teachers their " +
+        "invigilation duties.",
+    },
+    {
       name: "Gradebook Configuration",
       description:
         "Gradebook configuration endpoints. Authenticated and tenant-scoped. " +

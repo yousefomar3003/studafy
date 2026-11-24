@@ -220,8 +220,8 @@ services (J and K both touch certificates, report cards and transcripts), i18n f
 - [x] WS-K Arabic + English documents (`feat/academic-bilingual-docs`, migration 000263;
       [module doc](../modules/bilingual-documents.md))
 - [x] WS-L ministry results export (`feat/academic-ministry-export`, migration 000264; `docs/modules/ministry-export.md`)
-- [ ] WS-M exam weeks
-- [ ] Integration of batch 1
+- [x] WS-M exam weeks (`feat/academic-exam-weeks`, migration 000265; `docs/modules/exam-weeks.md`)
+- [x] Integration of batch 1
 - [ ] WS-N Tawjihi equivalency + multi-year results
 - [ ] WS-O lesson and term plans + learning outcomes
 - [ ] WS-P remedial plans
