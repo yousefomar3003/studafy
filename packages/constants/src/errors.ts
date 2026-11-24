@@ -156,6 +156,8 @@ export const ERROR_CODES = {
   CERTIFICATE_NOT_FOUND: "CERTIFICATE_NOT_FOUND",
   // Predicted grades (000254): the grade's program for the year has them switched off.
   PREDICTED_GRADES_DISABLED: "PREDICTED_GRADES_DISABLED",
+  // Subject coordinators (000260): the user already coordinates the subject that year.
+  SUBJECT_COORDINATOR_DUPLICATE: "SUBJECT_COORDINATOR_DUPLICATE",
 
   // Enrollment — student-class binding.
   ENROLLMENT_DUPLICATE: "ENROLLMENT_DUPLICATE",

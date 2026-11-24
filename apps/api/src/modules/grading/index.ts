@@ -1,4 +1,7 @@
+export { assertCoordinatesSubject, coordinatedSubjects, coordinatesSubject } from "./access";
+export type { CoordinatedSubject } from "./access";
 export { gradingConfigRoutes } from "./routes/config-routes";
+export { gradingCoordinatorRoutes } from "./routes/coordinator-routes";
 export { gradingCurriculumTemplateRoutes } from "./routes/curriculum-template-routes";
 export { gradingMarksRoutes } from "./routes/marks-routes";
 export { gradingPredictedGradesRoutes } from "./routes/predicted-grades-routes";

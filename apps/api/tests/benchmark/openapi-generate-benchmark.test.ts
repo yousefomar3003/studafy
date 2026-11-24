@@ -564,6 +564,7 @@ const EXPECTED_PATHS = [
   "/api/grading/graduation-requirements/report",
   "/api/grading/mark-sheets/{sheetId}/decision",
   "/api/grading/my-assignments",
+  "/api/grading/my-coordinated-subjects",
   "/api/grading/report-card-settings",
   "/api/grading/scales/{scaleId}",
   "/api/grading/sections/{sectionId}/report-notes",
@@ -590,6 +591,7 @@ const EXPECTED_PATHS = [
   "/api/grading/subject-configs/{configId}/impact",
   "/api/grading/subject-configs/{configId}/keep",
   "/api/grading/subject-configs/{configId}/reset",
+  "/api/grading/subject-coordinators/{coordinatorId}",
   "/api/grading/teacher-assignments",
   "/api/grading/teacher-assignments/{assignmentId}",
   "/api/grading/transcripts/{transcriptId}",
@@ -610,6 +612,7 @@ const EXPECTED_PATHS = [
   "/api/grading/years/{yearId}/publish-check",
   "/api/grading/years/{yearId}/scales",
   "/api/grading/years/{yearId}/status",
+  "/api/grading/years/{yearId}/subject-coordinators",
   "/api/grading/years/{yearId}/teacher-assignments",
   // License billing (docs/billing/feature-licensing.md, session 3).
   "/api/platform/licenses/bank-details",

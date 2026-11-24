@@ -259,6 +259,10 @@ const EXPECTED_MUTATING_ROUTES = [
   "DELETE /api/grading/external-exam-results/{resultId}",
   // Predicted grades (000254): the service records each student's old and new label and note.
   "PUT /api/grading/sections/{sectionId}/subjects/{subjectId}/predicted-grades",
+  // Subject coordinators (000260): the service records each assignment and its grade levels.
+  "POST /api/grading/years/{yearId}/subject-coordinators",
+  "PATCH /api/grading/subject-coordinators/{coordinatorId}",
+  "DELETE /api/grading/subject-coordinators/{coordinatorId}",
   // Graduation requirements (000258): leadership behind academicConfig:manage; each write records
   // its old and new values in the service.
   "POST /api/grading/graduation-requirement-sets",

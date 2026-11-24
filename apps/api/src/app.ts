@@ -141,6 +141,7 @@ import {
 } from "./modules/grades";
 import {
   gradingConfigRoutes,
+  gradingCoordinatorRoutes,
   gradingCurriculumTemplateRoutes,
   gradingMarksRoutes,
   gradingPredictedGradesRoutes,
@@ -1214,6 +1215,8 @@ export function createApp({
     app.route("/", externalExamRoutes(database));
     // Predicted grades (000254).
     app.route("/", gradingPredictedGradesRoutes(database));
+    // Subject coordinators (000260).
+    app.route("/", gradingCoordinatorRoutes(database));
     // Curriculum templates (IGCSE, IB, American...) applied to a year's grades.
     app.route("/", gradingCurriculumTemplateRoutes(database));
     // Graduation requirements: the credits, subjects, GPA and exams a diploma needs (000258).

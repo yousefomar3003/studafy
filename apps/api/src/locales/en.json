@@ -122,6 +122,7 @@
   "CERTIFICATE_BLOCKED": "A certificate cannot be issued because the student's results are incomplete.",
   "CERTIFICATE_NOT_FOUND": "Certificate not found.",
   "PREDICTED_GRADES_DISABLED": "Predicted grades are not switched on for this grade this year.",
+  "SUBJECT_COORDINATOR_DUPLICATE": "This person already coordinates this subject this year.",
   "ENROLLMENT_DUPLICATE": "This student is already enrolled in this class.",
   "ENROLLMENT_NOT_ACTIVE": "This enrollment is not active.",
   "TIMETABLE_TEACHER_CONFLICT": "This teacher is already assigned to another class at this time",
