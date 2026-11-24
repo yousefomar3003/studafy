@@ -406,6 +406,29 @@ export type StudentStatus = z.infer<typeof studentStatusSchema>;
 // Student profile (full — admin / finance-visible)
 // ---------------------------------------------------------------------------
 
+/** Optional Arabic names (000263), shown on Arabic and bilingual documents and in the Arabic app. */
+const studentArabicNameFields = {
+  first_name_ar: z.string().nullable().openapi({ description: "Arabic first name, if any." }),
+  middle_name_ar: z
+    .string()
+    .nullable()
+    .openapi({ description: "Arabic middle (father's) name, if any." }),
+  last_name_ar: z.string().nullable().openapi({ description: "Arabic family name, if any." }),
+};
+
+/** Arabic names on a write: omitted keeps the value, null or blank clears it. */
+const studentArabicNameInputFields = {
+  first_name_ar: z.string().trim().max(100).nullable().optional().openapi({
+    description: "Arabic first name. null or blank clears it.",
+  }),
+  middle_name_ar: z.string().trim().max(100).nullable().optional().openapi({
+    description: "Arabic middle (father's) name. null or blank clears it.",
+  }),
+  last_name_ar: z.string().trim().max(100).nullable().optional().openapi({
+    description: "Arabic family name. null or blank clears it.",
+  }),
+};
+
 export const studentProfileSchema = z
   .object({
     id: uuidSchema.openapi({ description: "Primary key." }),
@@ -419,6 +442,7 @@ export const studentProfileSchema = z
     middle_name: z.string().nullable().openapi({ description: "Middle name, if any." }),
     last_name: z.string().openapi({ description: "Legal last name." }),
     preferred_name: z.string().nullable().openapi({ description: "Preferred or informal name." }),
+    ...studentArabicNameFields,
     date_of_birth: dateSchema.nullable().openapi({ description: "Date of birth (YYYY-MM-DD)." }),
     nationality_country_id: uuidSchema
       .nullable()
@@ -447,6 +471,7 @@ export const studentDemographicsSchema = z
     middle_name: z.string().nullable().openapi({ description: "Middle name, if any." }),
     last_name: z.string().openapi({ description: "Legal last name." }),
     preferred_name: z.string().nullable().openapi({ description: "Preferred or informal name." }),
+    ...studentArabicNameFields,
     date_of_birth: dateSchema.nullable().openapi({ description: "Date of birth (YYYY-MM-DD)." }),
     nationality_country_id: uuidSchema
       .nullable()
@@ -471,6 +496,7 @@ export const studentSelfSchema = z
     first_name: z.string().openapi({ description: "Legal first name." }),
     last_name: z.string().openapi({ description: "Legal last name." }),
     preferred_name: z.string().nullable().openapi({ description: "Preferred or informal name." }),
+    ...studentArabicNameFields,
     status: studentStatusSchema,
     enrolled_class_ids: z.array(uuidSchema).openapi({
       description:
@@ -566,6 +592,7 @@ export const createStudentBodySchema = z
       .max(100)
       .optional()
       .openapi({ description: "Preferred or informal name." }),
+    ...studentArabicNameInputFields,
     date_of_birth: z
       .string()
       .date()
@@ -634,6 +661,7 @@ export const updateStudentBodySchema = z
       .max(100)
       .optional()
       .openapi({ description: "Preferred or informal name." }),
+    ...studentArabicNameInputFields,
     date_of_birth: z
       .string()
       .date()
