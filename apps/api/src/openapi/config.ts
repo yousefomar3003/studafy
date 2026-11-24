@@ -330,6 +330,15 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "linked parents when the set is shown to them.",
     },
     {
+      name: "Exam entries",
+      description:
+        "Entering students for external exams: sessions of a catalogue exam (series, entry " +
+        "deadline, dates, results date) and per-student entries with subjects, tiers, candidate " +
+        "numbers and a draft / entered / withdrawn status, exported as CSV for the board. " +
+        "Leadership (academicConfig:manage) manages them; a student's entries are read by " +
+        "leadership, the student's teachers, the student and linked parents.",
+    },
+    {
       name: "Gradebook Configuration",
       description:
         "Gradebook configuration endpoints. Authenticated and tenant-scoped. " +

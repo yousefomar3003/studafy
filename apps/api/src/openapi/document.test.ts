@@ -403,6 +403,15 @@ describe("structure", () => {
         "/api/grading/external-exams/{examId}",
         "/api/grading/external-exams/{examId}/archive",
         "/api/grading/external-exams/{examId}/restore",
+        // Exam entries (000261).
+        "/api/grading/external-exam-sessions",
+        "/api/grading/external-exam-sessions/{sessionId}",
+        "/api/grading/external-exam-sessions/{sessionId}/candidate-numbers",
+        "/api/grading/external-exam-sessions/{sessionId}/entries",
+        "/api/grading/external-exam-sessions/{sessionId}/entries/export",
+        "/api/grading/external-exam-sessions/{sessionId}/entries/status",
+        "/api/grading/external-exam-entries/{entryId}",
+        "/api/grading/students/{studentId}/external-exam-entries",
         "/api/grading/finalizations",
         "/api/grading/finalizations/{finalizationId}",
         "/api/grading/finalizations/{finalizationId}/certificates",
@@ -1448,6 +1457,20 @@ describe("security", () => {
         "POST /api/grading/students/{studentId}/external-exam-results",
         "PUT /api/grading/external-exam-results/{resultId}",
         "DELETE /api/grading/external-exam-results/{resultId}",
+        // Exam entries (000261): sessions and entries behind academicConfig:manage (sessions read with
+        // academicConfig:read), a student's entries behind grade:read plus app.can_read_student.
+        "GET /api/grading/external-exam-sessions",
+        "POST /api/grading/external-exam-sessions",
+        "PUT /api/grading/external-exam-sessions/{sessionId}",
+        "DELETE /api/grading/external-exam-sessions/{sessionId}",
+        "GET /api/grading/external-exam-sessions/{sessionId}/entries",
+        "POST /api/grading/external-exam-sessions/{sessionId}/entries",
+        "POST /api/grading/external-exam-sessions/{sessionId}/entries/status",
+        "POST /api/grading/external-exam-sessions/{sessionId}/candidate-numbers",
+        "GET /api/grading/external-exam-sessions/{sessionId}/entries/export",
+        "PUT /api/grading/external-exam-entries/{entryId}",
+        "DELETE /api/grading/external-exam-entries/{entryId}",
+        "GET /api/grading/students/{studentId}/external-exam-entries",
         // Graduation requirements (000258): sets behind academicConfig:read/manage, the report and
         // previews behind academicConfig:manage, a checklist behind grade:read plus
         // app.can_read_student.

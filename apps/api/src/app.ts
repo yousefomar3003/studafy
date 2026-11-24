@@ -105,6 +105,7 @@ import { bulkInviteRoutes } from "./modules/auth/invitation/bulk-invite-routes";
 import { invitationRoutes } from "./modules/auth/invitation/route";
 import { customListRoutes } from "./modules/custom-lists";
 import { disciplineRoutes, evaluationRoutes } from "./modules/discipline";
+import { examEntryRoutes } from "./modules/exam-entries";
 import { externalExamRoutes } from "./modules/external-exams";
 import { createFeatureService, featureRoutes, provideFeatures } from "./modules/features";
 import {
@@ -1212,6 +1213,8 @@ export function createApp({
     app.route("/", gradingReportCardRoutes(database));
     // External exams and test scores: SAT, IELTS, IGCSE finals... (000255).
     app.route("/", externalExamRoutes(database));
+    // Exam entries: sessions of those exams and the students entered for them (000261).
+    app.route("/", examEntryRoutes(database));
     // Predicted grades (000254).
     app.route("/", gradingPredictedGradesRoutes(database));
     // Curriculum templates (IGCSE, IB, American...) applied to a year's grades.

@@ -176,6 +176,16 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/grading/students/{studentId}/external-exam-results",
   "PUT /api/grading/external-exam-results/{resultId}",
   "DELETE /api/grading/external-exam-results/{resultId}",
+  // Exam entries (000261): leadership behind academicConfig:manage; each write records its old
+  // and new values in the service.
+  "POST /api/grading/external-exam-sessions",
+  "PUT /api/grading/external-exam-sessions/{sessionId}",
+  "DELETE /api/grading/external-exam-sessions/{sessionId}",
+  "POST /api/grading/external-exam-sessions/{sessionId}/entries",
+  "POST /api/grading/external-exam-sessions/{sessionId}/entries/status",
+  "POST /api/grading/external-exam-sessions/{sessionId}/candidate-numbers",
+  "PUT /api/grading/external-exam-entries/{entryId}",
+  "DELETE /api/grading/external-exam-entries/{entryId}",
   // Graduation requirements (000258): leadership behind academicConfig:manage; each write records
   // its old and new values in the service.
   "POST /api/grading/graduation-requirement-sets",

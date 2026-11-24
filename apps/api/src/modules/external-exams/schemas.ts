@@ -193,6 +193,14 @@ const resultFields = {
   subject_id: uuidSchema.nullable().optional().openapi({
     description: "Required for a per-subject exam; must be absent or null otherwise.",
   }),
+  entry_id: uuidSchema
+    .nullable()
+    .optional()
+    .openapi({
+      description:
+        "The student's exam entry (entered or withdrawn, same exam, covering the subject) the result " +
+        "came from. On update, absent keeps the current link and null clears it.",
+    }),
   sat_on: dateSchema,
   note: text(EXTERNAL_EXAM_LIMITS.noteLength).nullable().optional(),
   scores: z.array(scoreBodySchema).min(1).max(EXTERNAL_EXAM_LIMITS.maxComponents),
@@ -226,6 +234,7 @@ export const externalExamResultSchema = z
       .object({ id: uuidSchema, code: z.string(), name: z.string() })
       .openapi("ExternalExamResultSubject")
       .nullable(),
+    entry_id: uuidSchema.nullable().openapi({ description: "The exam entry it came from." }),
     sat_on: dateSchema,
     total_score: z.number().nullable().openapi({
       description:
