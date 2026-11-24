@@ -4,7 +4,8 @@
     "tryAgain": "Please try again.",
     "previous": "Previous",
     "next": "Next",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "inUse": "It's still used by other records, so it can't be deleted. Remove or move what uses it first."
   },
   "layouts": {
     "account": "Account",

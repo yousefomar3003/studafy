@@ -1,4 +1,3 @@
-import { ApiError } from "@studafy/api-client";
 import { PERMISSIONS } from "@studafy/constants";
 import { Button, Modal, Table, useToast } from "@studafy/ui";
 import { useQueryClient } from "@tanstack/react-query";
@@ -7,6 +6,7 @@ import { useState } from "react";
 import { ImportCsvButton } from "../../../components/ImportCsvButton";
 import { LinkButton } from "../../../components/LinkButton";
 import { api } from "../../../lib/api";
+import { apiErrorDescription } from "../../../lib/api-error";
 import { usePermissions } from "../../../lib/auth";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 import {
@@ -197,7 +197,7 @@ export default function PrincipalClassesPage() {
         show({
           variant: "error",
           title: t("principal.classes.delete.failed"),
-          description: error instanceof ApiError ? (error.detail ?? error.title) : undefined,
+          description: apiErrorDescription(error, t),
         });
         setPendingDelete(null);
       },

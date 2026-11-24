@@ -118,9 +118,17 @@ describe("SchoolYearsPage", () => {
     );
     fireEvent.click(within(editDialog).getByRole("button", { name: "Cancel" }));
 
-    // Only a planned year can be started or deleted; the current one offers neither.
-    expect(screen.queryByRole("button", { name: "Delete 2026–2027" })).toBeNull();
+    // Every year offers Delete. Only a planned one can go: the current year's dialog says why and
+    // offers no Delete button, so nothing is sent.
     expect(screen.getByRole("button", { name: "Delete 2027–2028" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Delete 2026–2027" }));
+    const blocked = await screen.findByRole("dialog", { name: "Delete 2026–2027?" });
+    expect(within(blocked).getByText(/current year can't be deleted/)).toBeTruthy();
+    expect(within(blocked).queryByRole("button", { name: "Delete" })).toBeNull();
+    fireEvent.click(within(blocked).getByRole("button", { name: "Close" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Delete 2026–2027?" })).toBeNull(),
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "Add term" }));
     const dialog = await screen.findByRole("dialog", { name: "Add term" });

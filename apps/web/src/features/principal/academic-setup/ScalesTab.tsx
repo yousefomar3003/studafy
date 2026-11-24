@@ -117,7 +117,7 @@ export function ScalesTab({ ctx }: { ctx: SetupContext }) {
                   >
                     {canEdit ? t("academicGrading.common.edit") : t("academicGrading.common.view")}
                   </Button>
-                  {canEdit ? (
+                  {ctx.can.manage ? (
                     <Button
                       type="button"
                       variant="tertiary"
@@ -141,6 +141,9 @@ export function ScalesTab({ ctx }: { ctx: SetupContext }) {
         title={t("academicGrading.scales.deleteTitle", { name: pendingDelete?.name ?? "" })}
         description={t("academicGrading.scales.deleteDescription")}
         confirmLabel={t("academicGrading.common.remove")}
+        blockedReason={
+          ctx.configEditable ? undefined : t("academicGrading.errors.codes.ACADEMIC_CONFIG_LOCKED")
+        }
         submitting={remove.isPending}
         onCancel={() => setPendingDelete(null)}
         onConfirm={() =>

@@ -7,7 +7,7 @@ import { requireAuth } from "../../../middleware/authContext";
 import { requirePermission } from "../../../middleware/authz";
 import { onlyMethods } from "../../../middleware/only-methods";
 import { openApiValidationHook } from "../../../openapi/hook";
-import { standardResponses } from "../../../openapi/responses";
+import { requestIdHeaders, standardResponses } from "../../../openapi/responses";
 import { withStudentIdentityTx } from "../students/service";
 
 import {
@@ -29,6 +29,7 @@ import {
   createAward,
   createScholarship,
   decideAward,
+  deleteScholarship,
   getAward,
   listAwards,
   listScholarships,
@@ -201,6 +202,22 @@ const revokeAwardDef = createRoute({
 // Route factory
 // ---------------------------------------------------------------------------
 
+const deleteScholarshipDef = createRoute({
+  method: "delete",
+  path: "/api/finance/scholarships/{scholarshipId}",
+  tags: ["Finance"],
+  operationId: "deleteScholarship",
+  summary: "Delete a scholarship that was never awarded",
+  description:
+    "Refused with 409 RESOURCE_IN_USE once any student has an award of it; deactivate it instead.",
+  security: [{ bearerAuth: [] }],
+  request: { params: scholarshipIdParamSchema },
+  responses: {
+    204: { description: "Deleted.", headers: requestIdHeaders },
+    ...standardResponses({}, [401, 403, 404, 409, 500]),
+  },
+});
+
 export function scholarshipRoutes(database: Database): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
@@ -210,6 +227,10 @@ export function scholarshipRoutes(database: Database): OpenAPIHono<AppEnv> {
   routes.use(
     "/api/finance/scholarships/:scholarshipId",
     onlyMethods(["PATCH"], auditAction("update", "scholarships")),
+  );
+  routes.use(
+    "/api/finance/scholarships/:scholarshipId",
+    onlyMethods(["DELETE"], auditAction("delete", "scholarships")),
   );
   routes.use("/api/finance/scholarship-awards", post(auditAction("insert", "scholarship_awards")));
   routes.use(
@@ -235,7 +256,7 @@ export function scholarshipRoutes(database: Database): OpenAPIHono<AppEnv> {
   routes.use("/api/finance/scholarships", post(requirePermission(PERMISSIONS.BILLING_UPDATE)));
   routes.use(
     "/api/finance/scholarships/:scholarshipId",
-    onlyMethods(["PATCH"], requirePermission(PERMISSIONS.BILLING_UPDATE)),
+    onlyMethods(["PATCH", "DELETE"], requirePermission(PERMISSIONS.BILLING_UPDATE)),
   );
   routes.use(
     "/api/finance/scholarship-awards",
@@ -277,6 +298,15 @@ export function scholarshipRoutes(database: Database): OpenAPIHono<AppEnv> {
       updateScholarship(tx, tenant.schoolId, scholarshipId, c.req.valid("json")),
     );
     return c.json(row, 200);
+  });
+
+  routes.openapi(deleteScholarshipDef, async (c) => {
+    const tenant = tenantFrom(c);
+    const { scholarshipId } = c.req.valid("param");
+    await withTenantTx(database, tenant, (tx) =>
+      deleteScholarship(tx, tenant.schoolId, scholarshipId),
+    );
+    return c.body(null, 204);
   });
 
   routes.openapi(listAwardsDef, async (c) => {

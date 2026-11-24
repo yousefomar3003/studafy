@@ -56,6 +56,7 @@ export function isProblem(error: unknown, code: string): boolean {
 export function problemMessage(error: unknown, t: TFunction): string {
   if (!(error instanceof ApiError)) return t("academicGrading.errors.generic");
   const code = error.code;
+  if (code === ERROR_CODES.RESOURCE_IN_USE) return t("site.common.inUse");
   if (code && EXPLAINED_CODES.includes(code)) {
     const explanation = t(`academicGrading.errors.codes.${code}`);
     return DETAIL_CODES.includes(code) && error.detail

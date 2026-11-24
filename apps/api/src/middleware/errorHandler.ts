@@ -101,8 +101,35 @@ function mapError(error: unknown): MappedError {
     return { status: 400, code: ERROR_CODES.VALIDATION_FAILED, detail: z.prettifyError(error) };
   }
 
+  if (isDeleteBlockedByReference(error)) {
+    // A DELETE the service did not pre-check hit an ON DELETE RESTRICT foreign key: other records
+    // still use the row. That is the caller's conflict, not our failure, so it gets a 409 with a
+    // reason instead of a bare 500. Table and constraint names stay on the log line only.
+    return {
+      status: 409,
+      code: ERROR_CODES.RESOURCE_IN_USE,
+      detail:
+        "This is still used by other records, so it can't be deleted. Remove or move what uses it first.",
+    };
+  }
+
   // Unknown errors: nothing reaches the client. Full details are logged.
   return { status: 500, code: ERROR_CODES.INTERNAL_ERROR };
+}
+
+/**
+ * Postgres foreign_key_violation (23503) raised by deleting a referenced row. The same SQLSTATE on
+ * an INSERT pointing at a missing parent reads "insert or update on table" and is a genuine bug, so
+ * it stays a 500.
+ */
+function isDeleteBlockedByReference(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const { code, message } = error as { code?: unknown; message?: unknown };
+  return (
+    code === "23503" &&
+    typeof message === "string" &&
+    message.startsWith("update or delete on table")
+  );
 }
 
 function buildProblem(
