@@ -358,6 +358,15 @@ subject in a year, optionally for some grade levels. A coordinator reads every c
 marks, predicted grades and subject results, read-only, through `app.coordinates_section_subject`
 and its siblings; see [`docs/modules/subject-coordinators.md`](../modules/subject-coordinators.md).
 
+### Learning outcomes and plans (000267)
+
+`app.learning_outcomes` is a catalogue per subject and grade level; `app.student_outcome_achievements`
+holds a teacher's level per student, outcome and period. When a school shows outcomes on report
+cards, finalization copies the period's achievement into the append-only
+`app.finalized_outcome_achievements`, which results and report cards read. Term and lesson plans
+(`app.term_plans`, `app.lesson_plans` and their parts) are staff-only; see
+[`docs/modules/lesson-plans-and-outcomes.md`](../modules/lesson-plans-and-outcomes.md).
+
 ## Policy decisions left to each school
 
 Configured, not hard-coded: weights, structures, number of assessments, pass marks, final-exam rule,

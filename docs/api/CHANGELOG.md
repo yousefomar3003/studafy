@@ -13,6 +13,24 @@ when it required the `version-bump` label.
 
 ### Added
 
+- Learning outcomes and lesson and term plans (migration 000267;
+  docs/modules/lesson-plans-and-outcomes.md), tags "Learning outcomes" and "Lesson plans".
+  `getPlanningSettings` / `updatePlanningSettings` (`/api/grading/planning-settings`:
+  achievement scale, `show_outcomes_on_report_cards`, plan due days); `listLearningOutcomes`,
+  `createLearningOutcome`, `updateLearningOutcome`, `deleteLearningOutcome` and
+  `importLearningOutcomes` (`/api/grading/learning-outcomes`, CSV with dry run; 409
+  `LEARNING_OUTCOME_DUPLICATE` / `LEARNING_OUTCOME_IN_USE`); `getSectionOutcomeAchievements` /
+  `saveSectionOutcomeAchievements` (`.../sections/{sectionId}/subjects/{subjectId}/outcome-achievements`,
+  `grade:read` / `grade:update`); term plans (`listTermPlans`, `createTermPlan`, `getTermPlan`,
+  `updateTermPlan`, `deleteTermPlan`, `submitTermPlan`, `reviewTermPlan`), lesson plans
+  (`listLessonPlans`, `createLessonPlan`, `getLessonPlanOptions`, `getLessonPlan`,
+  `updateLessonPlan`, `deleteLessonPlan`, `submitLessonPlan`, `reviewLessonPlan`,
+  `saveLessonReflection`), `listPlanReviews` (`/api/grading/plan-reviews`) and `getPlanCoverage`
+  (`/api/grading/plan-coverage`). Plan writes need `lesson:create` / `lesson:update` /
+  `lesson:delete` and a teacher of the section and subject; reads and reviews `academicConfig:read`,
+  narrowed to the section's teachers, the subject's coordinator and leadership. Additive:
+  `FinalizedSubjectResult.outcomes` (`OutcomeAchievementResult[]`, empty unless the school shows
+  outcomes on report cards) and `CertificateContentSubject.outcomes` (optional).
 - Subject coordinators (migration 000260; docs/modules/subject-coordinators.md), tag "Academic
   grading". `listSubjectCoordinators` (`GET /api/grading/years/{yearId}/subject-coordinators`,
   `academicConfig:read`), `createSubjectCoordinator` (`POST` same path, `SubjectCoordinatorBody`:
