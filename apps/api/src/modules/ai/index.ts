@@ -236,7 +236,9 @@ export { withScriptGuard } from "./llm/script-guard";
 export { recordDurableUsage } from "./usage/durable";
 export {
   createDeterministicQueryEmbedder,
+  createOpenAiCompatibleQueryEmbedder,
   deterministicQueryEmbedding,
+  embedForSearch,
   estimateQueryTokens,
   RETRIEVAL_EMBEDDING_DIMENSIONS,
   RETRIEVAL_EMBEDDING_MODEL,

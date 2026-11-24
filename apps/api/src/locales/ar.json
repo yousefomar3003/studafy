@@ -49,6 +49,7 @@
   "CONFLICT_DUPLICATE_ENTRY": "تم اكتشاف إدخال مكرر",
   "CONFLICT_STATE_MISMATCH": "الطلب يتعارض مع الحالة الحالية",
   "CONFLICT_IDEMPOTENCY_KEY_MISMATCH": "محتوى الطلب يختلف عن الطلب الأصلي المحدد بمعرف التكرار",
+  "RESOURCE_IN_USE": "لا يمكن حذفه لأنه ما زال مستخدمًا في سجلات أخرى",
   "RATE_LIMIT_EXCEEDED": "تم تجاوز حد الطلبات",
   "INTERNAL_ERROR": "حدث خطأ غير متوقع",
   "NO_ACCOUNT": "لم يتم العثور على حساب",

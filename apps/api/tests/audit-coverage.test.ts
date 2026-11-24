@@ -504,6 +504,7 @@ const EXPECTED_MUTATING_ROUTES = [
   // Scholarships: finance requests an award, the school admin decides it (finance/scholarships).
   "POST /api/finance/scholarships",
   "PATCH /api/finance/scholarships/{scholarshipId}",
+  "DELETE /api/finance/scholarships/{scholarshipId}",
   "POST /api/finance/scholarship-awards",
   "POST /api/finance/scholarship-awards/{awardId}/approve",
   "POST /api/finance/scholarship-awards/{awardId}/reject",

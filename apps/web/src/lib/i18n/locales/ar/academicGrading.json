@@ -35,7 +35,8 @@
     "view": "عرض",
     "remove": "إزالة",
     "reason": "السبب",
-    "reasonRequired": "اذكر السبب."
+    "reasonRequired": "اذكر السبب.",
+    "close": "إغلاق"
   },
   "status": {
     "draft": "مسودة",

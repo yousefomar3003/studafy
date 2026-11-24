@@ -2,9 +2,9 @@
 
 ## Status
 
-Accepted. The storage and index design stands. Production retrieval runs the full-text leg alone
-until a real embedding provider is wired: see
-[ADR-020](0020-lexical-only-retrieval.md) (2026-11-03, F-06).
+Accepted. The storage and index design stands. Production ran the full-text leg alone from
+[ADR-020](0020-lexical-only-retrieval.md) (2026-11-03, F-06) until
+[ADR-024](0024-semantic-retrieval.md) (2026-11-24) wired a real embedding model.
 
 ## Context
 

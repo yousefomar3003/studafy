@@ -841,7 +841,7 @@ test.describe("custom lists", () => {
     await stubLists(page, ["ORG_ADMIN"]);
     await page.goto("/portal/lists");
     await expect(page.getByRole("heading", { name: "Lists", level: 1 })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Lockers" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Lockers", exact: true })).toBeVisible();
     await runAudit(page);
   });
 

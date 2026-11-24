@@ -18,6 +18,7 @@ import { sweepStuckUploadScans } from "../scan/stuck-scan-sweep";
 import { purgeAbandonedMaterials } from "./abandoned-material-sweep";
 import { runAccountDeletionSweep } from "./account-deletion-sweep";
 import { purgeExpiredAiMessages } from "./ai-message-retention-sweep";
+import { reembedStaleChunks } from "./chunk-reembed-sweep";
 import { CLOSURE_ERASURE_RETENTION_HOLD_DAYS, runTenantClosureSweep } from "./closure-sweep";
 import { purgeExpiredRetainedData } from "./data-retention-sweep";
 import { leaseMaintenancePool, processDsrJob } from "./dsr-processor";
@@ -78,6 +79,18 @@ export async function processMaintenanceJob(
 
   if (job.name === JOB_NAMES.PURGE_EXPIRED_AI_MESSAGES) {
     const result = await withPrimarySql(config, (sql) => purgeExpiredAiMessages(sql, workerLogger));
+    return { processed: true, ...result };
+  }
+
+  if (job.name === JOB_NAMES.REEMBED_STALE_CHUNKS) {
+    const provider = config.embeddingProvider;
+    if (!provider) return { processed: false, reason: "no embedding model configured" };
+    const result = await withPrimarySql(config, (sql) =>
+      reembedStaleChunks(sql, provider, workerLogger),
+    );
+    if (result.reembedded > 0 || result.failed > 0) {
+      workerLogger.info({ event: "chunk_reembed_sweep", ...result }, "chunk re-embed sweep done");
+    }
     return { processed: true, ...result };
   }
 

@@ -533,7 +533,7 @@ function GradeSubjects({
                         ? t("academicGrading.common.edit")
                         : t("academicGrading.common.view")}
                     </Button>
-                    {canEdit ? (
+                    {ctx.can.manage ? (
                       <Button
                         type="button"
                         variant="tertiary"
@@ -559,6 +559,9 @@ function GradeSubjects({
         })}
         description={t("academicGrading.subjects.removeDescription")}
         confirmLabel={t("academicGrading.common.remove")}
+        blockedReason={
+          ctx.configEditable ? undefined : t("academicGrading.errors.codes.ACADEMIC_CONFIG_LOCKED")
+        }
         submitting={remove.isPending}
         onCancel={() => setPendingRemove(null)}
         onConfirm={confirmRemove}

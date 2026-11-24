@@ -212,7 +212,23 @@
           "toast": "تم إلغاء المنحة",
           "error": "تعذّر إلغاء المنحة"
         }
-      }
+      },
+      "edit": "تعديل",
+      "editLabel": "تعديل {{name}}",
+      "editTitle": "تعديل المنحة",
+      "editNote": "لا يمكن تغيير قيمة الخصم بعد تحديدها. لتقديم خصم مختلف، أنشئ منحة جديدة.",
+      "descriptionLabel": "الوصف",
+      "save": "حفظ",
+      "savedToast": "تم حفظ المنحة",
+      "saveError": "تعذّر حفظ المنحة",
+      "delete": "حذف",
+      "deleteLabel": "حذف {{name}}",
+      "deleteTitle": "حذف {{name}}؟",
+      "deleteBody": "لا يمكن التراجع عن الحذف.",
+      "deleteBlocked": "تم منح {{name}} لطلاب، لذا لا يمكن حذفها. أوقفها بدلًا من ذلك كي لا تُمنح مجددًا.",
+      "deletedToast": "تم حذف المنحة",
+      "deleteError": "تعذّر حذف المنحة",
+      "close": "إغلاق"
     },
     "siblingDiscount": {
       "title": "خصم الإخوة",

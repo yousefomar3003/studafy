@@ -6,9 +6,14 @@ import postgres from "postgres";
 
 import { leaseDatabase } from "../../db/pool";
 import { withSystemTenantTx } from "../../db/tenant-tx";
+import { workerLogger } from "../../log";
 
 import { buildAssignmentBlocks, loadAssignmentSourceContent } from "./assignment-source";
-import { createEmbeddingStage, createMockEmbeddingProvider } from "./embedding";
+import {
+  createEmbeddingStage,
+  createFallbackEmbeddingStage,
+  createMockEmbeddingProvider,
+} from "./embedding";
 import { DocumentTooLargeError, MaterialParseError } from "./errors";
 import { buildIngestChunks, buildIngestChunksFromBlocks } from "./ingest";
 import { aiIngestionJobDataSchema } from "./job";
@@ -16,6 +21,7 @@ import { lowConfidencePages, TesseractOcrEngine } from "./ocr";
 import { isOcrCandidate } from "./parsers";
 import { nullSemaphore, TenantConcurrencyExceededError } from "./semaphore";
 
+import type { EmbeddingProvider } from "./embedding";
 import type { IngestChunk } from "./ingest";
 import type { OcrReport } from "./ocr";
 import type { TenantSemaphore, TenantSemaphoreLease } from "./semaphore";
@@ -48,6 +54,12 @@ export interface AiIngestionWorkerConfig {
    * pattern replaces on its side.
    */
   fetchBytes?: (storageKey: string) => Promise<Uint8Array>;
+  /**
+   * The live embedding provider (ADR-024), wired by the workers registry when AI_EMBEDDING_MODEL is
+   * set. Omitted (tests, or no model configured), chunks get the mock's vectors, which the semantic
+   * leg never reads.
+   */
+  embeddingProvider?: EmbeddingProvider;
   /**
    * Enqueue the `derive-material-previews` job once ingestion flips the material `ready`. Injected
    * by the workers registry; omitted in tests. Best-effort: called after the ready flip commits, and
@@ -230,12 +242,22 @@ export async function processIngestJob(
     let ocrReport: OcrReport | null = null;
     let embeddingTokens = 0;
     try {
-      // The stage over the repository's mock provider is the single swap point for a real
-      // embedding client: batching, rate limiting, 429 retries and per-tenant metering are all
-      // inside the stage, so the worker never changes when the provider does. The mock's vectors
-      // only satisfy `embedding NOT NULL`: the API reads none of them while retrieval is
-      // lexical-only (ADR-020, QA-15/F-06).
-      const embedder = createEmbeddingStage(createMockEmbeddingProvider());
+      // The live provider when one is configured (ADR-024), falling back to the mock if it fails
+      // outright, so an embedding outage never blocks a material: the keyword leg finds it at once
+      // and the re-embed sweep replaces the mock vectors later. Batching, rate limiting, 429
+      // retries and metering are all inside the stage.
+      const mockStage = createEmbeddingStage(createMockEmbeddingProvider());
+      const embedder = config.embeddingProvider
+        ? createFallbackEmbeddingStage(
+            createEmbeddingStage(config.embeddingProvider, { requestsPerSecond: 5 }),
+            mockStage,
+            (error) =>
+              workerLogger.warn(
+                { school_id: data.schoolId, material_id: data.materialId, err: String(error) },
+                "embedding provider failed; material stored with keyword search only until the re-embed sweep",
+              ),
+          )
+        : mockStage;
       if (claimedMaterial.source_kind === "assignment") {
         // An assignment source (000232): the assignment's text and its attached files, read in
         // place. A deleted assignment cascades its source away, so a missing one is a race the

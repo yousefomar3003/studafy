@@ -19,6 +19,7 @@ import type { AppEnv } from "../../../middleware/requestId";
 import type { FlagsService } from "../../flags";
 import type { AiQuotaHandle } from "../gate/token-budget";
 import type { LlmProvider, LlmStreamEvent } from "../llm/provider";
+import type { QueryEmbedder } from "../retrieval/embeddings";
 import type { TransactionSql } from "postgres";
 
 const SCHOOL_ID = "00000000-0000-4000-8000-000000000001";
@@ -65,6 +66,7 @@ function groundedHit(over: Record<string, unknown> = {}): Record<string, unknown
     rrf_score: 0.0333,
     semantic_rank: 1,
     keyword_rank: 1,
+    semantic_similarity: 0.7,
     ...over,
   };
 }
@@ -210,6 +212,7 @@ function buildAskApp(
     handle?: ReturnType<typeof quotaHandle>;
     modelOverrides?: Record<string, string>;
     flags?: FlagsService;
+    embedder?: QueryEmbedder | null;
   } = {},
 ): {
   app: OpenAPIHono<AppEnv>;
@@ -231,7 +234,7 @@ function buildAskApp(
     aiAskRoutes({
       database: db.database,
       provider,
-      embedder: createDeterministicQueryEmbedder(),
+      embedder: opts.embedder === undefined ? createDeterministicQueryEmbedder() : opts.embedder,
       modelOverrides: opts.modelOverrides,
       flags: opts.flags,
     }),
@@ -351,9 +354,8 @@ describe("POST /api/ai/students/{studentId}/ask", () => {
 
   test("an ungrounded question streams a single refusal event with nearest topics", async () => {
     const db = fakeDatabase({
-      // Semantic-only hit: a high RRF score from the deterministic mock embedder still does not
-      // clear the keyword-leg AND arm of assessGrounding, so the answer is refused.
-      hits: [groundedHit({ keyword_rank: null, rrf_score: 0.05 })],
+      // Semantic-only hit well under the similarity floor, and no keyword match: refused.
+      hits: [groundedHit({ keyword_rank: null, rrf_score: 0.05, semantic_similarity: 0.3 })],
     });
     const { app, quota } = buildAskApp(fakeProvider(answeredStream()), { database: db });
 
@@ -375,9 +377,58 @@ describe("POST /api/ai/students/{studentId}/ask", () => {
     expect(quota.releases).toEqual([1]);
   });
 
+  describe("semantic retrieval (ADR-024)", () => {
+    test("a question in other words, with no keyword match, is answered by meaning", async () => {
+      const db = fakeDatabase({
+        hits: [groundedHit({ keyword_rank: null, semantic_similarity: 0.72 })],
+      });
+      const { app } = buildAskApp(fakeProvider(answeredStream()), { database: db });
+
+      const res = await postAsk(app, { question: "ما هو التمثيل الضوئي؟" });
+      const events = parseSse(await res.text());
+
+      expect(events[0].event).not.toBe("refusal");
+      expect(events[events.length - 1].event).toBe("done");
+    });
+
+    test("the semantic leg compares the question with chunks of the embedder's model only", async () => {
+      const db = fakeDatabase();
+      const { app } = buildAskApp(fakeProvider(answeredStream()), { database: db });
+
+      await (await postAsk(app, { question: "How does photosynthesis work?" })).text();
+
+      // The fake records the model filter as its own SQL fragment, spliced into the semantic leg.
+      expect(db.queries.some((q) => q.includes("embedding <=>"))).toBe(true);
+      expect(db.queries.some((q) => q.startsWith("embedding_model ="))).toBe(true);
+    });
+
+    test("a failed question embedding still answers, by keyword search alone", async () => {
+      const db = fakeDatabase();
+      const failing: QueryEmbedder = {
+        model: "m@1536",
+        embed: async () => {
+          throw new Error("embedding provider down");
+        },
+      };
+      const { app } = buildAskApp(fakeProvider(answeredStream()), {
+        database: db,
+        embedder: failing,
+      });
+
+      const res = await postAsk(app, { question: "How does photosynthesis work?" });
+      const events = parseSse(await res.text());
+
+      expect(res.status).toBe(200);
+      expect(events[events.length - 1].event).toBe("done");
+      expect(db.queries.some((q) => q.includes("embedding <=>"))).toBe(false);
+    });
+  });
+
   describe("a question the materials do not cover, by the school's ai.ask.general flag", () => {
     const ungrounded = () =>
-      fakeDatabase({ hits: [groundedHit({ keyword_rank: null, rrf_score: 0.05 })] });
+      fakeDatabase({
+        hits: [groundedHit({ keyword_rank: null, rrf_score: 0.05, semantic_similarity: 0.3 })],
+      });
     const flagsWith = (general: boolean): FlagsService => ({
       get: async (name) => (name === "ai.ask.general" ? general : true),
     });
@@ -433,7 +484,7 @@ describe("POST /api/ai/students/{studentId}/ask", () => {
 
     test("a follow-up in a conversation carries its earlier turns, oldest first", async () => {
       const db = fakeDatabase({
-        hits: [groundedHit({ keyword_rank: null, rrf_score: 0.05 })],
+        hits: [groundedHit({ keyword_rank: null, rrf_score: 0.05, semantic_similarity: 0.3 })],
         conversationExists: true,
         history: [
           { question: "What is ChatGPT?", answer: "A chatbot made by OpenAI." },
@@ -467,7 +518,7 @@ describe("POST /api/ai/students/{studentId}/ask", () => {
 
     test("a new conversation sends no history", async () => {
       const db = fakeDatabase({
-        hits: [groundedHit({ keyword_rank: null, rrf_score: 0.05 })],
+        hits: [groundedHit({ keyword_rank: null, rrf_score: 0.05, semantic_similarity: 0.3 })],
         history: [{ question: "Old question", answer: "Old answer" }],
       });
       let prompt = "";
@@ -499,8 +550,10 @@ describe("POST /api/ai/students/{studentId}/ask", () => {
     });
   });
 
-  test("a below-threshold best hit is refused too", async () => {
-    const db = fakeDatabase({ hits: [groundedHit({ rrf_score: 0.01, keyword_rank: 3 })] });
+  test("a meaning match just under the similarity floor is refused too", async () => {
+    const db = fakeDatabase({
+      hits: [groundedHit({ keyword_rank: null, semantic_similarity: 0.49 })],
+    });
     const { app } = buildAskApp(fakeProvider(answeredStream()), { database: db });
 
     const res = await postAsk(app, { question: "Something distant" });
@@ -558,7 +611,9 @@ describe("POST /api/ai/students/{studentId}/ask", () => {
   });
 
   describe("a question about the material the student has open", () => {
-    const UNMATCHED = [groundedHit({ keyword_rank: null, rrf_score: 0.05 })];
+    const UNMATCHED = [
+      groundedHit({ keyword_rank: null, rrf_score: 0.05, semantic_similarity: 0.3 }),
+    ];
     const lesson = {
       title: "Plants and light",
       chunks: ["Plants make food from light.", "Chlorophyll absorbs red and blue light."],

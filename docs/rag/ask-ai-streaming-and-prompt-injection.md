@@ -41,22 +41,20 @@ done in the handler and answered as a normal problem+json response. A client tha
 
 The answer is refused unless retrieval establishes that the question is grounded in the school's
 corpus, because answering from noise would produce a confident-looking answer that is not sourced.
-The verdict (`ask/refusal.ts`) is deliberately conservative and AND-ed:
+The verdict (`ask/refusal.ts`, ADR-024) grounds a question when either:
 
-- the best hit's fused RRF score must clear `AI_ASK_MIN_RELEVANCE_SCORE` (0.02), **AND**
-- that same hit must have matched the keyword leg (`keywordRank !== null`).
+- some hit matched the keyword leg (`keywordRank !== null`) -- `websearch_to_tsquery` ANDs the
+  question's content words, so every one of them appears in that chunk; **or**
+- in hybrid mode, some hit's cosine similarity to the question reaches
+  `AI_ASK_MIN_SEMANTIC_SIMILARITY` (0.55) -- the arm that answers a question asked in other words,
+  in dialect, or in the other language.
 
-The keyword-leg arm is load-bearing. The semantic leg in this repository is a deterministic mock
-embedder, so a semantic-only hit means only the mock's cosine distance said "nearby" — which cannot
-carry a relevance verdict on its own. The keyword leg is real PostgreSQL full-text search; a hit it
-found genuinely mentions the question's words. Requiring both keeps a mock-embedding false positive
-from producing a confident answer.
-
-The 0.02 threshold is deliberately low and documented against the test corpus: hybrid retrieval
-reliably tops out around 0.1 with the deterministic mock embedder, and a keyword-only hit (a single
-leg under RRF) lands around 0.02 — so 0.02 is the floor for a real, grounded hit. The threshold and
-the keyword-leg AND arm together mean the refusal path triggers on a genuinely ungrounded question
-without gating every answer.
+The similarity arm can be trusted because the semantic leg compares a question only with chunks
+embedded by the same real model (`google/gemini-embedding-001@1536`); chunks still on the mock's
+vectors are invisible to it. Lexical mode (no embedder, or the question's embedding failed) keeps
+the keyword arm only. The 0.55 floor and the scores it was sized on are documented on the constant
+in `apps/api/src/modules/ai/config.ts`; a near-topic question that passes it still meets prompt
+rule 4, which tells the model to say so when the sources do not answer.
 
 ### A general study assistant (`ai.ask.general`)
 

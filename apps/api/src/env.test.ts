@@ -418,6 +418,27 @@ describe("loadEnv", () => {
       expect(() => loadEnv({ ...together, AI_LLM_ENABLED: "false" })).toThrow(EnvValidationError);
     });
 
+    test("accepts an embedding model on the same host (ADR-024)", () => {
+      const env = loadEnv({ ...together, AI_EMBEDDING_MODEL: "google/gemini-embedding-001" });
+      expect(env.AI_EMBEDDING_MODEL).toBe("google/gemini-embedding-001");
+    });
+
+    test("rejects an embedding model while AI is off or on the Anthropic provider", () => {
+      expect(() =>
+        loadEnv({
+          AI_EMBEDDING_MODEL: "google/gemini-embedding-001",
+          AI_LLM_PROVIDER: "openai-compatible",
+        }),
+      ).toThrow(EnvValidationError);
+      expect(() =>
+        loadEnv({
+          AI_EMBEDDING_MODEL: "google/gemini-embedding-001",
+          AI_LLM_ENABLED: "true",
+          ANTHROPIC_API_KEY: "sk-ant-test",
+        }),
+      ).toThrow(EnvValidationError);
+    });
+
     test("rejects an unknown provider", () => {
       expect(() => loadEnv({ ...together, AI_LLM_PROVIDER: "openai" })).toThrow(EnvValidationError);
     });

@@ -435,6 +435,7 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/finance/payments/{paymentId}/reversal",
   "POST /api/finance/scholarships",
   "PATCH /api/finance/scholarships/{scholarshipId}",
+  "DELETE /api/finance/scholarships/{scholarshipId}",
   "POST /api/finance/scholarship-awards",
   "POST /api/finance/scholarship-awards/{awardId}/approve",
   "POST /api/finance/scholarship-awards/{awardId}/reject",

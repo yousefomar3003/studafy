@@ -1196,9 +1196,13 @@
     "delete": {
       "action": "Delete",
       "title": "Delete {{name}}?",
-      "body": "Only a planned year or term can be deleted.",
+      "body": "Deleting it can't be undone.",
       "deleted": "Deleted",
-      "failed": "Couldn't delete it"
+      "failed": "Couldn't delete it",
+      "blockedYearActive": "The current year can't be deleted: the school's terms, classes, enrollments and grades for this year belong to it. Only a planned year can be deleted.",
+      "blockedYearClosed": "A closed year can't be deleted: it keeps that year's classes, enrollments and grades. Only a planned year can be deleted.",
+      "blockedTerm": "Only a planned term can be deleted. This term has already started, so its classes and marks belong to it.",
+      "close": "Close"
     },
     "rollover": {
       "start": "Start this year",
@@ -1246,7 +1250,9 @@
       "subjectBody": "A subject that already has courses is archived instead of deleted, so its courses and grades keep it.",
       "courseBody": "A course that already has classes is archived instead of deleted, so its classes and grades keep it.",
       "done": "Removed",
-      "failed": "Couldn't remove it"
+      "failed": "Couldn't remove it",
+      "blockedSubject": "{{name}} is already archived and can't be deleted while it still has courses. Remove its courses first.",
+      "close": "Close"
     },
     "modal": {
       "subject": {

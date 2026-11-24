@@ -15,6 +15,6 @@
  */
 export const LEGAL_DOCUMENT_VERSIONS = {
   terms: "2026-11-22",
-  privacy: "2026-11-22",
-  schoolAgreement: "2026-11-22",
+  privacy: "2026-11-24",
+  schoolAgreement: "2026-11-24",
 } as const;

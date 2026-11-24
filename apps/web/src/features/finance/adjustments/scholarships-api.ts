@@ -92,6 +92,29 @@ export function useSetScholarshipActive() {
   });
 }
 
+/** Renames or re-describes a scholarship. Its discount is fixed once created. */
+export function useUpdateScholarship() {
+  return useInvalidating(
+    async ({ id, name, description }: { id: string; name: string; description: string }) => {
+      const { data } = await api.PATCH("/api/finance/scholarships/{scholarshipId}", {
+        params: { path: { scholarshipId: id } },
+        body: { name, description },
+      });
+      if (!data) throw new Error("Updating the scholarship returned no data.");
+      return data;
+    },
+  );
+}
+
+/** Deletes a scholarship nobody was awarded; the API refuses (RESOURCE_IN_USE) once someone was. */
+export function useDeleteScholarship() {
+  return useInvalidating(async (id: string) => {
+    await api.DELETE("/api/finance/scholarships/{scholarshipId}", {
+      params: { path: { scholarshipId: id } },
+    });
+  });
+}
+
 export function useRequestAward() {
   return useInvalidating(
     async (body: { scholarship_id: string; student_id: string; notes?: string }) => {

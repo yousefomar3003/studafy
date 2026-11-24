@@ -21,7 +21,8 @@
     "columns": {
       "name": "List",
       "audience": "Shared with",
-      "rows": "Rows"
+      "rows": "Rows",
+      "actions": "Actions"
     },
     "rowCount_one": "{{count}} row",
     "rowCount_other": "{{count}} rows",
@@ -30,7 +31,12 @@
     "namesRequired": "Give the list a name in English and in Arabic.",
     "firstColumns": "Columns (optional; you can add more later)",
     "addColumn": "Add a column",
-    "removeColumn": "Remove this column"
+    "removeColumn": "Remove this column",
+    "edit": "Edit",
+    "editLabel": "Edit {{name}}",
+    "delete": "Delete",
+    "deleteLabel": "Delete {{name}}",
+    "deleteTitle": "Delete {{name}}?"
   },
   "audience": {
     "admins": "School admins only",

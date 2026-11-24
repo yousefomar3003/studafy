@@ -21,7 +21,8 @@
     "columns": {
       "name": "القائمة",
       "audience": "مشاركة مع",
-      "rows": "الصفوف"
+      "rows": "الصفوف",
+      "actions": "الإجراءات"
     },
     "rowCount_zero": "لا توجد صفوف",
     "rowCount_one": "صف واحد",
@@ -34,7 +35,12 @@
     "namesRequired": "أدخل اسمًا للقائمة بالإنجليزية وبالعربية.",
     "firstColumns": "الأعمدة (اختيارية؛ يمكنك إضافة المزيد لاحقًا)",
     "addColumn": "إضافة عمود",
-    "removeColumn": "إزالة هذا العمود"
+    "removeColumn": "إزالة هذا العمود",
+    "edit": "تعديل",
+    "editLabel": "تعديل {{name}}",
+    "delete": "حذف",
+    "deleteLabel": "حذف {{name}}",
+    "deleteTitle": "حذف {{name}}؟"
   },
   "audience": {
     "admins": "مسؤولو المدرسة فقط",

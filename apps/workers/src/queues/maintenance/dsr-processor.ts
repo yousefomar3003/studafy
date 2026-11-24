@@ -27,6 +27,7 @@ import { runTenantExport } from "./tenant-export.worker";
 
 import type { MaintenanceS3Client } from "./export-storage";
 import type { DatabaseLease } from "../../db/pool";
+import type { EmbeddingProvider } from "../ai-ingestion/embedding";
 import type { EnqueueUploadScanJobs } from "../scan/stuck-scan-sweep";
 import type { RecordKeyring } from "@studafy/records";
 import type { Job } from "bullmq";
@@ -50,6 +51,8 @@ export interface MaintenanceRunnerConfig {
   recordKeyring: RecordKeyring;
   /** Puts scan-upload jobs on the file-scan queue, for the upload-scan sweep (QA-055). */
   enqueueUploadScans?: EnqueueUploadScanJobs;
+  /** The live embedding provider, for the chunk re-embed sweep (ADR-024); absent when not configured. */
+  embeddingProvider?: EmbeddingProvider;
 }
 
 export interface DsrJobResult {

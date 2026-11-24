@@ -275,11 +275,12 @@ describeDb("hybridSearch scoped to one material", () => {
     });
     const embedder = createDeterministicQueryEmbedder();
     const query = "zirconium corrosion resistance";
+    const queryVector = await embedder.embed(query);
     const search = (scope?: string) =>
       withTenantTx(tenantClient!, { schoolId: tenant.schoolId, userId: auth.userId }, (tx) =>
         hybridSearch(tx, {
           query,
-          queryVector: embedder.embed(query),
+          queryVector,
           ...(scope !== undefined ? { materialId: scope } : {}),
         }),
       );

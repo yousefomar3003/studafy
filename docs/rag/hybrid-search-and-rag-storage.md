@@ -7,9 +7,13 @@ Fusion — under forced Row-Level Security.
 
 Measured on PostgreSQL **16.14** with pgvector **0.8.5** (`pgvector/pgvector:pg16`).
 
-> **Production runs lexical-only ([ADR-020](../adr/0020-lexical-only-retrieval.md)).** No real
-> embedding provider is wired, so `app.ts` passes no query vector and `hybridSearch` runs the
-> full-text leg alone. The hybrid design below is what a real provider brings back.
+> **Production runs hybrid with a real model ([ADR-024](../adr/0024-semantic-retrieval.md)).**
+> Questions and chunks are embedded with `google/gemini-embedding-001` at 1536 dimensions through
+> OpenRouter, labeled `google/gemini-embedding-001@1536`. The semantic leg reads only chunks with
+> that label, so chunks still on the mock's vectors are found by the keyword leg alone until the
+> `reembed-stale-chunks` maintenance sweep (every 30 minutes) re-embeds them -- the "Embedding
+> regeneration" procedure below, run continuously. From 2026-11-03 to 2026-11-24 production ran
+> lexical-only ([ADR-020](../adr/0020-lexical-only-retrieval.md)).
 
 ## Stated assumptions
 
