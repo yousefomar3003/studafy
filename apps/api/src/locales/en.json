@@ -31,6 +31,7 @@
   "CONFLICT_DUPLICATE_ENTRY": "Duplicate entry detected",
   "CONFLICT_STATE_MISMATCH": "Request conflicts with current state",
   "CONFLICT_IDEMPOTENCY_KEY_MISMATCH": "Request body differs from the original idempotent request",
+  "RESOURCE_IN_USE": "It's still used by other records, so it can't be deleted",
   "RATE_LIMIT_EXCEEDED": "Too many requests",
   "INTERNAL_ERROR": "An unexpected error occurred",
   "NO_ACCOUNT": "No account found",

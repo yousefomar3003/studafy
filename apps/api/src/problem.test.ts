@@ -160,6 +160,40 @@ describe("internal errors do not leak", () => {
   });
 });
 
+describe("deletes blocked by a foreign key", () => {
+  const pgError = (message: string) => Object.assign(new Error(message), { code: "23503" });
+
+  test("a referenced row's delete is a 409 RESOURCE_IN_USE without table names", async () => {
+    const { app } = buildApp((a) =>
+      a.delete("/thing", () => {
+        throw pgError(
+          'update or delete on table "terms" violates foreign key constraint "fk_classes_term" on table "classes"',
+        );
+      }),
+    );
+
+    const res = await app.request("/thing", { method: "DELETE" });
+    const raw = await res.text();
+
+    expect(res.status).toBe(409);
+    expect(raw).not.toInclude("fk_classes_term");
+    expect(raw).not.toInclude("classes");
+    expect(JSON.parse(raw)).toMatchObject({ status: 409, code: "RESOURCE_IN_USE" });
+    expect((JSON.parse(raw) as { detail: string }).detail).toInclude("still used");
+  });
+
+  test("an insert pointing at a missing parent stays a 500", async () => {
+    const { app } = buildApp((a) =>
+      a.post("/thing", () => {
+        throw pgError('insert or update on table "classes" violates foreign key constraint "x"');
+      }),
+    );
+
+    const res = await app.request("/thing", { method: "POST" });
+    expect(res.status).toBe(500);
+  });
+});
+
 describe("validation errors", () => {
   test("a ZodError maps to 400 VALIDATION_FAILED with a detail", async () => {
     // Also the guard for a silent dependency hazard: if apps/api and @studafy/shared-schemas ever

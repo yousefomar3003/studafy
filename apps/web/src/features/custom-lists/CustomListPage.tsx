@@ -8,6 +8,7 @@ import { usePortalBack } from "../../layouts/portal/PortalBackLink";
 import { api } from "../../lib/api";
 import { usePermissions } from "../../lib/auth";
 import { useLocale, useTranslation } from "../../lib/i18n";
+import { useSearchParamFlag } from "../../lib/use-search-param-flag";
 
 import { cellText, columnLabel, listName } from "./cells";
 import { errorDetail } from "./CustomListsPage";
@@ -63,6 +64,8 @@ export default function CustomListPage() {
   const [editing, setEditing] = useState<CustomListRow | "new" | null>(null);
   const [deleting, setDeleting] = useState<CustomListRow | null>(null);
   const [managing, setManaging] = useState<"columns" | "settings" | null>(null);
+  // `?settings=1` (the Edit action on the Lists page) opens the settings once the list has loaded.
+  const [settingsParam, clearSettingsParam] = useSearchParamFlag("settings");
   const [revealed, setRevealed] = useState<ReadonlyMap<string, CellValue | null>>(new Map());
   const timers = useRef<number[]>([]);
 
@@ -105,6 +108,12 @@ export default function CustomListPage() {
     onError: (caught) =>
       show({ variant: "error", title: errorDetail(caught) ?? t("customLists.rows.deleteError") }),
   });
+
+  useEffect(() => {
+    if (settingsParam !== "1" || !list.data) return;
+    if (canManage) setManaging("settings");
+    clearSettingsParam();
+  }, [settingsParam, list.data, canManage, clearSettingsParam]);
 
   if (list.isPending) return <p role="status">{t("customLists.common.loading")}</p>;
   if (list.isError) return <p role="alert">{t("customLists.list.loadError")}</p>;

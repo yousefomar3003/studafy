@@ -311,6 +311,32 @@ describeDb("scholarships HTTP", () => {
     expect(taken.status).toBe(409);
   });
 
+  test("a scholarship can be deleted until someone is awarded it", async () => {
+    const fixture = await createFullTenant(database!.sql);
+    const finance = await financeOf(fixture);
+
+    const unused = await createScholarship(finance, {
+      name: "Never awarded",
+      discount_type: "percentage",
+      percentage: 5,
+    });
+    const deleted = await request(finance, "DELETE", `/api/finance/scholarships/${unused.id}`);
+    expect(deleted.status).toBe(204);
+    const list = await request(finance, "GET", "/api/finance/scholarships");
+    const { scholarships } = (await list.json()) as { scholarships: Scholarship[] };
+    expect(scholarships.map((row) => row.id)).not.toContain(unused.id);
+
+    const awarded = await createScholarship(finance, {
+      name: "Awarded once",
+      discount_type: "percentage",
+      percentage: 5,
+    });
+    await requestAward(finance, awarded.id, fixture.students[0]!.id);
+    const refused = await request(finance, "DELETE", `/api/finance/scholarships/${awarded.id}`);
+    expect(refused.status).toBe(409);
+    expect(await refused.json()).toMatchObject({ code: "RESOURCE_IN_USE" });
+  });
+
   test("another school's admin can neither see nor decide an award", async () => {
     const fixture = await createFullTenant(database!.sql);
     const other = await createFullTenant(database!.sql);

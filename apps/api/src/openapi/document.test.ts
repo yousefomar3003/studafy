@@ -1583,6 +1583,7 @@ describe("security", () => {
         "GET /api/finance/scholarships",
         "POST /api/finance/scholarships",
         "PATCH /api/finance/scholarships/{scholarshipId}",
+        "DELETE /api/finance/scholarships/{scholarshipId}",
         "GET /api/finance/scholarship-awards",
         "POST /api/finance/scholarship-awards",
         "GET /api/finance/students",
