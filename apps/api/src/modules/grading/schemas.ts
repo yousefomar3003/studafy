@@ -776,7 +776,13 @@ export const myAssignmentsQuerySchema = z
   .object({ academic_year_id: uuidSchema.optional() })
   .openapi("MyGradingAssignmentsQuery");
 
-const sheetStatusSchema = z.enum(["draft", "submitted", "approved", "returned"]);
+export const sheetStatusSchema = z.enum(["draft", "submitted", "approved", "returned"]);
+export const sectionSubjectAccessSchema = z
+  .enum(["leadership", "teacher", "coordinator"])
+  .openapi("SectionSubjectAccess", {
+    description:
+      "How the caller reads a section's subject: school leadership, one of its teachers, or the subject's coordinator (read-only, 000260).",
+  });
 const assessmentReleaseStatusSchema = z
   .enum(["draft", "submitted", "approved", "returned"])
   .openapi("AssessmentReleaseStatus", {
@@ -847,6 +853,7 @@ export const markSheetSchema = z
     config_id: uuidSchema,
     source: z.string(),
     year_status: gradingConfigStatusSchema,
+    access: sectionSubjectAccessSchema,
     can_edit_marks: z.boolean(),
     can_add_assessments: z.boolean(),
     config: z

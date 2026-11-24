@@ -3,7 +3,12 @@ import { ERROR_CODES } from "@studafy/constants";
 import { CodedHttpException } from "../../coded-http-exception";
 import { emitAuditLog } from "../../middleware/auditEmitter";
 
-import { assertCanGradeSectionSubject, assertConfigEditable, requireYear } from "./access";
+import {
+  assertCanGradeSectionSubject,
+  assertCanReadSectionSubject,
+  assertConfigEditable,
+  requireYear,
+} from "./access";
 import {
   loadRoster,
   loadScale,
@@ -164,7 +169,8 @@ export async function getSectionPredictedGrades(
   subjectId: string,
   termId: string | null,
 ): Promise<SectionPredictedGradesView> {
-  await assertCanGradeSectionSubject(tx, sectionId, subjectId);
+  // The subject's coordinator reads them too, never edits (000260).
+  const { access } = await assertCanReadSectionSubject(tx, sectionId, subjectId);
   const period = await loadSectionPeriod(tx, schoolId, sectionId, subjectId, termId);
   const studentIds = period.roster.map((student) => student.student_id);
   const rows = studentIds.length
@@ -192,7 +198,10 @@ export async function getSectionPredictedGrades(
     term_id: termId,
     enabled: period.program.predicted_grades_enabled,
     visibility: period.program.predicted_grades_visibility,
-    editable: period.program.predicted_grades_enabled && isYearOpen(period.year),
+    editable:
+      access !== "coordinator" &&
+      period.program.predicted_grades_enabled &&
+      isYearOpen(period.year),
     labels: period.labels,
     terms: terms.map((term) => ({ term_id: term.id, term_name: term.name })),
     students: period.roster.map((student) => {

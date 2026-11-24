@@ -10,6 +10,7 @@ import { ApprovalsTab } from "./ApprovalsTab";
 import { CertificateView } from "./CertificateView";
 import { YearStatusBadge } from "./components";
 import { SETUP_BASE } from "./context";
+import { CoordinatorsTab } from "./CoordinatorsTab";
 import { ExternalExamsTab } from "./ExternalExamsTab";
 import { GraduationRequirementsTab } from "./GraduationRequirementsTab";
 import { OverviewTab } from "./OverviewTab";
@@ -39,6 +40,7 @@ const TABS: readonly TabDef[] = [
   { path: "scales", key: "scales", show: () => true },
   { path: "external-exams", key: "externalExams", show: () => true },
   { path: "graduation-requirements", key: "graduation", show: () => true },
+  { path: "coordinators", key: "coordinators", show: () => true },
   { path: "approvals", key: "approvals", show: (ctx) => ctx.can.review },
   { path: "results", key: "results", show: (ctx) => ctx.can.finalize || ctx.can.certify },
   { path: "top-students", key: "topStudents", show: (ctx) => ctx.can.finalize },
@@ -61,6 +63,7 @@ const TABS: readonly TabDef[] = [
  * - external exams — the school's SAT, IELTS, IGCSE finals... (not tied to the year);
  * - graduation requirements — the credits, subjects, GPA and exams a diploma needs, a check
  *   against a student and the students of a grade not on track (not tied to the year);
+ * - coordinators — who coordinates which subject this year, and for which grades;
  * - approvals — submitted mark sheets and teacher-proposed assessments;
  * - results — preview, finalize, correct, and certificates; `certificates/:id` prints one.
  * - top students — a grade's best places by class rank for a term or the year (leadership).
@@ -162,6 +165,7 @@ export default function AcademicSetupPage() {
           <Route path="scales" element={<ScalesTab ctx={ctx} />} />
           <Route path="external-exams" element={<ExternalExamsTab ctx={ctx} />} />
           <Route path="graduation-requirements" element={<GraduationRequirementsTab ctx={ctx} />} />
+          <Route path="coordinators" element={<CoordinatorsTab ctx={ctx} />} />
           {ctx.can.review ? <Route path="approvals" element={<ApprovalsTab ctx={ctx} />} /> : null}
           {ctx.can.finalize || ctx.can.certify ? (
             <Route path="results" element={<ResultsTab ctx={ctx} />} />

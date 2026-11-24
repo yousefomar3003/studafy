@@ -351,6 +351,13 @@ new values.
 Predicted grades (000254) are a separate, opt-in table per grade and year that nothing above reads;
 see [`docs/modules/predicted-grades.md`](../modules/predicted-grades.md).
 
+### Subject coordinators (000260)
+
+`app.subject_coordinators` (+ `app.subject_coordinator_grade_levels`) names who coordinates a
+subject in a year, optionally for some grade levels. A coordinator reads every covered section's
+marks, predicted grades and subject results, read-only, through `app.coordinates_section_subject`
+and its siblings; see [`docs/modules/subject-coordinators.md`](../modules/subject-coordinators.md).
+
 ## Policy decisions left to each school
 
 Configured, not hard-coded: weights, structures, number of assessments, pass marks, final-exam rule,

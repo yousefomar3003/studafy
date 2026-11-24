@@ -80,7 +80,7 @@ const markSheetRoute = createRoute({
   operationId: "getMarkSheet",
   summary: "Mark sheet for a section and subject",
   description:
-    "The effective grading rules, assessments, roster, recorded marks and the engine's preview per student. Teachers of the section and subject, and school leadership.",
+    "The effective grading rules, assessments, roster, recorded marks and the engine's preview per student. Teachers of the section and subject, and school leadership; the subject's coordinator for the section's grade reads it too, read-only (access coordinator, can_edit_marks and can_add_assessments false).",
   security,
   request: { params: sectionSubjectParamSchema },
   responses: standardResponses(
