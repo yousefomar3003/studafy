@@ -98,6 +98,50 @@ describe("header detection and suggested mapping", () => {
     });
   });
 
+  test("Arabic name columns map beside the English ones (000263)", () => {
+    const { headers } = readCsvSource(
+      "Student number,First name,Last name,First name (Arabic),Father name - Arabic,Last name (Arabic)\n",
+    );
+    expect(suggestColumnMapping(headers)).toEqual({
+      admission_number: "Student number",
+      first_name: "First name",
+      last_name: "Last name",
+      first_name_ar: "First name (Arabic)",
+      middle_name_ar: "Father name - Arabic",
+      last_name_ar: "Last name (Arabic)",
+    });
+    // An Arabic export: the plain headers stay the English fields, as before; "بالعربي" marks
+    // the Arabic spelling.
+    const arabic = readCsvSource(
+      "رقم الطالب,الاسم الأول,اسم العائلة,الاسم الأول بالعربي,اسم الأب بالعربي,اسم العائلة بالعربي\n",
+    );
+    expect(suggestColumnMapping(arabic.headers)).toMatchObject({
+      first_name: "الاسم الأول",
+      last_name: "اسم العائلة",
+      first_name_ar: "الاسم الأول بالعربي",
+      middle_name_ar: "اسم الأب بالعربي",
+      last_name_ar: "اسم العائلة بالعربي",
+    });
+    const staged = stageRows(
+      readCsvSource(
+        "Student number,First name,Last name,First name (Arabic),Last name (Arabic)\nS1,Ali,Hassan,  علي ,حسن\nS2,Sara,Omar,,\n",
+      ),
+      {
+        admission_number: "Student number",
+        first_name: "First name",
+        last_name: "Last name",
+        first_name_ar: "First name (Arabic)",
+        last_name_ar: "Last name (Arabic)",
+      },
+    );
+    expect(staged.rows[0]!.record).toMatchObject({
+      first_name_ar: "علي",
+      middle_name_ar: null,
+      last_name_ar: "حسن",
+    });
+    expect(staged.rows[1]!.record).toMatchObject({ first_name_ar: null, last_name_ar: null });
+  });
+
   test("the fixed template maps onto itself", () => {
     const { headers } = readCsvSource(`${TEMPLATE_HEADER}\n`);
     const mapping = suggestColumnMapping(headers);
@@ -177,6 +221,9 @@ describe("stageRows", () => {
       middle_name: null,
       last_name: "Lee",
       preferred_name: null,
+      first_name_ar: null,
+      middle_name_ar: null,
+      last_name_ar: null,
       date_of_birth: null,
       status: "enrolled",
       grade: null,
