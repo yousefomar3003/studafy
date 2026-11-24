@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
   CURRICULUM_TEMPLATES,
+  DEFAULT_DIPLOMA_CONFIG,
   MYP_TOTAL_BOUNDARIES,
   buildTemplateTermStructure,
   calculateOverallResult,
@@ -13,6 +14,7 @@ import {
   matchBand,
   roundTo,
   templateScaleBands,
+  validateDiplomaConfig,
   validateGradeScale,
   validateSubjectConfig,
 } from "./index";
@@ -152,7 +154,14 @@ describe("curriculum templates", () => {
         );
         expect(issues).toEqual([]);
       }
-      // A GPA result needs GPA points on every band.
+      // A GPA or points-total result needs points on every band.
+      if (template.resultFormat.format === "points_total") {
+        expect(template.scale!.bands.every((band) => band.gpaPoints !== null)).toBe(true);
+        expect(template.diploma).toBeDefined();
+        expect(validateDiplomaConfig(template.diploma!, template.resultFormat.max)).toEqual([]);
+      } else {
+        expect(template.diploma).toBeUndefined();
+      }
       if (template.resultFormat.format === "gpa") {
         expect(template.scale!.bands.every((band) => band.gpaPoints !== null)).toBe(true);
         expect(template.resultFormat.max).toBeLessThanOrEqual(10);
@@ -417,7 +426,9 @@ describe("other templates", () => {
       expect(getCurriculumTemplate(id)!.subject.passPercentage).toBe(40);
     }
     const dp = getCurriculumTemplate("ib_dp")!;
-    expect(dp.resultFormat).toEqual({ format: "gpa", max: 7 });
+    // The Diploma total out of 45, with the IB matrix and conditions as editable defaults.
+    expect(dp.resultFormat).toEqual({ format: "points_total", max: 45 });
+    expect(dp.diploma).toEqual(DEFAULT_DIPLOMA_CONFIG);
     expect(hasErrors(validateGradeScale(templateScaleBands(dp, "ar")))).toBe(false);
   });
 });

@@ -33,6 +33,33 @@ export type {
   CumulativeYearInput,
 } from "./cumulative";
 export { calculateRanks, rankValue, topRanked, validateRankSettings } from "./rank";
+export {
+  CORE_GRADES,
+  DEFAULT_DIPLOMA_CONFIG,
+  DEFAULT_DIPLOMA_CORE_MATRIX,
+  DEFAULT_DIPLOMA_MAX,
+  DIPLOMA_CONDITION_TYPES,
+  DIPLOMA_LIMITS,
+  calculateDiplomaResult,
+  corePoints,
+  isCoreGrade,
+  validateDiplomaConfig,
+} from "./diploma";
+export type {
+  CoreComponent,
+  CoreGrade,
+  DiplomaCondition,
+  DiplomaConditionType,
+  DiplomaConfig,
+  DiplomaCoreInput,
+  DiplomaFailingCode,
+  DiplomaFailingCondition,
+  DiplomaMatrixCell,
+  DiplomaPendingReason,
+  DiplomaResult,
+  DiplomaStatus,
+  DiplomaSubjectInput,
+} from "./diploma";
 export type { RankBasis, RankCandidate, RankOutcome, RankScope, RankedStudent } from "./rank";
 export {
   calculateDescriptiveResult,

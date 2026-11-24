@@ -20,7 +20,7 @@ import type { ResultFormatKind, RoundingRule, ValidationIssue } from "./types";
  */
 
 /** What students are ranked by. */
-export type RankBasis = "average" | "gpa" | "weighted_gpa";
+export type RankBasis = "average" | "gpa" | "weighted_gpa" | "points_total";
 
 /** Who a student is ranked against: their section, or every section of their grade level. */
 export type RankScope = "section" | "grade_level";
@@ -35,6 +35,8 @@ export interface RankCandidate {
   gpa: number | null;
   /** The weighted GPA, stored only when a counted subject carries a boost (000253). */
   weightedGpa: number | null;
+  /** The IB Diploma total of a `points_total` result; null or absent otherwise (000262). */
+  pointsTotal?: number | null;
 }
 
 export interface RankedStudent {
@@ -64,6 +66,8 @@ export interface RankOutcome {
  *  - weighted_gpa  the weighted GPA. It is stored only when a counted subject is boosted, so a
  *                  student without boosted subjects is ranked by their plain GPA (which is then
  *                  their weighted GPA too).
+ *  - points_total  the IB Diploma total (out of 45); a student whose total is pending (core grades
+ *                  missing) takes no place.
  */
 export function rankValue(candidate: RankCandidate, basis: RankBasis): number | null {
   if (candidate.status !== "complete") return null;
@@ -74,6 +78,8 @@ export function rankValue(candidate: RankCandidate, basis: RankBasis): number | 
       return candidate.gpa;
     case "weighted_gpa":
       return candidate.gpa === null ? null : (candidate.weightedGpa ?? candidate.gpa);
+    case "points_total":
+      return candidate.pointsTotal ?? null;
   }
 }
 
@@ -118,13 +124,27 @@ export function topRanked(outcome: RankOutcome, limit: number): RankedStudent[] 
 
 /**
  * A grade's rank settings against its result format: a GPA basis needs a grade that shows its
- * result as a GPA (no other result has GPA values to rank by).
+ * result as a GPA (no other result has GPA values to rank by), and the points-total basis a grade
+ * whose result is the IB Diploma total.
  */
 export function validateRankSettings(
   settings: { enabled: boolean; basis: RankBasis },
   resultFormat: ResultFormatKind,
 ): ValidationIssue[] {
-  if (!settings.enabled || settings.basis === "average" || resultFormat === "gpa") return [];
+  if (!settings.enabled || settings.basis === "average") return [];
+  if (settings.basis === "points_total") {
+    return resultFormat === "points_total"
+      ? []
+      : [
+          {
+            code: "RANK_BASIS_NEEDS_POINTS_TOTAL",
+            severity: "error",
+            message:
+              "Ranking by the diploma total needs the grade's result shown as a points total. Rank by the average, or change the result format.",
+          },
+        ];
+  }
+  if (resultFormat === "gpa") return [];
   return [
     {
       code: "RANK_BASIS_NEEDS_GPA",

@@ -8,6 +8,8 @@
  * finalized under.
  */
 
+import type { DiplomaConfig, DiplomaResult } from "./diploma";
+
 /** How a subject's period grade is built from its categories. */
 export type GradingMethod =
   /** Each category's percentage is multiplied by its weight; weights total 100. */
@@ -255,6 +257,8 @@ export type SubjectRequirement = "mandatory" | "optional" | "elective";
 
 /** One subject's outcome as the overall calculation sees it. */
 export interface SubjectOutcomeForOverall {
+  /** Course level label (HL, SL...); the IB Diploma total's level conditions read it. */
+  courseLevel?: string | null;
   subjectId: string;
   requirement: SubjectRequirement;
   includeInAverage: boolean;
@@ -272,8 +276,10 @@ export interface SubjectOutcomeForOverall {
  *  - `out_of`      the average rescaled to `max` (out of 20, out of 10, ...).
  *  - `gpa`         the subjects' grade-band GPA points, weighted by the subject coefficients, on a
  *                  `max`-point scale (4 or 5).
+ *  - `points_total` the IB Diploma total: the best counted subjects' points plus core points from
+ *                  the TOK x EE matrix, out of `max` (45). See `diploma.ts`.
  */
-export type ResultFormatKind = "percentage" | "out_of" | "gpa";
+export type ResultFormatKind = "percentage" | "out_of" | "gpa" | "points_total";
 
 export interface ResultFormat {
   format: ResultFormatKind;
@@ -289,6 +295,8 @@ export interface OverallPolicy {
   scale: GradeBand[] | null;
   /** How the final result is shown; a percentage when absent. */
   resultFormat?: ResultFormat;
+  /** The diploma rules of a `points_total` result; the editable IB defaults when absent. */
+  diploma?: DiplomaConfig;
 }
 
 /** The final result in the grade's chosen format. */
@@ -326,6 +334,8 @@ export interface OverallResult {
   failedSubjectIds: string[];
   incompleteSubjectIds: string[];
   academicStatus: AcademicStatus;
+  /** A `points_total` result only: the diploma total, core points and award status. */
+  diploma?: DiplomaResult;
 }
 
 export type ValidationSeverity = "error" | "warning";
