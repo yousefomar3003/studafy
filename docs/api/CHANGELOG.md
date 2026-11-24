@@ -13,6 +13,19 @@ when it required the `version-bump` label.
 
 ### Added
 
+- Subject coordinators (migration 000260; docs/modules/subject-coordinators.md), tag "Academic
+  grading". `listSubjectCoordinators` (`GET /api/grading/years/{yearId}/subject-coordinators`,
+  `academicConfig:read`), `createSubjectCoordinator` (`POST` same path, `SubjectCoordinatorBody`:
+  `subject_id`, `user_id`, `grade_level_ids`), `updateSubjectCoordinator`
+  (`PATCH /api/grading/subject-coordinators/{coordinatorId}`, `SubjectCoordinatorUpdateBody`) and
+  `deleteSubjectCoordinator` (`DELETE` same path), all writes `academicConfig:manage`, returning
+  `SubjectCoordinator` / `SubjectCoordinatorList`; a repeat is 409 `SUBJECT_COORDINATOR_DUPLICATE`,
+  a non-staff user 400. `listMyCoordinatedSubjects` (`GET /api/grading/my-coordinated-subjects`,
+  `academicConfig:read`, query `academic_year_id`) returns `MyCoordinatedSubjects` (subjects,
+  their sections, mark sheet status per period, current and finalized averages). `MarkSheet` adds
+  `access` (`SectionSubjectAccess`: `leadership`, `teacher`, `coordinator`); `getMarkSheet` and
+  `getSectionPredictedGrades` now also answer the subject's coordinator, read-only
+  (`can_edit_marks`, `can_add_assessments` and `editable` false).
 - Class rank and percentile (migration 000257; docs/database/academic-grading.md "Class rank and
   percentile"). New `listTopStudents`
   (`GET /api/grading/years/{yearId}/programs/{gradeLevelId}/top-students`, `result:finalize`;
