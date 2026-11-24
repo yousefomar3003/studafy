@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:studafy_mobile/src/core/localization/app_locales.dart';
 import 'package:studafy_mobile/src/design/theme/app_theme.dart';
+import 'package:studafy_mobile/src/features/student/application/academic_equivalency_providers.dart';
 import 'package:studafy_mobile/src/features/student/application/academic_results_providers.dart';
 import 'package:studafy_mobile/src/features/student/application/exam_entries_providers.dart';
 import 'package:studafy_mobile/src/features/student/application/diploma_providers.dart';
@@ -12,6 +13,7 @@ import 'package:studafy_mobile/src/features/student/application/predicted_grades
 import 'package:studafy_mobile/src/features/student/application/graduation_requirements_providers.dart';
 import 'package:studafy_mobile/src/features/student/application/student_context_providers.dart';
 import 'package:studafy_mobile/src/features/student/application/transcript_providers.dart';
+import 'package:studafy_mobile/src/features/student/data/academic_equivalency_client.dart';
 import 'package:studafy_mobile/src/features/student/data/academic_results_client.dart';
 import 'package:studafy_mobile/src/features/student/data/exam_entries_client.dart';
 import 'package:studafy_mobile/src/features/student/data/diploma_client.dart';
@@ -19,6 +21,7 @@ import 'package:studafy_mobile/src/features/student/data/external_exam_results_c
 import 'package:studafy_mobile/src/features/student/data/graduation_requirements_client.dart';
 import 'package:studafy_mobile/src/features/student/data/predicted_grades_client.dart';
 import 'package:studafy_mobile/src/features/student/data/transcript_client.dart';
+import 'package:studafy_mobile/src/features/student/domain/academic_equivalency.dart';
 import 'package:studafy_mobile/src/features/student/domain/academic_results.dart';
 import 'package:studafy_mobile/src/features/student/domain/exam_entries.dart';
 import 'package:studafy_mobile/src/features/student/domain/diploma_prediction.dart';
@@ -279,9 +282,29 @@ class _FakeGraduationClient implements GraduationRequirementsClient {
       parseGraduationChecklist(body);
 }
 
+/// Tawjihi equivalency and multi-year results as the API sends them (none by default).
+class _FakeEquivalencyClient implements AcademicEquivalencyClient {
+  _FakeEquivalencyClient({
+    this.equivalency = const {'estimates': <Object?>[]},
+    this.multiYear = const {'results': <Object?>[]},
+  });
+
+  final Object? equivalency;
+  final Object? multiYear;
+
+  @override
+  Future<List<EquivalencyEstimate>> fetchEquivalency(String studentId) async =>
+      parseStudentEquivalency(equivalency);
+
+  @override
+  Future<List<MultiYearResult>> fetchMultiYearResults(String studentId) async =>
+      parseStudentMultiYearResults(multiYear);
+}
+
 Future<void> _pump(
   WidgetTester tester,
   _FakeResultsClient client, {
+  AcademicEquivalencyClient? equivalency,
   ExternalExamResultsClient? testScores,
   ExamEntriesClient? examEntries,
   GraduationRequirementsClient? graduation,
@@ -315,6 +338,9 @@ Future<void> _pump(
           ),
           graduationRequirementsClientProvider.overrideWithValue(
             graduation ?? _FakeGraduationClient(),
+          ),
+          academicEquivalencyClientProvider.overrideWithValue(
+            equivalency ?? _FakeEquivalencyClient(),
           ),
           currentStudentIdProvider.overrideWithValue(currentStudentId),
         ],
@@ -1249,5 +1275,51 @@ void main() {
     expect(find.text('ممتاز'), findsOneWidget);
     expect(find.text('ملاحظة المدير'), findsOneWidget);
     expect(find.text('Well done this year.'), findsOneWidget);
+  });
+
+  testWidgets(
+    'shows the equivalency estimate and the multi-year result when shown',
+    (tester) async {
+      await _pump(
+        tester,
+        _FakeResultsClient(),
+        equivalency: _FakeEquivalencyClient(
+          equivalency: {
+            'estimates': [
+              {
+                'set': {'name': 'IGCSE equivalency'},
+                'status': 'estimated',
+                'percentage': 92,
+                'parts': <Object?>[],
+                'issues': <Object?>[],
+              },
+            ],
+          },
+          multiYear: {
+            'results': [
+              {
+                'config': {'name': 'Tawjihi two years'},
+                'status': 'pending',
+                'overall_percentage': null,
+                'years': <Object?>[],
+                'subjects': <Object?>[],
+              },
+            ],
+          },
+        ),
+      );
+      expect(find.text('Tawjihi equivalency (estimate)'), findsOneWidget);
+      expect(find.text('Estimated 92%'), findsOneWidget);
+      expect(find.text('Multi-year result'), findsOneWidget);
+      expect(find.text('Tawjihi two years'), findsOneWidget);
+    },
+  );
+
+  testWidgets('shows no equivalency or multi-year block by default', (
+    tester,
+  ) async {
+    await _pump(tester, _FakeResultsClient());
+    expect(find.text('Tawjihi equivalency (estimate)'), findsNothing);
+    expect(find.text('Multi-year result'), findsNothing);
   });
 }

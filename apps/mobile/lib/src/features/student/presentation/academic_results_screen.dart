@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../design/layout/bottom_inset_padding.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
+import '../application/academic_equivalency_providers.dart';
 import '../application/academic_results_providers.dart';
 import '../application/exam_entries_providers.dart';
 import '../application/diploma_providers.dart';
@@ -17,7 +18,9 @@ import 'certificate_detail_screen.dart';
 import 'widgets/academic_result_widgets.dart';
 import 'widgets/exam_entries_section.dart';
 import 'widgets/diploma_widgets.dart';
+import 'widgets/equivalency_section.dart';
 import 'widgets/graduation_requirements_section.dart';
+import 'widgets/multi_year_section.dart';
 import 'widgets/test_scores_section.dart';
 import 'widgets/predicted_grades_section.dart';
 import 'widgets/transcripts_section.dart';
@@ -27,7 +30,8 @@ import 'widgets/transcripts_section.dart';
 /// table — followed by their certificates and report cards, each opening
 /// [CertificateDetailScreen], their transcripts, their exam entries (shown only when they have
 /// some), their test scores (external exams) and, when the school shows them, their graduation
-/// requirements.
+/// requirements, their estimated Tawjihi equivalency (an estimate the school confirms, not an
+/// official conversion) and their multi-year result.
 ///
 /// Shared by both audiences: the student opens it with no [studentId] (resolved from
 /// `currentStudentIdProvider`, i.e. `GET /api/students/me`); a parent opens it for the child
@@ -90,7 +94,9 @@ class _ResultsBody extends ConsumerWidget {
           ..invalidate(studentExternalExamResultsProvider(studentId))
           ..invalidate(studentPredictedGradesProvider(studentId))
           ..invalidate(studentDiplomaPredictionProvider(studentId))
-          ..invalidate(studentGraduationChecklistProvider(studentId));
+          ..invalidate(studentGraduationChecklistProvider(studentId))
+          ..invalidate(studentEquivalencyProvider(studentId))
+          ..invalidate(studentMultiYearResultsProvider(studentId));
         await ref.read(studentResultsProvider(studentId).future);
       },
       child: results.when(
@@ -165,6 +171,8 @@ class _ResultsBody extends ConsumerWidget {
               ExamEntriesSection(studentId: studentId),
               TestScoresSection(studentId: studentId),
               GraduationRequirementsSection(studentId: studentId),
+              EquivalencySection(studentId: studentId),
+              MultiYearSection(studentId: studentId),
             ],
           );
         },
