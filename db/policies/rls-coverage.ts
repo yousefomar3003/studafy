@@ -197,7 +197,17 @@ approved_flexible_columns(table_name, column_name) AS (
     -- ordered list -- a CHECK holds it to 1..50 non-null entries -- read whole with the component
     -- and never joined or filtered on; the order is the payload, so a child table would add an
     -- ordinal column to store what the array already guarantees.
-    ('external_exam_components', 'allowed_labels')
+    ('external_exam_components', 'allowed_labels'),
+    -- 000262: a points_total grade's IB Diploma rules -- counted subjects, the 25-cell TOK x EE
+    -- matrix and the award conditions -- validated whole by the API through the grading engine
+    -- (a CHECK holds it to an object, and to NULL for other formats), read with the program and
+    -- never joined or filtered on. Edited as one unit; a child table per cell and rule would only
+    -- scatter one setting.
+    ('grade_programs', 'diploma_config'),
+    -- 000262: the diploma outcome as finalized (total, points, TOK/EE/CAS used, failing
+    -- conditions), a write-once snapshot like the subject breakdown (ADR-017); the total itself
+    -- stays in the normalized result_value column.
+    ('student_overall_results', 'diploma_result')
 ),
 relations AS (
   SELECT
