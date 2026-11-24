@@ -358,6 +358,13 @@ subject in a year, optionally for some grade levels. A coordinator reads every c
 marks, predicted grades and subject results, read-only, through `app.coordinates_section_subject`
 and its siblings; see [`docs/modules/subject-coordinators.md`](../modules/subject-coordinators.md).
 
+### Remedial plans (000268)
+
+`app.remedial_plans` (+ `app.remedial_plan_reviews`, `app.remedial_plan_notes`, and the reserved
+`app.remedial_plan_outcomes`) holds plans for struggling students per student, subject and term or
+year. Nothing above reads them; suggestions reuse the engine's current percentage. See
+[`docs/modules/remedial-plans.md`](../modules/remedial-plans.md).
+
 ## Policy decisions left to each school
 
 Configured, not hard-coded: weights, structures, number of assessments, pass marks, final-exam rule,

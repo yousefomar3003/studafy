@@ -223,5 +223,5 @@ services (J and K both touch certificates, report cards and transcripts), i18n f
 - [ ] Integration of batch 1
 - [ ] WS-N Tawjihi equivalency + multi-year results
 - [ ] WS-O lesson and term plans + learning outcomes
-- [ ] WS-P remedial plans
+- [x] WS-P remedial plans (`feat/academic-remedial-plans`, migration 000268; `docs/modules/remedial-plans.md`)
 - [ ] Integration of batch 2, then dev → stage
