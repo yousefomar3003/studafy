@@ -5,17 +5,20 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:studafy_mobile/src/core/localization/app_locales.dart';
 import 'package:studafy_mobile/src/design/theme/app_theme.dart';
 import 'package:studafy_mobile/src/features/student/application/academic_results_providers.dart';
+import 'package:studafy_mobile/src/features/student/application/exam_entries_providers.dart';
 import 'package:studafy_mobile/src/features/student/application/external_exam_results_providers.dart';
 import 'package:studafy_mobile/src/features/student/application/predicted_grades_providers.dart';
 import 'package:studafy_mobile/src/features/student/application/graduation_requirements_providers.dart';
 import 'package:studafy_mobile/src/features/student/application/student_context_providers.dart';
 import 'package:studafy_mobile/src/features/student/application/transcript_providers.dart';
 import 'package:studafy_mobile/src/features/student/data/academic_results_client.dart';
+import 'package:studafy_mobile/src/features/student/data/exam_entries_client.dart';
 import 'package:studafy_mobile/src/features/student/data/external_exam_results_client.dart';
 import 'package:studafy_mobile/src/features/student/data/graduation_requirements_client.dart';
 import 'package:studafy_mobile/src/features/student/data/predicted_grades_client.dart';
 import 'package:studafy_mobile/src/features/student/data/transcript_client.dart';
 import 'package:studafy_mobile/src/features/student/domain/academic_results.dart';
+import 'package:studafy_mobile/src/features/student/domain/exam_entries.dart';
 import 'package:studafy_mobile/src/features/student/domain/external_exam_results.dart';
 import 'package:studafy_mobile/src/features/student/domain/graduation_requirements.dart';
 import 'package:studafy_mobile/src/features/student/domain/predicted_grades.dart';
@@ -226,6 +229,20 @@ class _FakeTestScoresClient implements ExternalExamResultsClient {
       parseExternalExamResults(body);
 }
 
+/// Exam entries as the API sends them (parsed with the app's own parser).
+class _FakeExamEntriesClient implements ExamEntriesClient {
+  _FakeExamEntriesClient([this.body = const {'entries': <Object?>[]}]);
+
+  final Object? body;
+  final List<String> requestedStudents = [];
+
+  @override
+  Future<List<StudentExamEntry>> fetchEntries(String studentId) async {
+    requestedStudents.add(studentId);
+    return parseStudentExamEntries(body);
+  }
+}
+
 /// Predicted grades as the API hands them to a student or parent (no notes).
 class _FakePredictedClient implements StudentPredictedGradesClient {
   _FakePredictedClient([this.json]);
@@ -252,6 +269,7 @@ Future<void> _pump(
   WidgetTester tester,
   _FakeResultsClient client, {
   ExternalExamResultsClient? testScores,
+  ExamEntriesClient? examEntries,
   GraduationRequirementsClient? graduation,
   Widget home = const AcademicResultsScreen(),
   String? currentStudentId = 'st-1',
@@ -270,6 +288,9 @@ Future<void> _pump(
           transcriptClientProvider.overrideWithValue(_NoTranscriptsClient()),
           externalExamResultsClientProvider.overrideWithValue(
             testScores ?? _FakeTestScoresClient(),
+          ),
+          examEntriesClientProvider.overrideWithValue(
+            examEntries ?? _FakeExamEntriesClient(),
           ),
           studentPredictedGradesClientProvider.overrideWithValue(
             predicted ?? _FakePredictedClient(),
@@ -360,6 +381,121 @@ void main() {
     // Read-only: nothing to add, edit or delete.
     expect(find.byIcon(Icons.edit_outlined), findsNothing);
     expect(find.byIcon(Icons.delete_outline), findsNothing);
+  });
+
+  final entries = {
+    'entries': [
+      {
+        'id': 'entry-igcse',
+        'exam': {'id': 'e-igcse', 'code': 'IGCSE', 'name': 'IGCSE (A*-G)'},
+        'session': {
+          'id': 'session-1',
+          'series': 'May/June 2027',
+          'entry_deadline': '2027-02-21',
+          'starts_on': '2027-04-27',
+          'ends_on': '2027-06-10',
+          'results_date': '2027-08-12',
+        },
+        'candidate_number': 'JO-0001',
+        'status': 'entered',
+        'subjects': [
+          {
+            'subject': {'id': 's-1', 'code': 'MAT', 'name': 'Mathematics'},
+            'tier': 'Extended',
+            'option_code': '0580',
+          },
+          {
+            'subject': {'id': 's-2', 'code': 'PHY', 'name': 'Physics'},
+            'tier': null,
+          },
+          // A subject the API could not name still shows, generically.
+          {'subject': null, 'tier': 'Core'},
+        ],
+        'entered_at': '2026-10-01T00:00:00.000Z',
+        'withdrawn_at': null,
+      },
+      {
+        'id': 'entry-ielts',
+        'exam': {'id': 'e-ielts', 'name': 'IELTS Academic'},
+        'session': {'id': 'session-2', 'series': 'April 2027'},
+        'candidate_number': null,
+        'status': 'withdrawn',
+        'subjects': <Object?>[],
+      },
+      {
+        'id': 'entry-future',
+        'exam': {'id': 'e-sat', 'name': 'SAT'},
+        'session': {'id': 'session-3', 'series': 'June 2027'},
+        // A status a newer API might send.
+        'status': 'confirmed_by_board',
+        'future_field': {'x': 1},
+      },
+      // Malformed rows are skipped, not fatal.
+      {'exam': 'not a map'},
+      'not a row',
+    ],
+  };
+
+  testWidgets('lists exam entries read-only: subjects, candidate number, dates', (
+    tester,
+  ) async {
+    final client = _FakeExamEntriesClient(entries);
+    await _pump(tester, _FakeResultsClient(), examEntries: client);
+
+    expect(client.requestedStudents, ['st-1']);
+    expect(find.text('Exam entries'), findsOneWidget);
+    expect(find.text('IGCSE (A*-G) — May/June 2027'), findsOneWidget);
+    expect(find.text('Candidate number: JO-0001'), findsOneWidget);
+    expect(find.text('Exams Apr 27, 2027 – Jun 10, 2027'), findsOneWidget);
+    expect(find.text('Results on Aug 12, 2027'), findsOneWidget);
+    expect(find.text('Mathematics · Extended · 0580'), findsOneWidget);
+    expect(find.text('Physics'), findsOneWidget);
+    expect(find.text('Subject · Core'), findsOneWidget);
+    expect(find.text('Entered'), findsOneWidget);
+    // A withdrawn entry, with no number yet; an unknown status reads neutrally.
+    expect(find.text('IELTS Academic — April 2027'), findsOneWidget);
+    expect(find.text('Withdrawn'), findsOneWidget);
+    expect(find.text('Candidate number: not set yet'), findsNWidgets(2));
+    expect(find.text('SAT — June 2027'), findsOneWidget);
+    expect(find.text('Entry'), findsOneWidget);
+    // Read-only.
+    expect(find.byIcon(Icons.edit_outlined), findsNothing);
+  });
+
+  testWidgets("a parent sees their child's exam entries", (tester) async {
+    final client = _FakeExamEntriesClient(entries);
+    await _pump(
+      tester,
+      _FakeResultsClient(),
+      examEntries: client,
+      currentStudentId: null,
+      home: const AcademicResultsScreen(
+        studentId: 'child-1',
+        studentName: 'Lina',
+      ),
+    );
+    expect(client.requestedStudents, ['child-1']);
+    expect(find.text('IGCSE (A*-G) — May/June 2027'), findsOneWidget);
+  });
+
+  testWidgets('exam entries render in Arabic', (tester) async {
+    await _pump(
+      tester,
+      _FakeResultsClient(),
+      examEntries: _FakeExamEntriesClient(entries),
+      locale: const Locale('ar'),
+    );
+    expect(find.text('تسجيل الامتحانات'), findsOneWidget);
+    expect(find.text('رقم الجلوس: JO-0001'), findsOneWidget);
+    expect(find.text('مسجّل'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('shows no exam entries section when the student has none', (
+    tester,
+  ) async {
+    await _pump(tester, _FakeResultsClient());
+    expect(find.text('Exam entries'), findsNothing);
   });
 
   testWidgets('says so when there are no test scores', (tester) async {
