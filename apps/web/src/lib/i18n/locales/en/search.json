@@ -330,6 +330,11 @@
       "where": "Principal › Academic setup › Graduation requirements",
       "keywords": "graduation requirements, diploma, credits, credit hours, gpa, on track, not on track, required subjects, graduation checklist"
     },
+    "academic-remedial-plans": {
+      "title": "Remedial plans",
+      "where": "Principal › Academic setup › Remedial plans",
+      "keywords": "remedial plans, struggling students, support plans, below pass, failing, intervention, catch up, overdue reviews, follow up"
+    },
     "academic-approvals": {
       "title": "Mark sheet approvals",
       "where": "Principal › Academic setup › Approvals",
