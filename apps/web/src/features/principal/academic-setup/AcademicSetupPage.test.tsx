@@ -444,6 +444,76 @@ const IELTS_EXAM = {
   updated_at: "2026-09-01T00:00:00.000Z",
 };
 
+const IGCSE_SESSION = {
+  id: "session-igcse",
+  exam: {
+    id: "exam-igcse",
+    code: "IGCSE",
+    name: "IGCSE (A*-G)",
+    per_subject: true,
+    archived: false,
+  },
+  series: "May/June 2027",
+  entry_deadline: "2027-02-21",
+  starts_on: "2027-04-27",
+  ends_on: "2027-06-10",
+  results_date: "2027-08-12",
+  note: null,
+  draft_count: 1,
+  entered_count: 1,
+  withdrawn_count: 0,
+  created_at: "2026-09-01T00:00:00.000Z",
+  updated_at: "2026-09-01T00:00:00.000Z",
+};
+
+const examEntry = (id: string, first: string, status: string, candidate: string | null) => ({
+  id,
+  session_id: "session-igcse",
+  student: {
+    id: `stu-${first.toLowerCase()}`,
+    admission_number: `A-${first}`,
+    first_name: first,
+    last_name: "Haddad",
+    grade_level_name: "Grade 10",
+    section_name: "C",
+  },
+  candidate_number: candidate,
+  status,
+  note: null,
+  subjects: [
+    {
+      subject_id: "sub-math",
+      code: "IG-MATH",
+      name: "IGCSE Mathematics",
+      tier: "Extended",
+      option_code: "0580",
+    },
+  ],
+  result_count: 0,
+  entered_at: status === "draft" ? null : "2026-10-01T00:00:00.000Z",
+  withdrawn_at: null,
+  created_at: "2026-09-01T00:00:00.000Z",
+  updated_at: "2026-09-01T00:00:00.000Z",
+});
+
+const SESSION_ENTRIES = {
+  session: IGCSE_SESSION,
+  entries: [
+    examEntry("entry-lina", "Lina", "entered", "JO-0001"),
+    examEntry("entry-sami", "Sami", "draft", null),
+  ],
+  subject_counts: [
+    {
+      subject_id: "sub-math",
+      code: "IG-MATH",
+      name: "IGCSE Mathematics",
+      draft: 1,
+      entered: 1,
+      withdrawn: 0,
+    },
+  ],
+};
+
 const EXTERNAL_EXAM_PRESETS = [
   {
     key: "tawjihi",
@@ -540,6 +610,8 @@ const GET_RESPONSES: Record<string, unknown> = {
   "/api/grading/graduation-requirements/report": GRADUATION_REPORT,
   "/api/grading/external-exams": { exams: [IELTS_EXAM] },
   "/api/grading/external-exam-presets": { presets: EXTERNAL_EXAM_PRESETS },
+  "/api/grading/external-exam-sessions": { sessions: [IGCSE_SESSION] },
+  "/api/grading/external-exam-sessions/{sessionId}/entries": SESSION_ENTRIES,
   "/api/grading/report-card-settings": REPORT_SETTINGS,
   "/api/grading/sections/{sectionId}/report-notes": REPORT_NOTES,
   "/api/grading/certificates/{certificateId}": CERTIFICATE,
@@ -1290,6 +1362,106 @@ describe("AcademicSetupPage", () => {
     expect((within(listening).getByLabelText(/Part name/) as HTMLInputElement).disabled).toBe(
       false,
     );
+  });
+
+  test("adds an exam session with its series and dates", async () => {
+    await renderAt("/exam-entries");
+    expect(await screen.findByText("May/June 2027")).toBeTruthy();
+    expect(screen.getByText("1 entered · 1 draft · 0 withdrawn")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Add a session" }));
+    fireEvent.click(await screen.findByRole("combobox", { name: /^Exam/ }));
+    fireEvent.click(await screen.findByRole("option", { name: "IELTS Academic" }));
+    fireEvent.change(screen.getByLabelText(/^Series/), { target: { value: "April 2027" } });
+    fireEvent.change(screen.getByLabelText("First exam"), { target: { value: "2027-04-03" } });
+    fireEvent.change(screen.getByLabelText("Last exam"), { target: { value: "2027-04-01" } });
+    // The last exam cannot come before the first.
+    expect(
+      await screen.findByText("Give the first exam date, on or before the last one."),
+    ).toBeTruthy();
+    expect(
+      (screen.getByRole("button", { name: "Save session" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+    fireEvent.change(screen.getByLabelText("Last exam"), { target: { value: "2027-04-10" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save session" }));
+    await waitFor(() => expect(postMock).toHaveBeenCalledTimes(1));
+    const [path, init] = postMock.mock.calls[0] as [string, { body: unknown }];
+    expect(path).toBe("/api/grading/external-exam-sessions");
+    expect(init.body).toEqual({
+      exam_id: "exam-ielts",
+      series: "April 2027",
+      entry_deadline: null,
+      starts_on: "2027-04-03",
+      ends_on: "2027-04-10",
+      results_date: null,
+      note: null,
+    });
+  });
+
+  test("opens a session: subject counts, entering a section, and marking drafts entered", async () => {
+    RESPONSES_BY_PATH.set("/api/academics/subjects", {
+      subjects: [{ id: "sub-math", code: "IG-MATH", name: "IGCSE Mathematics", ...STAMP }],
+      total: 1,
+    });
+    try {
+      const { container } = await renderAt("/exam-entries");
+      fireEvent.click(
+        await screen.findByRole("button", { name: "Open IGCSE (A*-G) — May/June 2027" }),
+      );
+      expect(
+        await screen.findByRole("heading", { name: "IGCSE (A*-G) — May/June 2027" }),
+      ).toBeTruthy();
+      const counts = screen.getByRole("table", { name: "Students per subject" });
+      expect(within(counts).getByText("IGCSE Mathematics")).toBeTruthy();
+      expect(rowOf("Lina Haddad").textContent).toContain("JO-0001");
+      expect(rowOf("Lina Haddad").textContent).toContain("IGCSE Mathematics · Extended · 0580");
+      await expectNoA11yViolations(container);
+
+      // Enter section C for Mathematics, Core tier.
+      fireEvent.click(screen.getByRole("combobox", { name: "Section" }));
+      fireEvent.click(await screen.findByRole("option", { name: "Grade 10 – C" }));
+      fireEvent.click(await screen.findByLabelText("IGCSE Mathematics"));
+      fireEvent.change(screen.getByLabelText(/^Tier for IGCSE Mathematics/), {
+        target: { value: "Core" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Enter students" }));
+      await waitFor(() => expect(postMock).toHaveBeenCalledTimes(1));
+      expect(postMock.mock.calls[0]).toEqual([
+        "/api/grading/external-exam-sessions/{sessionId}/entries",
+        {
+          params: { path: { sessionId: "session-igcse" } },
+          body: {
+            section_id: "sec-10c",
+            subjects: [{ subject_id: "sub-math", tier: "Core", option_code: null }],
+            status: "draft",
+          },
+        },
+      ]);
+
+      // Only the selected draft is marked entered; withdrawing needs an entered one.
+      fireEvent.click(screen.getByRole("checkbox", { name: "Select Sami Haddad" }));
+      expect(
+        (screen.getByRole("button", { name: "Withdraw (0)" }) as HTMLButtonElement).disabled,
+      ).toBe(true);
+      fireEvent.click(screen.getByRole("button", { name: "Mark entered (1)" }));
+      await waitFor(() => expect(postMock).toHaveBeenCalledTimes(2));
+      expect(postMock.mock.calls[1]).toEqual([
+        "/api/grading/external-exam-sessions/{sessionId}/entries/status",
+        {
+          params: { path: { sessionId: "session-igcse" } },
+          body: { entry_ids: ["entry-sami"], status: "entered" },
+        },
+      ]);
+      // Only a draft can be deleted.
+      expect(
+        screen.queryByRole("button", { name: "Delete the draft entry of Lina Haddad" }),
+      ).toBeNull();
+      expect(
+        screen.getByRole("button", { name: "Delete the draft entry of Sami Haddad" }),
+      ).toBeTruthy();
+    } finally {
+      RESPONSES_BY_PATH.set("/api/academics/subjects", { subjects: [], total: 0 });
+    }
   });
 
   test("has no accessibility violations on the report cards screen", async () => {

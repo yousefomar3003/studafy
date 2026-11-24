@@ -10,6 +10,7 @@ import { ApprovalsTab } from "./ApprovalsTab";
 import { CertificateView } from "./CertificateView";
 import { YearStatusBadge } from "./components";
 import { SETUP_BASE } from "./context";
+import { ExamEntriesTab } from "./ExamEntriesTab";
 import { ExternalExamsTab } from "./ExternalExamsTab";
 import { GraduationRequirementsTab } from "./GraduationRequirementsTab";
 import { OverviewTab } from "./OverviewTab";
@@ -38,6 +39,7 @@ const TABS: readonly TabDef[] = [
   { path: "sections", key: "sections", show: () => true },
   { path: "scales", key: "scales", show: () => true },
   { path: "external-exams", key: "externalExams", show: () => true },
+  { path: "exam-entries", key: "examEntries", show: (ctx) => ctx.can.manage },
   { path: "graduation-requirements", key: "graduation", show: () => true },
   { path: "approvals", key: "approvals", show: (ctx) => ctx.can.review },
   { path: "results", key: "results", show: (ctx) => ctx.can.finalize || ctx.can.certify },
@@ -59,6 +61,8 @@ const TABS: readonly TabDef[] = [
  * - sections — what each section inherits, overrides or excludes, its teachers and electives;
  * - scales — the year's grading scales;
  * - external exams — the school's SAT, IELTS, IGCSE finals... (not tied to the year);
+ * - exam entries — sessions of those exams and the students entered for them: candidate numbers,
+ *   withdrawals and the list for the exam board (leadership);
  * - graduation requirements — the credits, subjects, GPA and exams a diploma needs, a check
  *   against a student and the students of a grade not on track (not tied to the year);
  * - approvals — submitted mark sheets and teacher-proposed assessments;
@@ -161,6 +165,9 @@ export default function AcademicSetupPage() {
           <Route path="sections" element={<SectionsTab ctx={ctx} />} />
           <Route path="scales" element={<ScalesTab ctx={ctx} />} />
           <Route path="external-exams" element={<ExternalExamsTab ctx={ctx} />} />
+          {ctx.can.manage ? (
+            <Route path="exam-entries" element={<ExamEntriesTab ctx={ctx} />} />
+          ) : null}
           <Route path="graduation-requirements" element={<GraduationRequirementsTab ctx={ctx} />} />
           {ctx.can.review ? <Route path="approvals" element={<ApprovalsTab ctx={ctx} />} /> : null}
           {ctx.can.finalize || ctx.can.certify ? (

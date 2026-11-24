@@ -7,6 +7,7 @@ import { usePermissions } from "../../../lib/auth";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 import { ConfirmModal, Num, TextArea } from "../academic-setup/components";
 import { problemMessage } from "../academic-setup/errors";
+import { useStudentExamEntries } from "../academic-setup/exam-entries";
 import {
   useDeleteExternalExamResult,
   useExternalExams,
@@ -215,7 +216,9 @@ function ResultForm({
   const exams = useExternalExams(result !== null);
   const subjects = useSubjects();
   const save = useSaveExternalExamResult(studentId);
+  const examEntries = useStudentExamEntries(studentId);
   const [examId, setExamId] = useState<string | undefined>(result?.exam.id);
+  const [entryId, setEntryId] = useState(result?.entry_id ?? "");
   const [subjectId, setSubjectId] = useState<string | undefined>(result?.subject?.id);
   const [satOn, setSatOn] = useState(result?.sat_on ?? "");
   const [note, setNote] = useState(result?.note ?? "");
@@ -228,6 +231,14 @@ function ResultForm({
     ),
   );
   const exam = exams.data?.find((candidate) => candidate.id === examId);
+  // The student's entries for this exam (and subject) a result can be recorded from.
+  const linkable = (examEntries.data ?? []).filter(
+    (entry) =>
+      entry.exam.id === examId &&
+      (!subjectId ||
+        entry.subjects.length === 0 ||
+        entry.subjects.some((subject) => subject.subject?.id === subjectId)),
+  );
 
   const problems = useMemo(() => {
     const found: Record<string, string> = {};
@@ -255,6 +266,7 @@ function ResultForm({
     if (!exam || incomplete) return;
     const body = {
       subject_id: exam.per_subject ? (subjectId ?? null) : null,
+      entry_id: entryId === "" ? null : entryId,
       sat_on: satOn,
       note: note.trim() === "" ? null : note.trim(),
       scores: entered.map((component) => {
@@ -315,6 +327,7 @@ function ResultForm({
               disabled={result !== null || exams.isPending}
               onChange={(id) => {
                 setExamId(id);
+                setEntryId("");
                 setScores({});
               }}
             />
@@ -329,6 +342,23 @@ function ResultForm({
                 value={subjectId}
                 required
                 onChange={setSubjectId}
+              />
+            ) : null}
+            {linkable.length > 0 || entryId !== "" ? (
+              <Select
+                label={t("academicGrading.testScores.entry")}
+                options={[
+                  { value: "", label: t("academicGrading.testScores.noEntry") },
+                  ...linkable.map((entry) => ({
+                    value: entry.id,
+                    label: t("academicGrading.testScores.entryOption", {
+                      series: entry.session.series,
+                      number: entry.candidate_number ?? "—",
+                    }),
+                  })),
+                ]}
+                value={entryId}
+                onChange={setEntryId}
               />
             ) : null}
             <Input

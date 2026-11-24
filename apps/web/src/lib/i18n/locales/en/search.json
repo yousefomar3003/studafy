@@ -325,6 +325,11 @@
       "where": "Principal › Academic setup › External exams",
       "keywords": "external exams, test scores, sat, act, ap, ielts, toefl, igcse, a level, ib diploma, tawjihi, thanaweya amma, state test, national exams"
     },
+    "academic-exam-entries": {
+      "title": "Exam entries",
+      "where": "Principal › Academic setup › Exam entries",
+      "keywords": "exam entries, enter students, exam board, candidate numbers, entry list, withdraw, igcse entries, a level entries, exam session, entry deadline"
+    },
     "academic-graduation": {
       "title": "Graduation requirements",
       "where": "Principal › Academic setup › Graduation requirements",
