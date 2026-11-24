@@ -41,6 +41,13 @@ export {
   validateDescriptiveConfig,
 } from "./descriptive";
 export {
+  EXAM_ENTRY_LIMITS,
+  EXAM_ENTRY_STATUSES,
+  canChangeExamEntryStatus,
+  nextCandidateNumbers,
+} from "./exam-entries";
+export type { CandidateNumberPlan, ExamEntryStatus } from "./exam-entries";
+export {
   EXTERNAL_EXAM_LIMITS,
   EXTERNAL_EXAM_PRESETS,
   EXTERNAL_EXAM_PRESET_KEYS,
