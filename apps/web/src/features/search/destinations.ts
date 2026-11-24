@@ -283,6 +283,10 @@ export const SEARCH_DESTINATIONS: readonly SearchDestination[] = [
     variantOf: "build-timetable",
   }),
   entry("principal-classes", "page", "/portal/principal/classes", PRINCIPAL),
+  entry("exam-weeks", "page", "/portal/principal/exam-weeks", {
+    requiredPermission: P.TIMETABLE_MANAGE,
+    ...SCHOOL,
+  }),
   entry("grades-sections", "page", "/portal/principal/sections", {
     requiredPermission: P.TIMETABLE_MANAGE,
     ...SCHOOL,
