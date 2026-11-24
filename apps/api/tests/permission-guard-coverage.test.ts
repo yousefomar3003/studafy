@@ -181,6 +181,13 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/grading/graduation-requirement-sets",
   "PUT /api/grading/graduation-requirement-sets/{setId}",
   "DELETE /api/grading/graduation-requirement-sets/{setId}",
+  // Ministry results export (000264): templates behind academicConfig:manage, previews and
+  // downloads behind result:finalize.
+  "POST /api/grading/ministry-export-templates",
+  "PUT /api/grading/ministry-export-templates/{templateId}",
+  "DELETE /api/grading/ministry-export-templates/{templateId}",
+  "POST /api/grading/ministry-exports/preview",
+  "POST /api/grading/ministry-exports/download",
   // Transcripts (000207): issue, reissue and revoke behind academicCertificate:issue.
   "POST /api/grading/students/{studentId}/transcripts",
   "POST /api/grading/transcripts/{transcriptId}/reissue",

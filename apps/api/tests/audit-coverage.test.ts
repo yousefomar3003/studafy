@@ -264,6 +264,14 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/grading/graduation-requirement-sets",
   "PUT /api/grading/graduation-requirement-sets/{setId}",
   "DELETE /api/grading/graduation-requirement-sets/{setId}",
+  // Ministry results export (000264): template writes record old and new values in the service; a
+  // download records an export (and a reveal when sensitive national IDs are opened). The preview
+  // writes nothing and declares what its download audits.
+  "POST /api/grading/ministry-export-templates",
+  "PUT /api/grading/ministry-export-templates/{templateId}",
+  "DELETE /api/grading/ministry-export-templates/{templateId}",
+  "POST /api/grading/ministry-exports/preview",
+  "POST /api/grading/ministry-exports/download",
   // Timetable (ST-101). Version lifecycle + slot CRUD with conflict detection.
   "POST /api/academics/timetable-versions",
   "PATCH /api/academics/timetable-versions/{versionId}",

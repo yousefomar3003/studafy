@@ -330,6 +330,17 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "linked parents when the set is shown to them.",
     },
     {
+      name: "Ministry export",
+      description:
+        "Ministry results export: a school's templates (target, CSV or XLSX, UTF-8 with or " +
+        "without a byte-order mark, per-subject or overall rows, ordered columns mapped to known " +
+        "fields with optional value maps, the ministry's subject codes) and running one over the " +
+        "finalized results of a year and term, with a preview and a validation report. " +
+        "Leadership only: templates behind academicConfig:manage, exports behind result:finalize. " +
+        "A sensitive national ID is masked in previews and opened for a download only with " +
+        "studentRecord:readSensitive, audited.",
+    },
+    {
       name: "Gradebook Configuration",
       description:
         "Gradebook configuration endpoints. Authenticated and tenant-scoped. " +

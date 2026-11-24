@@ -166,6 +166,7 @@ import {
 } from "./modules/licensing";
 import { uploadConsistencyRoutes } from "./modules/licensing/upload-consistency-routes";
 import { messagingRoutes } from "./modules/messaging";
+import { ministryExportRoutes } from "./modules/ministry-export";
 import { mobileConfigRoutes, EMPTY_MOBILE_RELEASE_CONFIG } from "./modules/mobile";
 import { notificationRoutes, notificationPreferencesRoutes } from "./modules/notifications";
 import { platformGrantRoutes, platformRoutes, platformUserSupportRoutes } from "./modules/platform";
@@ -1218,6 +1219,9 @@ export function createApp({
     app.route("/", gradingCurriculumTemplateRoutes(database));
     // Graduation requirements: the credits, subjects, GPA and exams a diploma needs (000258).
     app.route("/", graduationRequirementRoutes(database));
+    // Ministry results export: configurable templates over finalized results (000264).
+    // `recordKeyring` opens a sensitive national ID for a download (ADR-019).
+    app.route("/", ministryExportRoutes(database, recordKeyring));
   }
 
   // Gradebook configuration (ST-112). Weighted assessment categories per gradebook and
