@@ -13,6 +13,23 @@ when it required the `version-bump` label.
 
 ### Added
 
+- Ministry results export (migration 000264; docs/modules/ministry-export.md), tag "Ministry
+  export", leadership from web sessions only. Templates: `listMinistryExportTemplates`
+  (`GET /api/grading/ministry-export-templates`), `createMinistryExportTemplate` (`POST`),
+  `updateMinistryExportTemplate` (`PUT .../{templateId}`) and `deleteMinistryExportTemplate`
+  (`DELETE .../{templateId}`), with `MinistryExportTemplate` / `MinistryExportTemplateInput`
+  (`MinistryExportFileFormat` `csv`/`xlsx`, `MinistryExportEncoding` `utf8`/`utf8_bom`,
+  `MinistryExportRowKind` `subject`/`overall`, ordered `MinistryExportColumn`s of a
+  `MinistryExportField` with optional value maps, subject codes, the national ID's student record
+  field), and `listMinistryExportExamples` (`GET /api/grading/ministry-export-examples`, editable
+  examples, not official formats), all `academicConfig:manage`. Exports, `result:finalize`:
+  `previewMinistryExport` (`POST /api/grading/ministry-exports/preview`, `MinistryExportPreview`:
+  heading, first rows, counts and `MinistryExportIssue`s — `national_id_source_missing`,
+  `missing_national_id`, `unmapped_subject`, `section_not_finalized`) and `downloadMinistryExport`
+  (`POST .../download`, `text/csv` or XLSX), both over finalized results of a year and a term or
+  the annual results (`MinistryExportRunInput`). A sensitive national ID is masked in the preview
+  and opened for the download only with `studentRecord:readSensitive` (403; 503
+  `RECORD_KEY_UNAVAILABLE`), audited as a reveal.
 - Class rank and percentile (migration 000257; docs/database/academic-grading.md "Class rank and
   percentile"). New `listTopStudents`
   (`GET /api/grading/years/{yearId}/programs/{gradeLevelId}/top-students`, `result:finalize`;

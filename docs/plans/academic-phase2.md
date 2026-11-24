@@ -218,7 +218,7 @@ services (J and K both touch certificates, report cards and transcripts), i18n f
 - [ ] WS-I exam entries
 - [ ] WS-J IB Diploma total
 - [ ] WS-K Arabic + English documents
-- [ ] WS-L ministry results export
+- [x] WS-L ministry results export (`feat/academic-ministry-export`, migration 000264; `docs/modules/ministry-export.md`)
 - [ ] WS-M exam weeks
 - [ ] Integration of batch 1
 - [ ] WS-N Tawjihi equivalency + multi-year results
