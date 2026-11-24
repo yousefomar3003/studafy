@@ -330,6 +330,16 @@
       "where": "Principal › Academic setup › Graduation requirements",
       "keywords": "graduation requirements, diploma, credits, credit hours, gpa, on track, not on track, required subjects, graduation checklist"
     },
+    "academic-outcomes": {
+      "title": "Learning outcomes",
+      "where": "Principal › Academic setup › Learning outcomes",
+      "keywords": "learning outcomes, outcomes, standards, curriculum outcomes, achievement scale, achievement levels, import outcomes, csv, strands, outcome achievement on report cards"
+    },
+    "academic-plans": {
+      "title": "Lesson plans",
+      "where": "Principal › Academic setup › Lesson plans",
+      "keywords": "lesson plans, term plans, unit plans, weekly plans, plan review, approve plans, return plans, plan coverage, submitted on time, outcomes covered"
+    },
     "academic-approvals": {
       "title": "Mark sheet approvals",
       "where": "Principal › Academic setup › Approvals",

@@ -13,7 +13,9 @@ import { SETUP_BASE } from "./context";
 import { CoordinatorsTab } from "./CoordinatorsTab";
 import { ExternalExamsTab } from "./ExternalExamsTab";
 import { GraduationRequirementsTab } from "./GraduationRequirementsTab";
+import { LearningOutcomesTab } from "./LearningOutcomesTab";
 import { OverviewTab } from "./OverviewTab";
+import { PlansTab } from "./PlansTab";
 import { useGradingOverview } from "./queries";
 import { ReportCardsTab } from "./ReportCardsTab";
 import { ResultsTab } from "./ResultsTab";
@@ -41,6 +43,8 @@ const TABS: readonly TabDef[] = [
   { path: "external-exams", key: "externalExams", show: () => true },
   { path: "graduation-requirements", key: "graduation", show: () => true },
   { path: "coordinators", key: "coordinators", show: () => true },
+  { path: "learning-outcomes", key: "outcomes", show: () => true },
+  { path: "plans", key: "plans", show: () => true },
   { path: "approvals", key: "approvals", show: (ctx) => ctx.can.review },
   { path: "results", key: "results", show: (ctx) => ctx.can.finalize || ctx.can.certify },
   { path: "top-students", key: "topStudents", show: (ctx) => ctx.can.finalize },
@@ -64,6 +68,8 @@ const TABS: readonly TabDef[] = [
  * - graduation requirements — the credits, subjects, GPA and exams a diploma needs, a check
  *   against a student and the students of a grade not on track (not tied to the year);
  * - coordinators — who coordinates which subject this year, and for which grades;
+ * - learning outcomes — the outcomes catalogue, the achievement scale and plan due dates;
+ * - plans — lesson and term plan coverage per term, and the plans awaiting review;
  * - approvals — submitted mark sheets and teacher-proposed assessments;
  * - results — preview, finalize, correct, and certificates; `certificates/:id` prints one.
  * - top students — a grade's best places by class rank for a term or the year (leadership).
@@ -166,6 +172,8 @@ export default function AcademicSetupPage() {
           <Route path="external-exams" element={<ExternalExamsTab ctx={ctx} />} />
           <Route path="graduation-requirements" element={<GraduationRequirementsTab ctx={ctx} />} />
           <Route path="coordinators" element={<CoordinatorsTab ctx={ctx} />} />
+          <Route path="learning-outcomes" element={<LearningOutcomesTab ctx={ctx} />} />
+          <Route path="plans" element={<PlansTab ctx={ctx} />} />
           {ctx.can.review ? <Route path="approvals" element={<ApprovalsTab ctx={ctx} />} /> : null}
           {ctx.can.finalize || ctx.can.certify ? (
             <Route path="results" element={<ResultsTab ctx={ctx} />} />

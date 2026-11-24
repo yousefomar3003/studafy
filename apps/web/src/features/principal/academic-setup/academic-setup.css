@@ -763,3 +763,9 @@
     display: none;
   }
 }
+
+/* Lesson and term plans (000267): a plan's free text keeps the teacher's line breaks. */
+.ag-pre {
+  margin-block: 0 var(--space-8);
+  white-space: pre-wrap;
+}
