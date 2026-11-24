@@ -42,6 +42,7 @@ class SubjectResult {
     this.credits,
     this.courseLevel,
     this.weightedGpaPoints,
+    this.outcomes = const [],
   });
 
   factory SubjectResult.fromJson(Map<String, Object?> json) => SubjectResult(
@@ -82,6 +83,20 @@ class SubjectResult {
     credits: _num(json['credits']),
     courseLevel: _text(json['course_level']),
     weightedGpaPoints: _num(json['weighted_gpa_points']),
+    // Learning outcome achievement as finalized; absent before 000267 and when the school does
+    // not show it.
+    outcomes: [
+      for (final outcome in _list(json['outcomes']))
+        if (_text(outcome['code']) case final code?)
+          (
+            code: code,
+            text: outcome['text'] as String? ?? '',
+            textAr: _text(outcome['text_ar']),
+            level: _int(outcome['level']),
+            label: _text(outcome['label']),
+            labelAr: _text(outcome['label_ar']),
+          ),
+    ],
   );
 
   final String subjectId;
@@ -128,6 +143,20 @@ class SubjectResult {
 
   /// GPA points with the course level's boost; null when the subject has no boost.
   final double? weightedGpaPoints;
+
+  /// Learning outcome achievement on the report card, in catalogue order; empty when the school
+  /// does not show it (and on results and documents from before it existed).
+  final List<
+    ({
+      String code,
+      String text,
+      String? textAr,
+      int? level,
+      String? label,
+      String? labelAr,
+    })
+  >
+  outcomes;
 
   bool get isExempt => status == 'exempt';
   bool get isIncomplete => status == 'incomplete';
