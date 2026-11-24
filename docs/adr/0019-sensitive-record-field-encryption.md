@@ -74,6 +74,14 @@ The API (reveal, DSR export) needs to decrypt. Retention deletes only rows and n
      other type (`long_text`, `date`, choices, `yes_no`), are fully masked as `••••`. For a
      medical note, even the last 4 characters would say too much.
 
+   **Amended 2026-11-24 (ministry results export).** A third audited path decrypts: the ministry
+   results export's download (`docs/modules/ministry-export.md`), which must send each student's
+   full national ID to the ministry. It follows the reveal's rules: leadership only,
+   `studentRecord:readSensitive`, web sessions only, the reveal's additional authenticated data,
+   fail-closed on a missing key, and one `read` audit row with `reveal: true` naming the field and
+   the students whose values were opened (never the values). Its preview, like every other
+   non-reveal path, returns only masks.
+
 5. **A `SensitiveValue` wrapper for plaintext held in memory.** Decrypted values travel inside a
    class whose `toString`, `toJSON` and `util.inspect` return the mask. A plaintext value that
    accidentally reaches pino, a Sentry event, an error message or `JSON.stringify` therefore

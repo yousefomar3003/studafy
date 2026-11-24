@@ -13,6 +13,7 @@ import { SETUP_BASE } from "./context";
 import { CoordinatorsTab } from "./CoordinatorsTab";
 import { ExternalExamsTab } from "./ExternalExamsTab";
 import { GraduationRequirementsTab } from "./GraduationRequirementsTab";
+import { MinistryExportTab } from "./MinistryExportTab";
 import { OverviewTab } from "./OverviewTab";
 import { useGradingOverview } from "./queries";
 import { ReportCardsTab } from "./ReportCardsTab";
@@ -44,6 +45,7 @@ const TABS: readonly TabDef[] = [
   { path: "approvals", key: "approvals", show: (ctx) => ctx.can.review },
   { path: "results", key: "results", show: (ctx) => ctx.can.finalize || ctx.can.certify },
   { path: "top-students", key: "topStudents", show: (ctx) => ctx.can.finalize },
+  { path: "ministry-export", key: "ministryExport", show: (ctx) => ctx.can.finalize },
   {
     path: "report-cards",
     key: "reportCards",
@@ -67,6 +69,8 @@ const TABS: readonly TabDef[] = [
  * - approvals — submitted mark sheets and teacher-proposed assessments;
  * - results — preview, finalize, correct, and certificates; `certificates/:id` prints one.
  * - top students — a grade's best places by class rank for a term or the year (leadership).
+ * - ministry export — templates in a ministry's columns and codes, and a preview and download of
+ *   the year's finalized results in that format (leadership).
  * - report cards — which sections report cards show, and the comments, conduct ratings and
  *   principal's comments written before a term or year is finalized.
  *
@@ -172,6 +176,9 @@ export default function AcademicSetupPage() {
           ) : null}
           {ctx.can.finalize ? (
             <Route path="top-students" element={<TopStudentsTab ctx={ctx} />} />
+          ) : null}
+          {ctx.can.finalize ? (
+            <Route path="ministry-export" element={<MinistryExportTab ctx={ctx} />} />
           ) : null}
           {ctx.can.manage || ctx.can.reportNotes ? (
             <Route path="report-cards" element={<ReportCardsTab ctx={ctx} />} />

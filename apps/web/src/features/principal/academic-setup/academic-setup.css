@@ -738,6 +738,12 @@
   margin-block-start: var(--space-16);
 }
 
+/* A ministry export preview: as many columns as the template has, scrolled sideways. */
+.ag-table-scroll {
+  overflow-x: auto;
+  max-inline-size: 100%;
+}
+
 @media print {
   /* Print only the certificate when one is on the page, never the portal chrome around it. */
   body:has(.ag-certificate) * {
