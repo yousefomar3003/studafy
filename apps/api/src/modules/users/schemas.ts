@@ -408,12 +408,21 @@ export type StudentStatus = z.infer<typeof studentStatusSchema>;
 
 /** Optional Arabic names (000263), shown on Arabic and bilingual documents and in the Arabic app. */
 const studentArabicNameFields = {
-  first_name_ar: z.string().nullable().openapi({ description: "Arabic first name, if any." }),
+  first_name_ar: z
+    .string()
+    .nullable()
+    .optional()
+    .openapi({ description: "Arabic first name, if any." }),
   middle_name_ar: z
     .string()
     .nullable()
+    .optional()
     .openapi({ description: "Arabic middle (father's) name, if any." }),
-  last_name_ar: z.string().nullable().openapi({ description: "Arabic family name, if any." }),
+  last_name_ar: z
+    .string()
+    .nullable()
+    .optional()
+    .openapi({ description: "Arabic family name, if any." }),
 };
 
 /** Arabic names on a write: omitted keeps the value, null or blank clears it. */

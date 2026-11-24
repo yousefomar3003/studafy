@@ -17,7 +17,8 @@ export interface ChildTimetableSlot {
   weekday: number;
   period: number;
   class: { id: string; code: string };
-  course: { id: string; code: string; name: string } | null;
+  /** `subject_name_ar` (000263): the course's subject's Arabic name, when it has one. */
+  course: { id: string; code: string; name: string; subject_name_ar?: string } | null;
   teacher: { id: string; name: string } | null;
   room: { id: string; name: string } | null;
 }
@@ -79,6 +80,7 @@ interface SlotRow {
   course_id: string | null;
   course_code: string | null;
   course_name: string | null;
+  subject_name_ar: string | null;
   teacher_id: string | null;
   teacher_name: string | null;
   room_id: string | null;
@@ -95,6 +97,8 @@ async function listChildSlots(
     SELECT s.id, s.weekday::int AS weekday, s.period::int AS period,
            cl.id AS class_id, cl.code AS class_code,
            co.id AS course_id, co.code AS course_code, co.name AS course_name,
+           (SELECT n.name_ar FROM app.subject_names_ar(ARRAY[co.subject_id]) AS n)
+             AS subject_name_ar,
            te.id AS teacher_id, COALESCE(u.display_name, u.email) AS teacher_name,
            r.id AS room_id, r.name AS room_name
     FROM app.timetable_slots s
@@ -120,7 +124,12 @@ async function listChildSlots(
     class: { id: row.class_id, code: row.class_code },
     course:
       row.course_id && row.course_code !== null && row.course_name !== null
-        ? { id: row.course_id, code: row.course_code, name: row.course_name }
+        ? {
+            id: row.course_id,
+            code: row.course_code,
+            name: row.course_name,
+            ...(row.subject_name_ar ? { subject_name_ar: row.subject_name_ar } : {}),
+          }
         : null,
     teacher:
       row.teacher_id && row.teacher_name !== null

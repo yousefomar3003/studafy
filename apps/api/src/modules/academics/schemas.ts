@@ -32,7 +32,7 @@ export const academicYearSchema = z
     name: z
       .string()
       .openapi({ description: "Human-readable name.", example: "Academic Year 2025-2026" }),
-    name_ar: z.string().nullable().openapi({
+    name_ar: z.string().nullable().optional().openapi({
       description: "Arabic name (000263); null when there is none, and readers use `name`.",
     }),
     starts_on: dateSchema.openapi({ description: "First day of the academic year." }),
@@ -102,7 +102,7 @@ export const termSchema = z
       .string()
       .openapi({ description: "Short unique code within the academic year.", example: "T1" }),
     name: z.string().openapi({ description: "Human-readable name.", example: "Term 1" }),
-    name_ar: z.string().nullable().openapi({
+    name_ar: z.string().nullable().optional().openapi({
       description: "Arabic name (000263); null when there is none, and readers use `name`.",
     }),
     sequence_number: z
@@ -258,7 +258,7 @@ export const subjectSchema = z
       .string()
       .openapi({ description: "Short unique code within the school.", example: "MATH" }),
     name: z.string().openapi({ description: "Human-readable name.", example: "Mathematics" }),
-    name_ar: z.string().nullable().openapi({
+    name_ar: z.string().nullable().optional().openapi({
       description: "Arabic name (000263); null when there is none, and readers use `name`.",
     }),
     description: z
@@ -594,7 +594,7 @@ export const gradeLevelSchema = z
     id: uuidSchema.openapi({ description: "Primary key." }),
     school_id: uuidSchema.openapi({ description: "Owning school tenant." }),
     name: z.string().openapi({ description: "Display name.", example: "Grade 10" }),
-    name_ar: z.string().nullable().openapi({
+    name_ar: z.string().nullable().optional().openapi({
       description: "Arabic name (000263); null when there is none, and readers use `name`.",
     }),
     sort_order: z
@@ -660,9 +660,10 @@ export const sectionSchema = z
     grade_level_name_ar: z
       .string()
       .nullable()
+      .optional()
       .openapi({ description: "The grade's Arabic name, if any (000263)." }),
     name: z.string().openapi({ description: "Section name within the grade.", example: "C" }),
-    name_ar: z.string().nullable().openapi({
+    name_ar: z.string().nullable().optional().openapi({
       description: "Arabic name (000263); null when there is none, and readers use `name`.",
     }),
     student_count: z.number().int().openapi({ description: "Students placed in this section." }),
