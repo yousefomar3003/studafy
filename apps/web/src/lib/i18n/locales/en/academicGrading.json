@@ -17,7 +17,8 @@
     "reportCards": "Report cards",
     "externalExams": "External exams",
     "topStudents": "Top students",
-    "graduation": "Graduation requirements"
+    "graduation": "Graduation requirements",
+    "coordinators": "Subject coordinators"
   },
   "common": {
     "loading": "Loading…",
@@ -169,7 +170,8 @@
       "GRADE_CONCURRENT_EDIT": "Someone else changed this in the meantime. Reload and try again.",
       "VALIDATION_FAILED": "Some values aren't valid.",
       "AUTHZ_FORBIDDEN": "You don't have permission to do this.",
-      "PREDICTED_GRADES_DISABLED": "Predicted grades aren't switched on for this grade this year."
+      "PREDICTED_GRADES_DISABLED": "Predicted grades aren't switched on for this grade this year.",
+      "SUBJECT_COORDINATOR_DUPLICATE": "This person already coordinates this subject this year."
     }
   },
   "issues": {
@@ -1376,6 +1378,36 @@
       "heading": "Graduation requirements",
       "empty": "No graduation requirements apply to this student.",
       "basis": "Academic years with finalized results counted: {{years}}."
+    }
+  },
+  "coordinators": {
+    "heading": "Subject coordinators",
+    "help": "A coordinator follows one subject across every section of the grades they cover in {{year}}: in the mobile app they see each section's mark sheets, averages, marks, predicted grades and results for that subject, read-only. Coordinating is not a role; the person keeps their own.",
+    "caption": "Subject coordinators for the year",
+    "add": "Add coordinator",
+    "addTitle": "Add a subject coordinator for {{year}}",
+    "editTitle": "{{name}}, {{subject}} coordinator",
+    "editLabel": "Edit {{name}} as {{subject}} coordinator",
+    "removeLabel": "Remove {{name}} as {{subject}} coordinator",
+    "removeTitle": "Remove {{name}} as {{subject}} coordinator?",
+    "removeDescription": "They stop seeing the other sections' marks and results for this subject. Nothing they could see is changed.",
+    "removed": "Coordinator removed",
+    "removeFailed": "The coordinator could not be removed",
+    "saved": "Coordinator saved",
+    "save": "Save",
+    "empty": "No subject coordinators this year.",
+    "allGrades": "Every grade",
+    "subject": "Subject",
+    "person": "Coordinator",
+    "pickSubject": "Choose a subject",
+    "pickPerson": "Choose a teacher",
+    "gradesLegend": "Grades covered",
+    "gradesHelp": "Leave every grade unticked to cover all the grades that take the subject.",
+    "columns": {
+      "subject": "Subject",
+      "person": "Coordinator",
+      "grades": "Grades",
+      "actions": "Actions"
     }
   }
 }

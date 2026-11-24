@@ -535,7 +535,20 @@ const GRADUATION_REPORT = {
   ],
 };
 
+const MATH_COORDINATOR = {
+  id: "coord-1",
+  academic_year_id: "year-1",
+  subject_id: "sub-math",
+  subject_code: "MTH",
+  subject_name: "Mathematics",
+  user_id: "user-omar",
+  user_name: "Omar Aziz",
+  grade_levels: [{ id: "grade-10", name: "Grade 10" }],
+  ...STAMP,
+};
+
 const GET_RESPONSES: Record<string, unknown> = {
+  "/api/grading/years/{yearId}/subject-coordinators": { coordinators: [MATH_COORDINATOR] },
   "/api/grading/graduation-requirement-sets": { sets: [DIPLOMA] },
   "/api/grading/graduation-requirements/report": GRADUATION_REPORT,
   "/api/grading/external-exams": { exams: [IELTS_EXAM] },
@@ -676,8 +689,11 @@ const putMock = mock((_path: string, _init?: unknown) =>
 const deleteMock = mock((_path: string, _init?: unknown) =>
   Promise.resolve<unknown>({ data: undefined }),
 );
+const patchMock = mock((_path: string, _init?: unknown) =>
+  Promise.resolve<unknown>({ data: { ...MATH_COORDINATOR, grade_levels: [] } }),
+);
 mock.module("../../../lib/api", () => ({
-  api: { GET: getMock, POST: postMock, PUT: putMock, DELETE: deleteMock },
+  api: { GET: getMock, POST: postMock, PUT: putMock, PATCH: patchMock, DELETE: deleteMock },
 }));
 
 async function renderAt(tab: string) {
@@ -716,6 +732,7 @@ afterEach(() => {
     Promise.resolve<unknown>({ data: { config: MATH_CONFIG, affected_section_ids: [] } }),
   );
   deleteMock.mockClear();
+  patchMock.mockClear();
 });
 
 describe("AcademicSetupPage", () => {
@@ -1290,6 +1307,72 @@ describe("AcademicSetupPage", () => {
     expect((within(listening).getByLabelText(/Part name/) as HTMLInputElement).disabled).toBe(
       false,
     );
+  });
+
+  test("lists the year's subject coordinators, adds one and widens one to every grade", async () => {
+    // A subject and a teacher to pick, for this test only.
+    RESPONSES_BY_PATH.set("/api/academics/subjects", {
+      subjects: [{ id: "sub-sci", code: "SCI", name: "Science", ...STAMP }],
+      total: 1,
+    });
+    RESPONSES_BY_PATH.set("/api/teachers", {
+      teachers: [{ id: "teacher-lina", user_id: "user-lina", employee_number: "T-9" }],
+      next_cursor: null,
+    });
+    RESPONSES_BY_PATH.set("/api/users", {
+      users: [{ id: "user-lina", display_name: "Lina Saleh" }],
+      next_cursor: null,
+    });
+    try {
+      const { container } = await renderAt("/coordinators");
+      const edit = await screen.findByRole("button", {
+        name: "Edit Omar Aziz as Mathematics coordinator",
+      });
+      expect(within(edit.closest("tr")!).getByText("Grade 10")).toBeTruthy();
+      await expectNoA11yViolations(container);
+
+      fireEvent.click(screen.getByRole("button", { name: "Add coordinator" }));
+      const save = await screen.findByRole("button", { name: "Save" });
+      expect((save as HTMLButtonElement).disabled).toBe(true);
+      fireEvent.click(screen.getByRole("combobox", { name: /^Subject/ }));
+      fireEvent.click(await screen.findByRole("option", { name: "Science" }));
+      fireEvent.click(screen.getByRole("combobox", { name: /^Coordinator/ }));
+      fireEvent.click(await screen.findByRole("option", { name: "Lina Saleh" }));
+      fireEvent.click(await screen.findByLabelText("Grade 10"));
+      await waitFor(() => expect((save as HTMLButtonElement).disabled).toBe(false));
+      fireEvent.click(save);
+      await waitFor(() => expect(postMock).toHaveBeenCalledTimes(1));
+      const [path, init] = postMock.mock.calls[0] as [string, { params: unknown; body: unknown }];
+      expect(path).toBe("/api/grading/years/{yearId}/subject-coordinators");
+      expect(init.params).toEqual({ path: { yearId: "year-1" } });
+      expect(init.body).toEqual({
+        subject_id: "sub-sci",
+        user_id: "user-lina",
+        grade_level_ids: ["grade-10"],
+      });
+
+      // Unticking the only grade covers every grade that takes the subject.
+      fireEvent.click(
+        await screen.findByRole("button", { name: "Edit Omar Aziz as Mathematics coordinator" }),
+      );
+      const dialog = await screen.findByRole("dialog");
+      fireEvent.click(within(dialog).getByLabelText("Grade 10"));
+      fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+      await waitFor(() => expect(patchMock).toHaveBeenCalledTimes(1));
+      const [patchPath, patchInit] = patchMock.mock.calls[0] as [
+        string,
+        { params: unknown; body: unknown },
+      ];
+      expect(patchPath).toBe("/api/grading/subject-coordinators/{coordinatorId}");
+      expect(patchInit).toEqual({
+        params: { path: { coordinatorId: "coord-1" } },
+        body: { grade_level_ids: [] },
+      });
+    } finally {
+      RESPONSES_BY_PATH.set("/api/academics/subjects", { subjects: [], total: 0 });
+      RESPONSES_BY_PATH.delete("/api/teachers");
+      RESPONSES_BY_PATH.delete("/api/users");
+    }
   });
 
   test("has no accessibility violations on the report cards screen", async () => {
