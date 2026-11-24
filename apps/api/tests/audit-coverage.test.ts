@@ -268,6 +268,12 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/grading/graduation-requirement-sets",
   "PUT /api/grading/graduation-requirement-sets/{setId}",
   "DELETE /api/grading/graduation-requirement-sets/{setId}",
+  // Remedial plans (000268): writes behind grade:update or result:finalize (the setting behind
+  // academicConfig:manage); each records its old and new values in the service.
+  "POST /api/grading/remedial-plans",
+  "PATCH /api/grading/remedial-plans/{planId}",
+  "POST /api/grading/remedial-plans/{planId}/notes",
+  "PUT /api/grading/remedial-plan-settings",
   // Timetable (ST-101). Version lifecycle + slot CRUD with conflict detection.
   "POST /api/academics/timetable-versions",
   "PATCH /api/academics/timetable-versions/{versionId}",

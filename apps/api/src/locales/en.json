@@ -123,6 +123,8 @@
   "CERTIFICATE_NOT_FOUND": "Certificate not found.",
   "PREDICTED_GRADES_DISABLED": "Predicted grades are not switched on for this grade this year.",
   "SUBJECT_COORDINATOR_DUPLICATE": "This person already coordinates this subject this year.",
+  "REMEDIAL_PLAN_DUPLICATE": "The student already has an active remedial plan in this subject for this period.",
+  "REMEDIAL_PLAN_CLOSED": "This remedial plan is achieved or closed and can no longer be changed.",
   "ENROLLMENT_DUPLICATE": "This student is already enrolled in this class.",
   "ENROLLMENT_NOT_ACTIVE": "This enrollment is not active.",
   "TIMETABLE_TEACHER_CONFLICT": "This teacher is already assigned to another class at this time",

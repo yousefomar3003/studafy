@@ -158,6 +158,10 @@ export const ERROR_CODES = {
   PREDICTED_GRADES_DISABLED: "PREDICTED_GRADES_DISABLED",
   // Subject coordinators (000260): the user already coordinates the subject that year.
   SUBJECT_COORDINATOR_DUPLICATE: "SUBJECT_COORDINATOR_DUPLICATE",
+  // Remedial plans (000268): the student already has an active plan in the subject for that period;
+  // the plan is achieved or closed and can no longer be changed.
+  REMEDIAL_PLAN_DUPLICATE: "REMEDIAL_PLAN_DUPLICATE",
+  REMEDIAL_PLAN_CLOSED: "REMEDIAL_PLAN_CLOSED",
 
   // Enrollment — student-class binding.
   ENROLLMENT_DUPLICATE: "ENROLLMENT_DUPLICATE",

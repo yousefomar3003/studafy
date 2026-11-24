@@ -330,6 +330,16 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "linked parents when the set is shown to them.",
     },
     {
+      name: "Remedial plans",
+      description:
+        "Remedial plans for struggling students: a plan per student, subject and term (or year) " +
+        "with its reason, target skills, actions, review dates, status and a timeline of progress " +
+        "and follow-up notes, plus suggestions of the students below the pass line on their " +
+        "current marks. The section's teachers of the subject write plans; the subject's " +
+        "coordinator and leadership follow them up; the student and linked parents read the " +
+        "shared plans when the school allows it, never internal notes.",
+    },
+    {
       name: "Gradebook Configuration",
       description:
         "Gradebook configuration endpoints. Authenticated and tenant-scoped. " +
