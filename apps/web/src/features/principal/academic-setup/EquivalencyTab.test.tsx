@@ -6,6 +6,7 @@ import { afterEach, describe, expect, mock, test } from "bun:test";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import { AuthProvider } from "../../../lib/auth";
+import * as realCsv from "../../../lib/csv";
 import { expectNoA11yViolations } from "../../../lib/test/axe";
 import { createTestSessionStore } from "../../../lib/test/session";
 
@@ -273,6 +274,11 @@ const putMock = mock((_path: string, _init?: unknown) =>
 const deleteMock = mock((_path: string, _init?: unknown) =>
   Promise.resolve<unknown>({ data: undefined }),
 );
+// downloadCsv is replaced (as SchoolMembersPage.test.tsx does): Bun keeps module mocks for the
+// whole run, so stubbing the DOM download behind it is unreliable when another file mocks it first.
+const downloadMock = mock((_filename: string, _csv: string) => undefined);
+mock.module("../../../lib/csv", () => ({ ...realCsv, downloadCsv: downloadMock }));
+
 mock.module("../../../lib/api", () => ({
   api: { GET: getMock, POST: postMock, PUT: putMock, DELETE: deleteMock },
 }));
@@ -378,32 +384,12 @@ describe("EquivalencyTab", () => {
     expect(
       screen.getByText("IGCSE subjects: No results recorded for this part's exams."),
     ).toBeTruthy();
-    const blobs: Blob[] = [];
-    const names: string[] = [];
-    const originalCreate = URL.createObjectURL;
-    const originalRevoke = URL.revokeObjectURL;
-    const originalClick = HTMLAnchorElement.prototype.click;
-    URL.createObjectURL = (blob: Blob) => {
-      blobs.push(blob);
-      return "blob:estimates";
-    };
-    URL.revokeObjectURL = () => undefined;
-    HTMLAnchorElement.prototype.click = function click(this: HTMLAnchorElement) {
-      names.push(this.download);
-    };
-    try {
-      fireEvent.click(screen.getByRole("button", { name: "Download CSV" }));
-      // The file is built and clicked after the handler's own awaits; keep the stubs in place until
-      // it has been (a slower CI runner got there after an immediate restore).
-      await waitFor(() =>
-        expect(names).toEqual(["igcse-equivalency-grade-12-2026-2027-estimates.csv"]),
-      );
-    } finally {
-      URL.createObjectURL = originalCreate;
-      URL.revokeObjectURL = originalRevoke;
-      HTMLAnchorElement.prototype.click = originalClick;
-    }
-    const lines = (await blobs[0]!.text()).replace(/^\uFEFF/, "").split("\r\n");
+    downloadMock.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "Download CSV" }));
+    await waitFor(() => expect(downloadMock).toHaveBeenCalledTimes(1));
+    const [filename, csv] = downloadMock.mock.calls[0]!;
+    expect(filename).toBe("igcse-equivalency-grade-12-2026-2027-estimates.csv");
+    const lines = csv.split("\r\n");
     expect(lines[0]).toBe(
       "Admission number,First name,Last name,Section,Status,Estimate,IGCSE subjects,Missing data",
     );
