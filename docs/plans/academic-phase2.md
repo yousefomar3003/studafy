@@ -215,7 +215,7 @@ services (J and K both touch certificates, report cards and transcripts), i18n f
 ## Progress
 
 - [x] WS-H subject coordinators (`feat/academic-coordinators`, migration 000260; `docs/modules/subject-coordinators.md`)
-- [ ] WS-I exam entries
+- [x] WS-I exam entries ([docs/modules/exam-entries.md](../modules/exam-entries.md))
 - [ ] WS-J IB Diploma total
 - [ ] WS-K Arabic + English documents
 - [x] WS-L ministry results export (`feat/academic-ministry-export`, migration 000264; `docs/modules/ministry-export.md`)

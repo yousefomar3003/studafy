@@ -2656,6 +2656,22 @@
       "serialLabel": "Serial number",
       "finalization": "Results version {version}, finalized {date}"
     },
+    "examEntries": {
+      "title": "Exam entries",
+      "error": "Exam entries couldn't be loaded.",
+      "examSeries": "{exam} — {series}",
+      "candidateNumber": "Candidate number: {number}",
+      "noCandidateNumber": "not set yet",
+      "examsOn": "Exam on {date}",
+      "examsBetween": "Exams {from} – {to}",
+      "resultsOn": "Results on {date}",
+      "unnamedSubject": "Subject",
+      "status": {
+        "entered": "Entered",
+        "withdrawn": "Withdrawn",
+        "unknown": "Entry"
+      }
+    },
     "testScores": {
       "title": "Test scores",
       "empty": "No external exam results recorded yet.",

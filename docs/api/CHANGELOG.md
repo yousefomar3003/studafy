@@ -43,6 +43,25 @@ when it required the `version-bump` label.
   the annual results (`MinistryExportRunInput`). A sensitive national ID is masked in the preview
   and opened for the download only with `studentRecord:readSensitive` (403; 503
   `RECORD_KEY_UNAVAILABLE`), audited as a reveal.
+- Exam entries (migration 000261; docs/modules/exam-entries.md), tag "Exam entries". Sessions:
+  `listExamSessions` (`GET /api/grading/external-exam-sessions?exam_id=`, `academicConfig:read`),
+  `createExamSession` (`POST`), `updateExamSession` (`PUT .../{sessionId}`) and
+  `deleteExamSession` (`DELETE .../{sessionId}`, 409 once it has entries), all
+  `academicConfig:manage`, with `ExamSession` (series, entry deadline, first and last exam, results
+  date, counts per `ExamEntryStatus`: `draft`, `entered`, `withdrawn`). Entries, all
+  `academicConfig:manage`: `listExamSessionEntries` (`GET .../{sessionId}/entries`,
+  `ExamSessionEntries` with `subject_counts`), `createExamEntries` (`POST .../{sessionId}/entries`,
+  bulk by `student_ids`, `section_id` or `grade_level_id` + `academic_year_id`),
+  `changeExamEntryStatus` (`POST .../{sessionId}/entries/status`), `assignExamCandidateNumbers`
+  (`POST .../{sessionId}/candidate-numbers`), `exportExamSessionEntries`
+  (`GET .../{sessionId}/entries/export?include_drafts=`, `text/csv`), `updateExamEntry`
+  (`PUT /api/grading/external-exam-entries/{entryId}`, 409 `CONFLICT_DUPLICATE_ENTRY` for a
+  candidate number used in the session) and `deleteExamEntry` (`DELETE`, drafts only). A student's
+  own: `listStudentExamEntries` (`GET /api/grading/students/{studentId}/external-exam-entries`,
+  `grade:read` + row scope, entered and withdrawn entries only, `StudentExamEntry`).
+  `RecordExternalExamResultBody` / `UpdateExternalExamResultBody` take an optional `entry_id`
+  (on update, absent keeps the link and null clears it); `ExternalExamResult` returns `entry_id`.
+
 - Class rank and percentile (migration 000257; docs/database/academic-grading.md "Class rank and
   percentile"). New `listTopStudents`
   (`GET /api/grading/years/{yearId}/programs/{gradeLevelId}/top-students`, `result:finalize`;

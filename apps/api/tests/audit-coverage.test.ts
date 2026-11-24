@@ -257,6 +257,16 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/grading/students/{studentId}/external-exam-results",
   "PUT /api/grading/external-exam-results/{resultId}",
   "DELETE /api/grading/external-exam-results/{resultId}",
+  // Exam entries (000261): leadership behind academicConfig:manage; each write records its old
+  // and new values in the service.
+  "POST /api/grading/external-exam-sessions",
+  "PUT /api/grading/external-exam-sessions/{sessionId}",
+  "DELETE /api/grading/external-exam-sessions/{sessionId}",
+  "POST /api/grading/external-exam-sessions/{sessionId}/entries",
+  "POST /api/grading/external-exam-sessions/{sessionId}/entries/status",
+  "POST /api/grading/external-exam-sessions/{sessionId}/candidate-numbers",
+  "PUT /api/grading/external-exam-entries/{entryId}",
+  "DELETE /api/grading/external-exam-entries/{entryId}",
   // Predicted grades (000254): the service records each student's old and new label and note.
   "PUT /api/grading/sections/{sectionId}/subjects/{subjectId}/predicted-grades",
   // Subject coordinators (000260): the service records each assignment and its grade levels.

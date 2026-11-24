@@ -2679,6 +2679,22 @@
       "serialLabel": "الرقم التسلسلي",
       "finalization": "نسخة النتائج {version}، اعتُمدت في {date}"
     },
+    "examEntries": {
+      "title": "تسجيل الامتحانات",
+      "error": "تعذّر تحميل تسجيلات الامتحانات.",
+      "examSeries": "{exam} — {series}",
+      "candidateNumber": "رقم الجلوس: {number}",
+      "noCandidateNumber": "لم يُحدَّد بعد",
+      "examsOn": "الامتحان بتاريخ {date}",
+      "examsBetween": "الامتحانات من {from} إلى {to}",
+      "resultsOn": "النتائج بتاريخ {date}",
+      "unnamedSubject": "مادة",
+      "status": {
+        "entered": "مسجّل",
+        "withdrawn": "منسحب",
+        "unknown": "تسجيل"
+      }
+    },
     "testScores": {
       "title": "نتائج الاختبارات",
       "empty": "لا توجد نتائج امتحانات خارجية مسجلة بعد.",

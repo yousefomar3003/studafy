@@ -309,6 +309,10 @@ export const SEARCH_DESTINATIONS: readonly SearchDestination[] = [
   entry("academic-sections", "page", `${SETUP}/sections`, ACADEMIC),
   entry("academic-scales", "page", `${SETUP}/scales`, ACADEMIC),
   entry("academic-external-exams", "page", `${SETUP}/external-exams`, ACADEMIC),
+  entry("academic-exam-entries", "page", `${SETUP}/exam-entries`, {
+    ...ACADEMIC,
+    alsoRequires: [P.ACADEMIC_CONFIG_MANAGE],
+  }),
   entry("academic-graduation", "page", `${SETUP}/graduation-requirements`, ACADEMIC),
   entry("academic-approvals", "page", `${SETUP}/approvals`, {
     ...ACADEMIC,
