@@ -23,6 +23,13 @@ skip-character-set-client-handshake
 innodb_buffer_pool_size = 384M
 innodb_log_buffer_size = 16M
 performance_schema = OFF
+# Every school site is its own database of ~1,000 tables, so the table caches, not the buffer pool,
+# are what grows with the number of sites. Fixed caps keep memory flat however many sites there are
+# (measured: 1.1 GiB for the whole machine with 10 warm sites, flat after the cache fills); more
+# sites only means more cache turnover.
+table_open_cache = 2000
+table_definition_cache = 2000
+innodb_open_files = 2000
 max_connections = 40
 key_buffer_size = 8M
 tmp_table_size = 32M
