@@ -198,7 +198,7 @@ services:
       MARIADB_ROOT_PASSWORD: studafy-local-erp
       ERPNEXT_ADMIN_PASSWORD: studafy-local-admin
       STUDAFY_API_URL: http://host.docker.internal:3000
-      ERPNEXT_AGENT_TOKEN: studafy-local-erpnext-agent
+      ERPNEXT_AGENT_TOKEN: studafy-local-erpnext-agent-token-0001
       STUDAFY_ERPNEXT_API_KEY: studafylocalkey01:studafy-local-erpnext-secret
       STUDAFY_ERPNEXT_WEBHOOK_SECRET: studafy-local-erpnext-webhook
       # BACKUP_S3_* unset: the agent skips backups locally.

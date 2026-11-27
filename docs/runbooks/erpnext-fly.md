@@ -209,11 +209,24 @@ mkdir -p /data/restore
 rclone copy ":s3:$BACKUP_S3_BUCKET/<path from the list>" /data/restore/
 bench --site "$site" set-maintenance-mode on
 bench --site "$site" restore /data/restore/<file>-database.sql.gz --db-root-password "$MARIADB_ROOT_PASSWORD" \
-  --with-public-files /data/restore/<file>-files.tar --with-private-files /data/restore/<file>-private-files.tar
+  --with-public-files /data/restore/<file>-files.tgz --with-private-files /data/restore/<file>-private-files.tgz
 bench --site "$site" migrate     # only if the backup was taken on an older ERPNext image
 bench --site "$site" set-maintenance-mode off
 rm -rf /data/restore
 ```
+
+After a restore, check two things:
+
+- **Studafy's copies.** Studafy keeps its own copies of invoices and payments (`app.invoice_cache`,
+  `app.payment_cache`). Anything recorded after the backup's time is still in those copies but no
+  longer in ERPNext, and **nothing corrects that automatically** (the finance reconciliation job
+  only checks fee schedules). List them for the school with
+  `select erpnext_docname, amount_minor, last_synced_at from app.payment_cache where school_id = '<id>' and last_synced_at > '<backup time>'`
+  (and the same on `app.invoice_cache`), go through them with the school, and record the real ones
+  again in Studafy so they reach ERPNext.
+- **The scheduler.** A restore brings back the scheduler setting the site had when it was backed
+  up. Make it match `app.erpnext_site_configs.scheduler_enabled`
+  (`bench --site "$site" enable-scheduler` or `disable-scheduler`).
 
 If the site's folder is gone too, create it first as the agent does
 (`bench new-site … --install-app erpnext --install-app education`, see the plan's "Site creation"),
