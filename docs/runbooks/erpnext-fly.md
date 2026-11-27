@@ -180,7 +180,9 @@ ERPNext.
 Before telling schools that finance is available, on a test school whose site is created:
 
 1. As the school's admin, create a fee structure and issue an invoice to a test student.
-2. Record a cash payment against it, then refund it.
+2. Record a cash payment against it, then refund part of it **in cash** (the default way the money
+   goes back), and approve it as a different user. The refund's result should read "… handed back
+   by Cash", and ERPNext's `Cash - <abbr>` account should drop by the amount.
 3. Open the finance reports and check the invoice, payment and refund appear with the right amounts.
 4. Check the site woke up: within two minutes of the first request, its row has
    `scheduler_enabled = true` and `status = 'completed'`.
@@ -191,6 +193,15 @@ Before telling schools that finance is available, on a test school whose site is
      RCLONE_S3_ACCESS_KEY_ID="$BACKUP_S3_ACCESS_KEY_ID" RCLONE_S3_SECRET_ACCESS_KEY="$BACKUP_S3_SECRET_ACCESS_KEY"
    rclone lsf -R ":s3:$BACKUP_S3_BUCKET" | sort | tail -n 20
    ```
+
+### Bank transfer and card refunds and payments
+
+A refund handed back by bank transfer or card, and a payment received that way, leave from or go
+into the default account of ERPNext's `Wire Transfer` or `Credit Card` mode of payment. A new site
+has a default only for `Cash`. Until the school's own bank account is set
+(**Accounting → Mode of Payment → Wire Transfer → Accounts**, one row for the school's company),
+approval refuses those refunds with ERPNext's "Please set default Cash or Bank account in Mode of
+Payment …", and the refund stays pending. Cash and keep-as-credit refunds need nothing extra.
 
 ## 4. Restore
 

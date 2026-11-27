@@ -294,9 +294,21 @@ A and B are independent of C. D and E come last.
   (1208.55) while ERPNext counts the outstanding from the rounded total (1209), so the cache's
   `outstanding <= total` check skipped them; invoices rounded down showed the wrong total. It now
   uses `rounded_total` when ERPNext rounds, as the finance reports already did.
-- **Still not built:** recording the cash actually handed back to a family for a credit left on
-  their account (a Pay Payment Entry). Until then the school records the payout in ERPNext, or keeps
-  the credit against the family's next invoice.
+- **Cash refunds** (most schools in Jordan are paid, and pay back, in cash).
+  - **The choice:** the maker chooses how the money goes back: cash (the default), bank transfer,
+    card, or kept as credit. The checker approves the cash leaving the school together with the
+    refund (migration 000271: `payout_mode`, `settlement`, `paid_out_minor`).
+  - **The entry:** the same journal entry credits what the invoice still owes first, then either
+    pays out the rest from the mode of payment's default account (Cash, the school's bank) or keeps
+    it as credit. One voucher, so nothing is left open on the family's account.
+  - **Why one voucher:** ERPNext lets a receivable line reference a document only when it is
+    credited, so a payout posted later could not be matched to the credit.
+  - **Tested live:**
+    - a paid invoice refunded in cash (the school's cash dropped by the refund)
+    - a partly paid invoice (600 off what it owed, 100 handed back)
+    - kept as credit
+    - bank transfer with no bank account set up (refused, still pending)
+  - **Not built yet:** a printable refund receipt for the parent to sign.
 - **VAT reporting:** a journal credit reverses VAT in the ledger (the tax account). Reports built
   from Sales Invoices rather than the ledger may not include journal credits; check the VAT report a
   school files from before relying on it.
