@@ -247,11 +247,31 @@ A and B are independent of C. D and E come last.
 ## Progress
 
 - [x] Owner approves this plan
-- [ ] A: image and Fly config
-- [ ] B: site agent
-- [ ] C: API changes
-- [ ] D: deploy wiring
-- [ ] E: runbook
-- [ ] Local end-to-end and memory check
+- [x] A: image and Fly config
+- [x] B: site agent
+- [x] C: API changes
+- [x] D: deploy wiring
+- [x] E: runbook
+- [x] Local end-to-end and memory check (2026-11-28). Results:
+  - **Memory:** 10 warm sites use 1.1 GiB of 2 GiB, flat once MariaDB's table cache fills (now capped
+    explicitly). No swap, nothing killed.
+  - **Sites:** a new site takes about 63–75 s to create and about 103 MB of disk.
+  - **End to end, all passed:** approval → backfill → the agent creates the site (asleep) →
+    signed webhooks fill Studafy's invoice and payment copies → finance reads (invoices, payments,
+    fee structures, AR aging, collections, general ledger) → a cash payment is recorded in ERPNext
+    and the balance updates → finance use wakes the site → a with-files backup → a restore.
+  - **Not passed: refund approval.** It fails against ERPNext, and that bug was already in the
+    finance code; this work did not cause it (see Known issues).
 - [ ] Merged to dev → stage
 - [ ] Released with the batch, backfill run, production check passed
+
+## Known issues found while testing
+
+- **Refund approval never worked against a real ERPNext.** `buildCreditNotePayload` and the
+  approval payload in `apps/api/src/modules/finance/refunds/service.ts` send `customer: ""` and
+  `items: []`. ERPNext v15 rejects the credit note: wrong customer, "Update Outstanding for Self",
+  and an amount above the outstanding on a paid invoice. The unit tests mock ERPNext, so they pass.
+  The fix needs a design choice for paid invoices (a credit note kept on the note plus a refund
+  Payment Entry) versus unpaid ones (credit the invoice). For both, build the note from ERPNext's
+  `make_sales_return`. Tracked separately; it does not block hosting, but refunds must not be
+  announced to schools until it is fixed.
