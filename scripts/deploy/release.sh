@@ -5,6 +5,8 @@
 #   release.sh build <app> <config> <label> [args...]   remote-build and push, print the digest ref
 #   release.sh deploy <app> <config> <image> [args...]  deploy exactly that image
 #   release.sh smoke <api base url> <web base url>      readiness + auth surface + shared JWT key
+#   release.sh private-only <app>                       the app has a private address and no public one
+#   release.sh smoke-private <app> <url>                <url> answers from inside the app's machine
 #
 # FLYCTL, DOCKER and CURL override the binaries (tests). The digest is resolved from the registry,
 # so the image Trivy scans is byte-for-byte the image that is deployed.
@@ -96,6 +98,52 @@ smoke() {
   echo "smoke ok: readyz, web, auth surface, JWKS kid(s) $kids"
 }
 
+# A private app (ERPNext) is reached over its Flycast address only. `fly deploy` allocates public
+# addresses to an app that has none, so this runs before its deploy as well as after.
+private_only() {
+  local app="$1" ips public private
+  ips="$("$flyctl_bin" ips list --app "$app" --json)" || {
+    echo "::error::Could not list the IP addresses of $app." >&2
+    return 1
+  }
+  public="$(jq -r '[(. // [])[] | select(((.Type // .type // "") | ascii_downcase | test("private")) | not)
+                    | (.Address // .address // "?")] | join(" ")' <<<"$ips")"
+  private="$(jq -r '[(. // [])[] | select((.Type // .type // "") | ascii_downcase | test("private"))] | length' <<<"$ips")"
+  if [ -n "$public" ]; then
+    echo "::error::$app has public addresses ($public). Release each: fly ips release <address> --app $app" >&2
+    return 1
+  fi
+  if [ "$private" = 0 ]; then
+    echo "::error::$app has no private address. Allocate one: fly ips allocate-v6 --private --app $app" >&2
+    return 1
+  fi
+  echo "$app: private address only"
+}
+
+# Nothing outside the organisation's network reaches a private app, so its URL is fetched from inside
+# its started machine. Any status below 500 passes: Frappe answers 404 when no site matches the Host.
+smoke_private() {
+  local app="$1" url="$2" attempt id out="" code=""
+  for attempt in $(seq 1 "${SMOKE_ATTEMPTS:-30}"); do
+    id="$("$flyctl_bin" machine list --app "$app" --json 2>/dev/null |
+      jq -r '[.[]? | select(.state == "started") | .id][0] // ""' 2>/dev/null || true)"
+    if [ -n "$id" ]; then
+      out="$("$flyctl_bin" machine exec "$id" \
+        "curl --silent --output /dev/null --max-time 10 --write-out smoke-status-%{http_code} $url" \
+        --app "$app" 2>&1 || true)"
+      code="$(grep -o 'smoke-status-[0-9]\{3\}' <<<"$out" | tail -n 1 | cut -d- -f3 || true)"
+      if [ -n "$code" ] && [ "$code" != 000 ] && [ "$code" -lt 500 ]; then
+        echo "smoke ok: $app answers $url with $code"
+        return 0
+      fi
+    fi
+    echo "$app does not answer $url yet (attempt $attempt, status ${code:-none})" >&2
+    sleep "${SMOKE_DELAY:-10}"
+  done
+  echo "::error::$app never answered $url from inside its machine. Last output: ${out:-none}" >&2
+  return 1
+}
+
 command="${1:-}"
 shift || true
 case "$command" in
@@ -103,8 +151,10 @@ case "$command" in
   build) build "$@" ;;
   deploy) deploy "$@" ;;
   smoke) smoke "$@" ;;
+  private-only) private_only "$@" ;;
+  smoke-private) smoke_private "$@" ;;
   *)
-    echo "usage: release.sh current-image|build|deploy|smoke ..." >&2
+    echo "usage: release.sh current-image|build|deploy|smoke|private-only|smoke-private ..." >&2
     exit 2
     ;;
 esac
