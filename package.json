@@ -18,6 +18,8 @@
     "erpnext:up": "docker compose -f db/compose.yml --profile erpnext up -d",
     "erpnext:site": "bun apps/api/scripts/init-local-erpnext.ts",
     "erpnext:stop": "docker compose -f db/compose.yml stop erpnext-frontend erpnext-backend erpnext-websocket erpnext-queue erpnext-scheduler erpnext-db erpnext-redis-cache erpnext-redis-queue",
+    "erpnext-fly:up": "docker compose -f db/compose.yml --profile erpnext-fly up -d --build --wait erpnext-fly",
+    "erpnext-fly:stop": "docker compose -f db/compose.yml stop erpnext-fly",
     "ci:local": "bun run format:check && bunx turbo run lint check-types test build --filter=!@studafy/mobile && bash scripts/check-drift.sh",
     "ci:local:db": "bash scripts/ci-local-db.sh",
     "ci:local:containers": "bash scripts/ci-local-containers.sh",

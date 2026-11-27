@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Mirrors the "build-scan" matrix in .github/workflows/containers.yml: builds each service image,
-# enforces its size budget, and runs a Trivy scan if Trivy is installed locally. Skips erpnext by
-# default (its base image is ~2.7GB); set INCLUDE_ERPNEXT=1 to include it.
+# enforces its size budget, and runs a Trivy scan if Trivy is installed locally. Skips erpnext and
+# erpnext-fly by default (their base image is ~2.7GB); set INCLUDE_ERPNEXT=1 to include them.
 set -uo pipefail
 
 # "service:size-budget-MB" pairs, same budgets as containers.yml. Plain arrays rather than
 # associative ones so this runs on macOS's stock bash 3.2.
 SERVICES=(api:150 realtime:200 workers:250 migrations:100 web:120)
 if [ "${INCLUDE_ERPNEXT:-0}" = "1" ]; then
-  SERVICES+=(erpnext:3072)
+  SERVICES+=(erpnext:3072 erpnext-fly:3328)
 fi
 
 fail=0

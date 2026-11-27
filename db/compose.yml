@@ -172,9 +172,47 @@ services:
       - erpnext-backend
       - erpnext-websocket
 
+  # --- All-in-one ERPNext (profile "erpnext-fly") ------------------------------------------------------
+  # The production ERPNext machine (infra/fly/erpnext.toml) as one container: MariaDB, Redis,
+  # gunicorn, worker, scheduler and the site agent under supervisord, held to the same 2 GB.
+  # `bun run erpnext-fly:up` / `erpnext-fly:stop`. The agent creates each approved school's site
+  # (it polls the API on this machine); gunicorn picks the site from the Host header:
+  #   curl -H 'Host: <slug>.erpnext.localhost' http://127.0.0.1:8090/api/method/ping
+  # Local-only credentials, bound to 127.0.0.1. Separate from the "erpnext" profile above (own
+  # port and volume); run one or the other.
+  erpnext-fly:
+    image: studafy/erpnext-fly:local
+    build:
+      context: ..
+      dockerfile: infra/docker/erpnext-fly.Dockerfile
+    profiles: ["erpnext-fly"]
+    mem_limit: 2g
+    # Like fly's kill_timeout (infra/fly/erpnext.toml): time for supervisord to stop everything and
+    # MariaDB to shut down cleanly, instead of Docker's 10 s before SIGKILL.
+    stop_grace_period: 150s
+    # The entrypoint bind-mounts /data/sites over the bench's sites/ (see infra/erpnext/fly/entrypoint.sh),
+    # which needs CAP_SYS_ADMIN, and on Linux hosts no AppArmor profile (docker-default denies mount).
+    cap_add: [SYS_ADMIN]
+    security_opt: ["apparmor=unconfined"]
+    environment:
+      MARIADB_ROOT_PASSWORD: studafy-local-erp
+      ERPNEXT_ADMIN_PASSWORD: studafy-local-admin
+      STUDAFY_API_URL: http://host.docker.internal:3000
+      ERPNEXT_AGENT_TOKEN: studafy-local-erpnext-agent
+      STUDAFY_ERPNEXT_API_KEY: studafylocalkey01:studafy-local-erpnext-secret
+      STUDAFY_ERPNEXT_WEBHOOK_SECRET: studafy-local-erpnext-webhook
+      # BACKUP_S3_* unset: the agent skips backups locally.
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # Linux; Docker Desktop defines it already
+    ports:
+      - "127.0.0.1:8090:8000"
+    volumes:
+      - erpnext-fly-data:/data
+
 volumes:
   s3-data:
   clamav-db:
   erpnext-db:
   erpnext-redis-queue:
   erpnext-sites:
+  erpnext-fly-data:

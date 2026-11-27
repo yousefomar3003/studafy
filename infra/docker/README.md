@@ -1,19 +1,20 @@
 # Image build doc: every container image Studafy ships
 
-Seven Dockerfiles live in this directory, plus a `.dockerignore` at the repo root (Docker only
+Eight Dockerfiles live in this directory, plus a `.dockerignore` at the repo root (Docker only
 reads `.dockerignore` from the build context root, and every image builds with the repo root as
 context — see "Why the build context is the repo root" below). fly.io builds the production images
 from these Dockerfiles (`infra/fly/*.toml`).
 
-| Group      | Image        | Dockerfile              | Config it bakes in / where it is deployed                                              |
-| ---------- | ------------ | ----------------------- | -------------------------------------------------------------------------------------- |
-| App        | `api`        | `api.Dockerfile`        | Bun bundle of `apps/api`; fly app `infra/fly/api.toml`                                 |
-| App        | `realtime`   | `realtime.Dockerfile`   | Bun bundle of `apps/realtime`; `infra/fly/realtime.toml`                               |
-| App        | `workers`    | `workers.Dockerfile`    | Bun bundle of `apps/workers` + `workers/healthcheck.ts`; `infra/fly/workers.toml`      |
-| App        | `web`        | `web.Dockerfile`        | Vite build of `apps/web` served by nginx with `web/nginx.conf`; `infra/fly/web.toml`   |
-| DB tooling | `migrations` | `migrations.Dockerfile` | `db/migrations` + the `@studafy/db` CLI; one-off machine `infra/fly/migrate.toml`      |
-| Scanning   | `clamav`     | `clamav.Dockerfile`     | clamd; `infra/fly/scanner.toml`                                                        |
-| ERPNext    | `erpnext`    | `erpnext.Dockerfile`    | `frappe/erpnext` + Education app + `infra/erpnext/seed`; local only (`db/compose.yml`) |
+| Group      | Image         | Dockerfile               | Config it bakes in / where it is deployed                                                                       |
+| ---------- | ------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------- |
+| App        | `api`         | `api.Dockerfile`         | Bun bundle of `apps/api`; fly app `infra/fly/api.toml`                                                          |
+| App        | `realtime`    | `realtime.Dockerfile`    | Bun bundle of `apps/realtime`; `infra/fly/realtime.toml`                                                        |
+| App        | `workers`     | `workers.Dockerfile`     | Bun bundle of `apps/workers` + `workers/healthcheck.ts`; `infra/fly/workers.toml`                               |
+| App        | `web`         | `web.Dockerfile`         | Vite build of `apps/web` served by nginx with `web/nginx.conf`; `infra/fly/web.toml`                            |
+| DB tooling | `migrations`  | `migrations.Dockerfile`  | `db/migrations` + the `@studafy/db` CLI; one-off machine `infra/fly/migrate.toml`                               |
+| Scanning   | `clamav`      | `clamav.Dockerfile`      | clamd; `infra/fly/scanner.toml`                                                                                 |
+| ERPNext    | `erpnext`     | `erpnext.Dockerfile`     | `frappe/erpnext` + Education app + `infra/erpnext/seed`; local only (`db/compose.yml`)                          |
+| ERPNext    | `erpnext-fly` | `erpnext-fly.Dockerfile` | the `erpnext` image + MariaDB, Redis, supervisord and the site agent in one container; `infra/fly/erpnext.toml` |
 
 `containers.yml` builds, size-checks, and trivy-scans every image on each relevant PR (erpnext's
 scan is report-only; see the workflow's matrix comment).
