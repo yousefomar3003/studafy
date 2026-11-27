@@ -34,8 +34,9 @@ export async function refreshInvoicesSettledBy(
   if (names.length === 0) return;
 
   try {
+    // Driven by an ERPNext webhook, not by the school: not finance activity (erpnext-agent).
     const erpnext = await withTenantTx(database, { schoolId }, (tx) =>
-      erpnextFactory.forSchool(tx, schoolId),
+      erpnextFactory.forSchool(tx, schoolId, { recordActivity: false }),
     );
     for (const name of names) {
       const response = await erpnext.get<{ data: ErpNextSalesInvoice }>(

@@ -153,6 +153,10 @@ const EXEMPT_PATHS = [
   // Daily finance reconciliation, called by the workers' scheduler with the X-Api-Key service key --
   // no cookie or user session, so nothing a cross-site page could forge.
   "/api/finance/reconciliation/run",
+  // The ERPNext site agent, a machine bearing ERPNEXT_AGENT_TOKEN (modules/finance/erpnext-agent):
+  // no cookie or user session. Listed so a call without its token gets the routes' own 401 rather
+  // than a CSRF 403.
+  "/api/internal/erpnext",
   // School self-registration (ST-184), same posture as /api/auth/login above: no ambient authority
   // (cookie or Bearer header) a cross-site page could forge — a forged POST here accomplishes
   // nothing an attacker could not already do by calling the endpoint directly. Without this entry a

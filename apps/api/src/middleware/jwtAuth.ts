@@ -128,6 +128,9 @@ const DEFAULT_PUBLIC_PATHS = [
   // (reconciliation, called by the workers' scheduler) rather than a user token -- see csrf.ts.
   "/api/finance/webhooks/erpnext",
   "/api/finance/reconciliation/run",
+  // The ERPNext site agent (docs/plans/erpnext-fly.md): a machine on the private network bearing the
+  // shared ERPNEXT_AGENT_TOKEN, checked by its own routes (modules/finance/erpnext-agent), not a JWT.
+  "/api/internal/erpnext",
   // Plan/price listing is pre-signup content (the marketing pricing page reads it anonymously) and
   // the query is not school-scoped — see getActivePlans in subscription-service.ts.
   "/api/subscriptions/plans",

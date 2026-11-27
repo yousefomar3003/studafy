@@ -137,6 +137,7 @@ import {
   settleOnlineFeePayment,
   TenantErpNextFactory,
 } from "./modules/finance";
+import { erpNextAgentRoutes, FinanceActivityMarker } from "./modules/finance/erpnext-agent";
 import {
   approvalQueueRoutes,
   gradebookConfigRoutes,
@@ -280,6 +281,11 @@ export interface AppOptions {
    * `GET /api/realtime/ticket` unmounted, as in tests that do not exercise it.
    */
   realtimeTicketSecret?: string | null;
+  /**
+   * Bearer token of the ERPNext site agent (env.ERPNEXT_AGENT_TOKEN). Unset leaves
+   * `/api/internal/erpnext/*` unmounted, so those paths answer 404 (docs/plans/erpnext-fly.md).
+   */
+  erpnextAgentToken?: string | null;
   /**
    * Where CORS and CSRF rejections are persisted (app.security_events).
    *
@@ -451,6 +457,7 @@ export function createApp({
   jwtAccessTtlSeconds = 900,
   jwtRefreshTtlSeconds = 30 * 24 * 60 * 60,
   realtimeTicketSecret = null,
+  erpnextAgentToken = null,
   securityEventSink,
   docsEnabled = false,
   flags = null,
@@ -668,8 +675,18 @@ export function createApp({
         }),
         logger,
         redis,
+        // Wakes a school's sleeping ERPNext site on its first finance request (erpnext-agent).
+        // Needs Redis for its once-an-hour throttle; without Redis nothing is recorded.
+        activity: redis ? new FinanceActivityMarker({ database, redis, logger }) : null,
       })
     : null;
+
+  // The ERPNext site agent's internal API (docs/plans/erpnext-fly.md): creates, wakes and sleeps
+  // sites. Bearer ERPNEXT_AGENT_TOKEN, platform scope, kept out of the OpenAPI document. Not mounted
+  // without the token, so it answers 404.
+  if (database && erpnextAgentToken) {
+    app.route("/", erpNextAgentRoutes({ database, token: erpnextAgentToken }));
+  }
 
   if (database) {
     app.route("/", erpNextWebhookRoutes(database, logger, erpnextFactory));
