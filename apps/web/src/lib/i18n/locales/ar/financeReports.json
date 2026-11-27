@@ -63,7 +63,7 @@
       "ownRejectHint": "يجب أن يرفض هذا الاسترداد مستخدم آخر.",
       "approvedToast": "تم اعتماد الاسترداد",
       "approveTitle": "اعتماد الاسترداد؟",
-      "approveDescription": "سيؤدي هذا إلى إرسال الاسترداد إلى ERPNext كإشعار دائن. لا يمكن التراجع عن ذلك من هنا.",
+      "approveDescription": "يسجّل هذا الاسترداد في ERPNext. يُخصم أولًا ما لا يزال مستحقًا على الفاتورة، ويُعاد الباقي بالطريقة المطلوبة أو يُبقى رصيدًا. لا يمكن التراجع عن ذلك من هنا.",
       "approveLabel": "اعتماد الاسترداد",
       "approveError": "تعذّر اعتماد الاسترداد."
     },
@@ -89,7 +89,13 @@
       "upToOutstanding": "ما زال مستحقًا {{amount}} {{currency}} ويمكن شطبه.",
       "exceedsOutstanding": "هذا أكثر من المستحق المتبقي على هذه الفاتورة ({{amount}} {{currency}}). خفّض المبلغ للمتابعة.",
       "upToTotal": "يمكن إصدار إشعار دائن حتى {{amount}} {{currency}} (إجمالي الفاتورة).",
-      "exceedsTotal": "هذا أكثر من إجمالي الفاتورة ({{amount}} {{currency}}). خفّض المبلغ للمتابعة."
+      "exceedsTotal": "هذا أكثر من إجمالي الفاتورة ({{amount}} {{currency}}). خفّض المبلغ للمتابعة.",
+      "payoutModeLabel": "طريقة إعادة المبلغ",
+      "payoutAllOffInvoice": "سيُخصم كامل المبلغ {{amount}} مما لا يزال مستحقًا على هذه الفاتورة. لن يُعاد أي مبلغ.",
+      "payoutHandedBackSplit": "سيُخصم {{offInvoice}} مما لا يزال مستحقًا على هذه الفاتورة، ويُعاد {{back}} {{mode}} عند الموافقة.",
+      "payoutHandedBack": "سيُعاد {{back}} {{mode}} عند الموافقة.",
+      "payoutKeptAsCreditSplit": "سيُخصم {{offInvoice}} مما لا يزال مستحقًا على هذه الفاتورة، ويُبقى {{back}} رصيدًا في حساب العائلة.",
+      "payoutKeptAsCredit": "سيُبقى {{back}} رصيدًا في حساب العائلة."
     },
     "rejectRefund": {
       "title": "رفض الاسترداد",
@@ -300,7 +306,19 @@
       "approvedAt": "تاريخ الاعتماد",
       "completedAt": "تاريخ الإتمام",
       "creditNote": "الإشعار الدائن",
-      "studentAccount": "فتح حساب الطالب"
+      "studentAccount": "فتح حساب الطالب",
+      "settlement": "النتيجة"
+    },
+    "payoutMode": {
+      "cash": "نقدًا",
+      "bank_transfer": "تحويل بنكي",
+      "card_external": "بطاقة",
+      "credit": "إبقاؤه رصيدًا لفاتورة لاحقة"
+    },
+    "settlement": {
+      "invoice": "خُصم مما كان مستحقًا على الفاتورة؛ لم يُعَد أي مبلغ",
+      "paid_out": "أُعيد {{amount}} {{mode}}",
+      "family_credit": "أُبقي رصيدًا في حساب العائلة"
     }
   },
   "reports": {

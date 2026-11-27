@@ -8,14 +8,14 @@ import { useTranslation } from "../../../lib/i18n";
 import { fetchInvoice, invoiceQueryKey } from "../invoices/queries";
 
 import { AdjustmentConfirmDialog } from "./AdjustmentConfirmDialog";
-import { REASON_CODE_LABEL_KEYS } from "./labels";
+import { PAYOUT_MODE_LABEL_KEYS, REASON_CODE_LABEL_KEYS } from "./labels";
 import { useInitiateRefund } from "./mutations";
 import { formatMinorAmount, invoicePaidAmountMinor } from "./queries";
 import { RefundInvoicePickerField } from "./RefundInvoicePickerField";
 
 import "./adjustments.css";
 
-import type { ReasonCode, Refund } from "./queries";
+import type { PayoutMode, ReasonCode, Refund } from "./queries";
 import type { Invoice } from "../invoices/queries";
 import type { SelectOption } from "@studafy/ui";
 import type { TFunction } from "i18next";
@@ -104,6 +104,19 @@ function isReasonCode(value: string | null): value is ReasonCode {
   return value !== null && value in REASON_CODE_LABEL_KEYS;
 }
 
+/**
+ * What approving the refund will do, as the API settles it (`refundSettlementOf`): what the invoice
+ * still owes is taken off first; the rest goes back to the family by the payout mode, or stays on
+ * their account as credit. A write-off never exceeds what is owed, so it never pays anything out.
+ */
+export function payoutPreview(
+  outstandingMinor: number,
+  amountMinor: number,
+): { offInvoiceMinor: number; backMinor: number } {
+  const offInvoiceMinor = Math.max(0, Math.min(outstandingMinor, amountMinor));
+  return { offInvoiceMinor, backMinor: amountMinor - offInvoiceMinor };
+}
+
 function RefundForm({ onCreated }: RefundFormProps) {
   const { t } = useTranslation();
   const initiateRefund = useInitiateRefund();
@@ -135,6 +148,8 @@ function RefundForm({ onCreated }: RefundFormProps) {
     }
   }, [prefill.data, prefillReason]);
   const [reasonNotes, setReasonNotes] = useState("");
+  // Cash by default: most schools are paid, and pay back, in cash.
+  const [payoutMode, setPayoutMode] = useState<PayoutMode>("cash");
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   // Same lifetime rules as `RecordPaymentPage`'s own refs: one idempotency key per submission
@@ -152,6 +167,33 @@ function RefundForm({ onCreated }: RefundFormProps) {
   const amountMinor =
     isValidAmount && invoice ? Math.round(amountValue * 10 ** invoice.currency_minor_unit) : 0;
   const exceedsPaidAmount = isValidAmount && invoice !== null && amountMinor > limitMinor;
+  const preview = invoice ? payoutPreview(invoice.outstanding_amount_minor, amountMinor) : null;
+  const showsPayout = reasonCode !== "write_off";
+
+  const payoutOptions: SelectOption<PayoutMode>[] = (
+    Object.entries(PAYOUT_MODE_LABEL_KEYS) as [PayoutMode, string][]
+  ).map(([value, labelKey]) => ({ value, label: t(labelKey) }));
+
+  function previewText(): string | null {
+    if (!invoice || !preview || !isValidAmount || exceedsPaidAmount) return null;
+    const money = (minor: number) =>
+      `${formatMinorAmount(minor, invoice.currency_minor_unit)} ${invoice.currency}`;
+    if (preview.backMinor === 0) {
+      return t("financeReports.adjustments.newRefund.payoutAllOffInvoice", {
+        amount: money(preview.offInvoiceMinor),
+      });
+    }
+    const key =
+      (payoutMode === "credit"
+        ? "financeReports.adjustments.newRefund.payoutKeptAsCredit"
+        : "financeReports.adjustments.newRefund.payoutHandedBack") +
+      (preview.offInvoiceMinor > 0 ? "Split" : "");
+    return t(key, {
+      back: money(preview.backMinor),
+      offInvoice: money(preview.offInvoiceMinor),
+      mode: t(PAYOUT_MODE_LABEL_KEYS[payoutMode]),
+    });
+  }
 
   const reasonOptions: SelectOption<ReasonCode | "">[] = [
     { value: "", label: t("financeReports.adjustments.newRefund.selectReason") },
@@ -181,6 +223,7 @@ function RefundForm({ onCreated }: RefundFormProps) {
           currency: invoice.currency,
           reason_code: reasonCode as ReasonCode,
           reason_notes: reasonNotes.trim() || undefined,
+          ...(showsPayout ? { payout_mode: payoutMode } : {}),
         },
         idempotencyKey: idempotencyKeyRef.current,
       },
@@ -235,6 +278,23 @@ function RefundForm({ onCreated }: RefundFormProps) {
               onChange={setReasonCode}
               disabled={!invoice}
             />
+
+            {showsPayout ? (
+              <>
+                <Select
+                  label={t("financeReports.adjustments.newRefund.payoutModeLabel")}
+                  options={payoutOptions}
+                  value={payoutMode}
+                  onChange={setPayoutMode}
+                  disabled={!invoice}
+                />
+                {previewText() ? (
+                  <p className="adjustments-form__math" role="status" data-tone="neutral">
+                    {previewText()}
+                  </p>
+                ) : null}
+              </>
+            ) : null}
 
             <div className="sf-field">
               <label className="sf-field__label" htmlFor={reasonNotesId}>
@@ -308,6 +368,12 @@ function RefundForm({ onCreated }: RefundFormProps) {
               <dt>{t("financeReports.adjustments.common.reason")}</dt>
               <dd>{reasonCode ? t(REASON_CODE_LABEL_KEYS[reasonCode]) : "—"}</dd>
             </div>
+            {showsPayout ? (
+              <div>
+                <dt>{t("financeReports.adjustments.newRefund.payoutModeLabel")}</dt>
+                <dd>{previewText() ?? t(PAYOUT_MODE_LABEL_KEYS[payoutMode])}</dd>
+              </div>
+            ) : null}
           </dl>
         ) : null}
       </AdjustmentConfirmDialog>

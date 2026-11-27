@@ -10,11 +10,13 @@ import { useFormatters, useTranslation } from "../../../lib/i18n";
 
 import { AdjustmentConfirmDialog } from "./AdjustmentConfirmDialog";
 import {
+  PAYOUT_MODE_LABEL_KEYS,
   REASON_CODE_LABEL_KEYS,
   REFUND_KIND_EFFECT_KEYS,
   REFUND_KIND_LABEL_KEYS,
   REFUND_STATUS_LABEL_KEYS,
   refundStatusTone,
+  SETTLEMENT_LABEL_KEYS,
 } from "./labels";
 import { useApproveRefund } from "./mutations";
 import { fetchRefund, refundQueryKey } from "./queries";
@@ -94,6 +96,21 @@ export default function RefundDetailPage() {
       request.completed_at ? formatDateTime(new Date(request.completed_at)) : "—",
     ],
   ];
+  if (request.kind === "credit_note") {
+    rows.push([
+      t("financeReports.adjustments.newRefund.payoutModeLabel"),
+      t(PAYOUT_MODE_LABEL_KEYS[request.payout_mode]),
+    ]);
+    if (request.settlement !== "pending") {
+      rows.push([
+        t("financeReports.adjustments.detail.settlement"),
+        t(SETTLEMENT_LABEL_KEYS[request.settlement], {
+          amount: `${request.paid_out_amount} ${request.currency}`,
+          mode: t(PAYOUT_MODE_LABEL_KEYS[request.payout_mode]),
+        }),
+      ]);
+    }
+  }
   if (request.erpnext_credit_note_id) {
     rows.push([t("financeReports.adjustments.detail.creditNote"), request.erpnext_credit_note_id]);
   }

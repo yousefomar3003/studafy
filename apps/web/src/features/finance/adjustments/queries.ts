@@ -6,6 +6,8 @@ export type Refund = components["schemas"]["Refund"];
 export type RefundStatus = Refund["status"];
 export type ReasonCode = Refund["reason_code"];
 export type RefundKind = Refund["kind"];
+export type PayoutMode = Refund["payout_mode"];
+export type RefundSettlement = Refund["settlement"];
 export type InitiateRefundBody = components["schemas"]["InitiateRefundBody"];
 
 /** A decimal amount at `minorUnit` precision, formatted the same way `RecordPaymentPage`'s
