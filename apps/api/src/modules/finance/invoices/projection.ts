@@ -41,6 +41,8 @@ export interface ErpNextSalesInvoice {
   status?: string | null;
   currency?: string | null;
   grand_total?: number | string | null;
+  /** The grand total rounded to the currency's whole unit, unless the invoice disables rounding (0). */
+  rounded_total?: number | string | null;
   total?: number | string | null;
   outstanding_amount?: number | string | null;
   posting_date?: string | null;
@@ -136,7 +138,15 @@ export async function projectInvoiceEntry(
     return null;
   }
 
-  const totalAmount = Number(doc.grand_total ?? doc.total ?? 0);
+  // What the family owes is the rounded total when ERPNext rounds (its default): the outstanding is
+  // counted from it, so 1208.55 rounded up is 1209 outstanding, more than the unrounded grand total.
+  // Reading grand_total here skipped every invoice ERPNext rounded up, and mis-stated the ones it
+  // rounded down. The finance reports already treat it the same way (payableAmount).
+  const roundedTotal = Number(doc.rounded_total ?? 0);
+  const totalAmount =
+    Number.isFinite(roundedTotal) && roundedTotal > 0
+      ? roundedTotal
+      : Number(doc.grand_total ?? doc.total ?? 0);
   const outstandingAmount = Number(doc.outstanding_amount ?? doc.grand_total ?? doc.total ?? 0);
   // ck_invoice_cache_amounts already forbids outstanding > total; reject here with a log rather
   // than a constraint violation that surfaces as a 500 after the outbox committed.
