@@ -39,12 +39,35 @@ truth: a service missing a required value refuses to boot and names it.
 | `MICROSOFT_OAUTH_CLIENT_ID` / `_SECRET`                 | api                           | Optional. Microsoft sign-in off                                                                                                                                                                                                                                                                                                                                |
 | `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET`           | api (both), workers (key)     | Optional. Every school bills through Stripe while `TAP_COUNTRIES` is empty (the default: Studafy's company is Irish, and Tap only takes merchants registered in its markets). Without them, buying the AI add-on on the website answers 503 `STRIPE_NOT_CONFIGURED`                                                                                            |
 
-Not wired into the deploy workflow today, so they stay unset on fly (and their features stay off)
-until the workflow's secret list gains them: `TAP_SECRET_KEY` / `TAP_WEBHOOK_URL` (Tap payments,
-`docs/runbooks/tap-payments-setup.md`), and `ERPNEXT_API_URL` / `ERPNEXT_API_KEY` /
-`ERPNEXT_WEBHOOK_SECRET` / `RECONCILIATION_API_KEY` (finance answers 503 `ERPNEXT_NOT_CONFIGURED`;
-there is no ERPNext deployment on fly). Adding one means a `prod` secret plus a line in the
-workflow's `stage` calls — see `infra/README.md`'s "Where to change X".
+### ERPNext (only while `ERPNEXT_ENABLED` is `true`)
+
+The workflow copies these only when the repository variable `ERPNEXT_ENABLED` is `true`. While it is
+unset, none of them is staged anywhere, and finance answers 503 `ERPNEXT_NOT_CONFIGURED`. When it is
+on, the deploy refuses to start if any of them is missing. Setup and rotation:
+[erpnext-fly.md](erpnext-fly.md).
+
+| Key                                                       | Service                                            | Notes                                                                                                                                                      |
+| --------------------------------------------------------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ERPNEXT_API_KEY`                                         | api, workers; erpnext as `STUDAFY_ERPNEXT_API_KEY` | `<api_key>:<api_secret>`. The one credential the api and workers send to every school's site; `provision.py setup` sets it on each site's integration user |
+| `ERPNEXT_WEBHOOK_SECRET`                                  | api; erpnext as `STUDAFY_ERPNEXT_WEBHOOK_SECRET`   | The webhook master secret. Each site stores only its own derived secret ([erpnext-webhooks.md](erpnext-webhooks.md))                                       |
+| `ERPNEXT_AGENT_TOKEN`                                     | api, erpnext                                       | Bearer token the site agent sends to `/api/internal/erpnext/*`. Without it on the api those routes are not mounted (404)                                   |
+| `MARIADB_ROOT_PASSWORD`                                   | erpnext                                            | Set when `/data/mysql` is first created. Changing the secret alone does not change MariaDB's password                                                      |
+| `ERPNEXT_ADMIN_PASSWORD`                                  | erpnext                                            | The Administrator password of each new site                                                                                                                |
+| `BACKUP_S3_ACCESS_KEY_ID` / `BACKUP_S3_SECRET_ACCESS_KEY` | erpnext                                            | An R2 token for `studafy-prod-erpnext-backups` only. The endpoint is `S3_ENDPOINT`'s value, staged as `BACKUP_S3_ENDPOINT`                                 |
+
+Fixed in the workflow, not stored: `ERPNEXT_API_URL` (`http://studafy-core-erpnext.flycast:8000`,
+api and workers), `ERPNEXT_SITE_DOMAIN` (`erpnext.studafy.com`, api), and on erpnext
+`STUDAFY_API_URL` (`https://api.studafy.com`) and `BACKUP_S3_BUCKET` (`studafy-prod-erpnext-backups`).
+They are staged as secrets rather than set in `api.toml` or `workers.toml` because those files apply
+to every release, and an `ERPNEXT_API_URL` without its key stops the api from booting.
+`FLY_API_TOKEN` must include a deploy token for `studafy-core-erpnext`.
+
+### Not wired
+
+Not in the deploy workflow today, so they stay unset on fly (and their features stay off) until the
+workflow's secret list gains them: `TAP_SECRET_KEY` / `TAP_WEBHOOK_URL` (Tap payments,
+`docs/runbooks/tap-payments-setup.md`) and `RECONCILIATION_API_KEY`. Adding one means a `prod`
+secret plus a line in the workflow's `stage` calls — see `infra/README.md`'s "Where to change X".
 
 `GOOGLE_PLAY_RTDN_TOKEN` is not issued by Google: `openssl rand -hex 32`, then use it in the Pub/Sub
 push URL (`docs/runbooks/in-app-purchase-setup.md`). `GOOGLE_PLAY_SERVICE_ACCOUNT` is the whole JSON

@@ -3,16 +3,16 @@
 Production runs on fly.io instead of AWS ECS. Each service is its own fly app in `fra`
 (Frankfurt), next to the managed services it uses:
 
-| fly app                 | Config             | What                                                            |
-| ----------------------- | ------------------ | --------------------------------------------------------------- |
-| `studafy-core-api`      | `api.toml`         | apps/api, public at `api.studafy.com`                           |
-| `studafy-core-realtime` | `realtime.toml`    | apps/realtime; reached through the API's `/ws` (fly-replay)     |
-| `studafy-core-workers`  | `workers.toml`     | apps/workers, no inbound traffic                                |
-| `studafy-core-scanner`  | `scanner.toml`     | clamd, private (Flycast) only                                   |
-| `studafy-core-erpnext`  | `erpnext.toml`     | ERPNext (school finance) on one machine, private (Flycast) only |
-| `studafy-core-web`      | `web.toml`         | apps/web, public at `app.studafy.com`                           |
-| `studafy-core-migrate`  | `migrate.toml`     | db migrations, run as a one-off machine                         |
-| `studafy-log-shipper`   | `log-shipper.toml` | ships every app's logs to Axiom (EU), dataset `studafy-logs`    |
+| fly app                 | Config             | What                                                                     |
+| ----------------------- | ------------------ | ------------------------------------------------------------------------ |
+| `studafy-core-api`      | `api.toml`         | apps/api, public at `api.studafy.com`                                    |
+| `studafy-core-realtime` | `realtime.toml`    | apps/realtime; reached through the API's `/ws` (fly-replay)              |
+| `studafy-core-workers`  | `workers.toml`     | apps/workers, no inbound traffic                                         |
+| `studafy-core-scanner`  | `scanner.toml`     | clamd, private (Flycast) only                                            |
+| `studafy-core-erpnext`  | `erpnext.toml`     | ERPNext finance on one machine, private (Flycast) only; gated, see below |
+| `studafy-core-web`      | `web.toml`         | apps/web, public at `app.studafy.com`                                    |
+| `studafy-core-migrate`  | `migrate.toml`     | db migrations, run as a one-off machine                                  |
+| `studafy-log-shipper`   | `log-shipper.toml` | ships every app's logs to Axiom (EU), dataset `studafy-logs`             |
 
 What runs when:
 
@@ -35,6 +35,10 @@ What runs when:
   `REALTIME_FLY_APP` (api.toml), `VITE_REALTIME_ENABLED = "true"` (web.toml), build the apps with
   `--dart-define=REALTIME_ENABLED=true`, and put realtime.toml back to `min_machines_running = 1`
   with `auto_stop_machines = "off"`.
+- **erpnext**: always on, one machine with its own MariaDB and a 10 GB volume. The deploy workflow
+  builds, stages and deploys it only while the repository variable `ERPNEXT_ENABLED` is `true`, and
+  then only after the migrations and before the API. Setup, backups, upgrades and restores:
+  [docs/runbooks/erpnext-fly.md](../../docs/runbooks/erpnext-fly.md).
 
 Managed services: Postgres on Supabase (project `studafy-prod`, `eu-central-1`), Redis on Redis
 Cloud (`eu-central-1`, `noeviction`, AOF every second), files on Cloudflare R2 (bucket
@@ -148,6 +152,10 @@ run would overwrite. The workflow checks the required ones up front and names an
 | `FIREBASE_SERVICE_ACCOUNT`                                                                                                        |     | ✓                             |                            |         |
 | Optional: `GOOGLE_OAUTH_CLIENT_ID`/`_SECRET`, `MICROSOFT_OAUTH_CLIENT_ID`/`_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | ✓   | `STRIPE_SECRET_KEY`           |                            |         |
 | Optional: `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS` (traces to Axiom, see Observability)                        | ✓   | ✓                             | ✓                          |         |
+
+ERPNext's secrets (`ERPNEXT_*`, `MARIADB_ROOT_PASSWORD`, `BACKUP_S3_*`) go to `studafy-core-erpnext`,
+and `ERPNEXT_*` to the api and workers, only while `ERPNEXT_ENABLED` is `true`:
+[docs/runbooks/production-secrets.md](../../docs/runbooks/production-secrets.md#erpnext-only-while-erpnext_enabled-is-true).
 
 Build-time values for the web app come from the environment's **variables**: `VITE_TURNSTILE_SITE_KEY`,
 `VITE_SENTRY_DSN`, `SENTRY_ORG`, `SENTRY_PROJECT` (and the `SENTRY_AUTH_TOKEN` secret, for source maps).

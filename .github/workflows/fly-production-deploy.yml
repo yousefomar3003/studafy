@@ -18,6 +18,12 @@ name: Production deploy (fly.io)
 # policy (main only) and required reviewers are the server-side half of the gate: a modified copy of
 # this file on another branch cannot pass them (docs/runbooks/deploy.md).
 #
+# ERPNext (studafy-core-erpnext, docs/runbooks/erpnext-fly.md) is OFF unless the ERPNEXT_ENABLED
+# variable is 'true'. Every step that touches it is named "ERPNext: ..." and carries that `if:`, and
+# no other step names an ERPNext secret. With the variable unset, nothing ERPNext is built, staged or
+# deployed, and the api and workers get no ERPNEXT_* secret: the release is what it was without it.
+# With it on, ERPNext deploys after the migrations and before the API.
+#
 # Replaced the retired AWS ECS deploy workflows, removed with the rest of the AWS stack.
 
 on:
@@ -48,7 +54,9 @@ jobs:
     needs: gate
     runs-on: ubuntu-latest
     environment: prod
-    timeout-minutes: 60
+    # ERPNext adds a ~3 GB image build and its deploy. ERPNEXT_ENABLED is a repository variable
+    # (docs/runbooks/erpnext-fly.md), so this job-level expression reads it like the step gates do.
+    timeout-minutes: ${{ vars.ERPNEXT_ENABLED == 'true' && 90 || 60 }}
     env:
       FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
       RELEASE: ${{ github.sha }}
@@ -154,6 +162,76 @@ jobs:
             GOOGLE_PLAY_SERVICE_ACCOUNT \
             OTEL_EXPORTER_OTLP_ENDPOINT OTEL_EXPORTER_OTLP_HEADERS
 
+      # ERPNext, gated (see the header). Its secrets go on its own app, and the api and workers get
+      # the settings that turn finance on. Nothing here runs while ERPNEXT_ENABLED is unset.
+      - name: "ERPNext: check the app is private, and copy its secrets"
+        if: ${{ vars.ERPNEXT_ENABLED == 'true' }}
+        env:
+          MARIADB_ROOT_PASSWORD: ${{ secrets.MARIADB_ROOT_PASSWORD }}
+          ERPNEXT_ADMIN_PASSWORD: ${{ secrets.ERPNEXT_ADMIN_PASSWORD }}
+          ERPNEXT_API_KEY: ${{ secrets.ERPNEXT_API_KEY }}
+          ERPNEXT_WEBHOOK_SECRET: ${{ secrets.ERPNEXT_WEBHOOK_SECRET }}
+          ERPNEXT_AGENT_TOKEN: ${{ secrets.ERPNEXT_AGENT_TOKEN }}
+          BACKUP_S3_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
+          BACKUP_S3_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
+          # The backup bucket is in the same R2 account as the files bucket.
+          BACKUP_S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
+          # Not secrets. Fixed here, not in api.toml or workers.toml [env], because those apply to
+          # every release, and an ERPNEXT_API_URL without its key stops the api from booting.
+          ERPNEXT_API_URL: http://studafy-core-erpnext.flycast:8000
+          ERPNEXT_SITE_DOMAIN: erpnext.studafy.com
+          STUDAFY_API_URL: https://api.studafy.com
+          BACKUP_S3_BUCKET: studafy-prod-erpnext-backups
+        run: |
+          set -euo pipefail
+
+          missing=()
+          for key in MARIADB_ROOT_PASSWORD ERPNEXT_ADMIN_PASSWORD ERPNEXT_API_KEY ERPNEXT_WEBHOOK_SECRET \
+            ERPNEXT_AGENT_TOKEN BACKUP_S3_ACCESS_KEY_ID BACKUP_S3_SECRET_ACCESS_KEY BACKUP_S3_ENDPOINT; do
+            [ -n "${!key:-}" ] || missing+=("$key")
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::ERPNEXT_ENABLED is true, but the prod environment lacks: ${missing[*]}"
+            exit 1
+          fi
+          # provision.py sets this one credential on every site as the integration user's key.
+          if ! [[ "$ERPNEXT_API_KEY" =~ ^[^:]+:[^:]+$ ]]; then
+            echo "::error::ERPNEXT_API_KEY must be <api_key>:<api_secret>."
+            exit 1
+          fi
+
+          # Before anything changes: a deploy to an app with no address at all allocates public ones.
+          scripts/deploy/release.sh private-only studafy-core-erpnext
+
+          # The ERPNext machine holds the same API key and webhook master secret as the api, under
+          # the names provision.py reads.
+          flyctl secrets set --stage --app studafy-core-erpnext \
+            "MARIADB_ROOT_PASSWORD=$MARIADB_ROOT_PASSWORD" \
+            "ERPNEXT_ADMIN_PASSWORD=$ERPNEXT_ADMIN_PASSWORD" \
+            "STUDAFY_API_URL=$STUDAFY_API_URL" \
+            "ERPNEXT_AGENT_TOKEN=$ERPNEXT_AGENT_TOKEN" \
+            "STUDAFY_ERPNEXT_API_KEY=$ERPNEXT_API_KEY" \
+            "STUDAFY_ERPNEXT_WEBHOOK_SECRET=$ERPNEXT_WEBHOOK_SECRET" \
+            "BACKUP_S3_ENDPOINT=$BACKUP_S3_ENDPOINT" \
+            "BACKUP_S3_ACCESS_KEY_ID=$BACKUP_S3_ACCESS_KEY_ID" \
+            "BACKUP_S3_SECRET_ACCESS_KEY=$BACKUP_S3_SECRET_ACCESS_KEY" \
+            "BACKUP_S3_BUCKET=$BACKUP_S3_BUCKET" > /dev/null
+          echo "studafy-core-erpnext: 10 secrets staged"
+
+          flyctl secrets set --stage --app studafy-core-api \
+            "ERPNEXT_API_URL=$ERPNEXT_API_URL" \
+            "ERPNEXT_API_KEY=$ERPNEXT_API_KEY" \
+            "ERPNEXT_WEBHOOK_SECRET=$ERPNEXT_WEBHOOK_SECRET" \
+            "ERPNEXT_SITE_DOMAIN=$ERPNEXT_SITE_DOMAIN" \
+            "ERPNEXT_AGENT_TOKEN=$ERPNEXT_AGENT_TOKEN" > /dev/null
+          echo "studafy-core-api: 5 ERPNext secrets staged"
+
+          # The workers validate the two as a pair (apps/workers/src/env.ts).
+          flyctl secrets set --stage --app studafy-core-workers \
+            "ERPNEXT_API_URL=$ERPNEXT_API_URL" \
+            "ERPNEXT_API_KEY=$ERPNEXT_API_KEY" > /dev/null
+          echo "studafy-core-workers: 2 ERPNext secrets staged"
+
       - name: Record the images running now (the rollback targets)
         id: previous
         run: |
@@ -161,6 +239,11 @@ jobs:
           for app in api realtime workers web; do
             echo "$app=$(scripts/deploy/release.sh current-image "studafy-core-$app")" >> "$GITHUB_OUTPUT"
           done
+
+      - name: "ERPNext: record the image running now (its rollback target)"
+        id: previous_erpnext
+        if: ${{ vars.ERPNEXT_ENABLED == 'true' }}
+        run: echo "image=$(scripts/deploy/release.sh current-image studafy-core-erpnext)" >> "$GITHUB_OUTPUT"
 
       - name: Build the app images once
         id: images
@@ -190,6 +273,18 @@ jobs:
           # Source maps upload to Sentry only when the token is there (web.Dockerfile mounts it as a
           # BuildKit secret, so it never lands in the image).
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+
+      # Built once and deployed by digest like the others, but not Trivy-gated here: it is the
+      # unmodified third-party frappe/erpnext base, whose scan is report-only in containers.yml for
+      # the same reason (its CVE set churns with Trivy's database and is not ours to patch).
+      - name: "ERPNext: build the image once"
+        id: erpnext_image
+        if: ${{ vars.ERPNEXT_ENABLED == 'true' }}
+        run: |
+          set -euo pipefail
+          flyctl auth docker
+          image="$(scripts/deploy/release.sh build studafy-core-erpnext infra/fly/erpnext.toml "$RELEASE")"
+          echo "image=$image" >> "$GITHUB_OUTPUT"
 
       # The exact digests about to be released, scanned before anything changes in production.
       - name: Scan the api image
@@ -299,6 +394,21 @@ jobs:
             exit 1
           fi
 
+      # Before the API, so the API never points at an ERPNext that is not there yet.
+      - name: "ERPNext: deploy"
+        id: deploy_erpnext
+        if: ${{ vars.ERPNEXT_ENABLED == 'true' }}
+        run: scripts/deploy/release.sh deploy studafy-core-erpnext infra/fly/erpnext.toml "${{ steps.erpnext_image.outputs.image }}"
+
+      # The app has no public address, so the check runs inside its machine: the web process
+      # answers, and the deploy did not add a public IP.
+      - name: "ERPNext: smoke check"
+        if: ${{ vars.ERPNEXT_ENABLED == 'true' }}
+        run: |
+          set -euo pipefail
+          scripts/deploy/release.sh private-only studafy-core-erpnext
+          scripts/deploy/release.sh smoke-private studafy-core-erpnext http://127.0.0.1:8000/api/method/ping
+
       - name: Deploy the API
         id: deploy_api
         run: scripts/deploy/release.sh deploy studafy-core-api infra/fly/api.toml "${{ steps.images.outputs.api }}" --env "RELEASE_VERSION=$RELEASE"
@@ -338,3 +448,18 @@ jobs:
           done
           echo "::error::Release $RELEASE failed and was rolled back. Migrations are not reverted."
           exit $status
+
+      # Anything after the ERPNext deploy started failed (its own smoke check included): put it back
+      # on the digest it ran before. Skipped whenever its deploy was, so always while it is gated off.
+      # Safe because a deploy never runs `bench migrate`; after a manual migrate, restore instead.
+      - name: "ERPNext: roll back to the previous image"
+        if: ${{ failure() && steps.deploy_erpnext.outcome != 'skipped' }}
+        run: |
+          set -uo pipefail
+          image="${{ steps.previous_erpnext.outputs.image }}"
+          if [ -z "$image" ]; then
+            echo "::warning::No previous image recorded for studafy-core-erpnext; left as is."
+            exit 0
+          fi
+          echo "Rolling studafy-core-erpnext back to $image"
+          scripts/deploy/release.sh deploy studafy-core-erpnext infra/fly/erpnext.toml "$image"
