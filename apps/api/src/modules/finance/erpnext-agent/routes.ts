@@ -161,7 +161,7 @@ export function erpNextAgentRoutes({
 
   // Authenticate before anything else, validation included: an unauthenticated caller learns
   // nothing about the shapes these routes accept. Constant time (QA-092).
-  routes.use(`${ERPNEXT_AGENT_BASE_PATH}/*`, async (c, next) => {
+  routes.use("/api/internal/erpnext/*", async (c, next) => {
     if (!secretsMatch(bearerToken(c.req.header("Authorization")), token)) {
       c.get("log")?.warn({ reason: "erpnext_agent_token" }, "authentication failed");
       throw new CodedHttpException(401, ERROR_CODES.AUTH_TOKEN_INVALID, "Invalid agent token");
