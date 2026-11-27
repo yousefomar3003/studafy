@@ -144,21 +144,12 @@ ERPNext.
    ```
 
 3. **Backfill** the schools approved before ERPNext existed (they have no `pending` row). The API
-   image holds only the compiled server, so bundle the script from a checkout of the released commit
-   (after `bun install`), copy it in, and run it with the API's own settings:
+   build bundles the script next to the server (`dist/backfill-erpnext-sites.js`), so run it on the
+   API machine with the API's own settings:
 
    ```sh
-   bun build apps/api/scripts/backfill-erpnext-sites.ts --target bun --outfile /tmp/backfill-erpnext-sites.js
-   echo "put /tmp/backfill-erpnext-sites.js /tmp/backfill-erpnext-sites.js" | fly ssh sftp shell -a studafy-core-api
-   fly ssh console -a studafy-core-api
-   ```
-
-   Then, on the API machine:
-
-   ```sh
-   bun /tmp/backfill-erpnext-sites.js           # dry run: lists the schools it would register
-   bun /tmp/backfill-erpnext-sites.js --apply   # writes the rows; safe to re-run
-   rm /tmp/backfill-erpnext-sites.js
+   fly ssh console -a studafy-core-api -C "bun /app/dist/backfill-erpnext-sites.js"           # dry run: counts and the schools it would register
+   fly ssh console -a studafy-core-api -C "bun /app/dist/backfill-erpnext-sites.js --apply"   # writes the rows; safe to re-run
    ```
 
 4. **Watch the sites being created.** The agent builds pending sites one at a time, oldest first.
