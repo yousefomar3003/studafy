@@ -195,6 +195,15 @@ export const refundSchema = z
         "What was handed back to the family, as a decimal string; '0.000' unless paid_out.",
     }),
     paid_out_amount_minor: z.number().int(),
+    receipt_url: z
+      .string()
+      .nullable()
+      .openapi({
+        description:
+          "Path of the refund's PDF receipt on this API (`GET " +
+          "/api/finance/refunds/{refundId}/receipt`), present once money was handed back " +
+          "(`settlement: paid_out`). Relative to the API origin; fetched with the caller's token.",
+      }),
     status: refundStatusSchema,
     maker_id: uuidSchema,
     checker_id: uuidSchema.nullable(),

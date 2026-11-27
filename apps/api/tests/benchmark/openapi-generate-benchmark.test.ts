@@ -548,6 +548,7 @@ const EXPECTED_PATHS = [
   "/api/finance/families/{familyId}/reminders",
   "/api/finance/families/{familyId}/statements",
   "/api/finance/payments/{paymentId}/receipt",
+  "/api/finance/refunds/{refundId}/receipt",
   "/api/finance/reminders",
   "/api/finance/sibling-discount",
   "/api/grading/assessment-releases/{releaseId}/decision",

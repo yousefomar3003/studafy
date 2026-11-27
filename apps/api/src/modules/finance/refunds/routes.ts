@@ -8,6 +8,7 @@ import { requireAuth } from "../../../middleware/authContext";
 import { requirePermission } from "../../../middleware/authz";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
+import { refundReceiptUrlFor } from "../receipts/url";
 
 import {
   approveRefundBodySchema,
@@ -69,6 +70,7 @@ function toRefundResponse(row: RefundRow) {
     settlement: row.settlement,
     paid_out_amount: row.paid_out_amount,
     paid_out_amount_minor: row.paid_out_amount_minor,
+    receipt_url: refundReceiptUrlFor(row),
     status: row.status,
     maker_id: row.maker_id,
     checker_id: row.checker_id,

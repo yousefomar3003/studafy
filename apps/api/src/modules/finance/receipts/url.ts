@@ -11,3 +11,22 @@ export function receiptPath(paymentId: string): string {
 export function receiptUrlFor(payment: { id: string; status: string }): string | null {
   return payment.status === "confirmed" ? receiptPath(payment.id) : null;
 }
+
+/** Where a refund's receipt is served: a refund handed back to the family has one. */
+export function refundReceiptPath(refundId: string): string {
+  return `/api/finance/refunds/${encodeURIComponent(refundId)}/receipt`;
+}
+
+/** The receipt link a refund response carries: only once money was handed back to the family. */
+export function refundReceiptUrlFor(refund: {
+  id: string;
+  kind: string;
+  status: string;
+  settlement: string;
+}): string | null {
+  return refund.kind === "credit_note" &&
+    refund.status === "completed" &&
+    refund.settlement === "paid_out"
+    ? refundReceiptPath(refund.id)
+    : null;
+}

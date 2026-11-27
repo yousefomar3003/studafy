@@ -308,7 +308,9 @@ A and B are independent of C. D and E come last.
     - a partly paid invoice (600 off what it owed, 100 handed back)
     - kept as credit
     - bank transfer with no bank account set up (refused, still pending)
-  - **Not built yet:** a printable refund receipt for the parent to sign.
+  - **Refund receipt:** a refund handed back has a PDF receipt (`GET /api/finance/refunds/{id}/receipt`,
+    `receipt_url` on the refund, "Open receipt" on its page) in English or Arabic, with lines for
+    the guardian who receives the money and the staff member who pays it to sign.
 - **VAT reporting:** a journal credit reverses VAT in the ledger (the tax account). Reports built
   from Sales Invoices rather than the ledger may not include journal credits; check the VAT report a
   school files from before relying on it.
