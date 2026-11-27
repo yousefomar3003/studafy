@@ -24,13 +24,43 @@ export async function refreshInvoicesSettledBy(
   payment: ErpNextPaymentEntry,
   logger: Logger,
 ): Promise<void> {
-  const names = [
-    ...new Set(
-      (payment.references ?? [])
-        .filter((ref) => ref.reference_doctype === "Sales Invoice" && ref.reference_name)
-        .map((ref) => ref.reference_name!.trim()),
-    ),
-  ];
+  const names = (payment.references ?? [])
+    .filter((ref) => ref.reference_doctype === "Sales Invoice" && ref.reference_name)
+    .map((ref) => ref.reference_name!);
+  await refreshInvoices(database, erpnextFactory, schoolId, names, logger, {
+    erpnext_docname: payment.name,
+    after: "a payment",
+  });
+}
+
+/**
+ * The same for the invoice a credit note was made against: a note that credits its invoice lowers
+ * that invoice's outstanding the same silent way (and a note kept on itself leaves it unchanged,
+ * which a re-read confirms just as well).
+ */
+export async function refreshInvoiceCreditedBy(
+  database: Database,
+  erpnextFactory: TenantErpNextFactory,
+  schoolId: string,
+  creditNote: { name?: unknown; return_against?: unknown },
+  logger: Logger,
+): Promise<void> {
+  const against = typeof creditNote.return_against === "string" ? creditNote.return_against : "";
+  await refreshInvoices(database, erpnextFactory, schoolId, [against], logger, {
+    erpnext_docname: creditNote.name,
+    after: "a credit note",
+  });
+}
+
+async function refreshInvoices(
+  database: Database,
+  erpnextFactory: TenantErpNextFactory,
+  schoolId: string,
+  docnames: string[],
+  logger: Logger,
+  context: { erpnext_docname: unknown; after: string },
+): Promise<void> {
+  const names = [...new Set(docnames.map((name) => name.trim()).filter(Boolean))];
   if (names.length === 0) return;
 
   try {
@@ -48,8 +78,8 @@ export async function refreshInvoicesSettledBy(
     }
   } catch (err) {
     logger.warn(
-      { err, school_id: schoolId, erpnext_docname: payment.name, invoices: names },
-      "could not refresh invoices after a payment",
+      { err, school_id: schoolId, erpnext_docname: context.erpnext_docname, invoices: names },
+      `could not refresh invoices after ${context.after}`,
     );
   }
 }

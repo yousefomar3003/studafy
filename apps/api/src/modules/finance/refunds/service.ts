@@ -6,13 +6,16 @@ import { captureError } from "@studafy/observability";
 import { CodedHttpException } from "../../../coded-http-exception";
 import { tenantTxRunner, withTenantTx } from "../../../db/tenant-tx";
 import { ErpNextError } from "../../../erpnext/client";
+import { schoolToday } from "../../../lib/school-today";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
-import { formatMinorUnits, getCurrencyByCode, toMinorUnits } from "../currency";
+import { formatMinorUnits, fromMinorUnits, getCurrencyByCode, toMinorUnits } from "../currency";
+import { projectInvoiceEntry } from "../invoices/projection";
 
 import type { Database } from "../../../db/client";
 import type { TenantContext, TxRunner } from "../../../db/tenant-tx";
 import type { Logger } from "../../../logger";
 import type { TenantErpNext, TenantErpNextFactory } from "../client/tenant-client";
+import type { ErpNextSalesInvoice } from "../invoices/projection";
 import type { TransactionSql } from "postgres";
 
 const SALES_INVOICE_RESOURCE = "/api/resource/Sales%20Invoice";
@@ -20,8 +23,8 @@ const SALES_INVOICE_RESOURCE = "/api/resource/Sales%20Invoice";
 export type ReasonCode =
   "overpayment" | "withdrawal" | "discount_adjustment" | "error_correction" | "write_off";
 /**
- * What the approval does in ERPNext (000177). `credit_note`: a Sales Invoice return (a refund, a
- * fee correction, a write-off). `invoice_cancellation`: cancel an invoice nothing was paid against.
+ * What the approval does in ERPNext (000177). `credit_note`: a Credit Note Journal Entry for the
+ * amount (a refund, a fee correction, a write-off; see buildCreditNoteEntry). `invoice_cancellation`: cancel an invoice nothing was paid against.
  * `payment_reversal`: cancel a payment recorded by mistake, so its invoice is owed again.
  */
 export type RefundKind = "credit_note" | "invoice_cancellation" | "payment_reversal";
@@ -217,28 +220,116 @@ async function reserveRefundIdempotencyKey(
 }
 
 // ---------------------------------------------------------------------------
-// ERPNext payload builder
+// The credit note: a Journal Entry crediting the family exactly the refund's amount
 // ---------------------------------------------------------------------------
 
-export function buildCreditNotePayload(
-  params: InitiateRefundParams,
-  schoolId: string,
+const JOURNAL_ENTRY_RESOURCE = "/api/resource/Journal%20Entry";
+
+/** The refunded invoice, as the credit note is checked and shaped against it. */
+export interface RefundableInvoice {
+  name?: string;
+  docstatus?: number;
+  is_return?: number | string;
+  company?: string;
+  customer?: string;
+  currency?: string;
+  conversion_rate?: number | string;
+  debit_to?: string;
+  grand_total?: number | string;
+  rounded_total?: number | string;
+  outstanding_amount?: number | string;
+  items?: { income_account?: string; cost_center?: string; net_amount?: number | string }[];
+  taxes?: {
+    account_head?: string;
+    cost_center?: string;
+    tax_amount_after_discount_amount?: number | string;
+  }[];
+}
+
+/**
+ * The credit note to submit: a Journal Entry of type Credit Note for exactly the refund's amount.
+ *
+ * Not a return Sales Invoice: ERPNext counts a return by item quantity, so after one partial refund
+ * of a tuition invoice its items read as fully returned and no further refund of it is possible
+ * (and a return of zero quantity is refused). A journal credit carries an amount, not quantities.
+ *
+ *   - Credit: the invoice's receivable account, for the invoice's customer. Applied to the invoice
+ *     (its outstanding drops by the refund) while the invoice still owes at least that much;
+ *     otherwise (paid, or owing less) left unallocated on the customer: a balance due to the family.
+ *   - Debit: the invoice's own income and tax accounts, in the invoice's proportions, so income and
+ *     VAT are reversed as a return would reverse them. Shares are worked out in minor units and the
+ *     rounding remainder goes to the largest line, so the lines always sum to the refund exactly.
+ *
+ * `user_remark` carries the refund's tag: how the entry is found again after an ambiguous failure.
+ */
+export function buildCreditNoteEntry(
+  invoice: RefundableInvoice,
+  refund: Pick<
+    RefundRow,
+    "id" | "erpnext_invoice_id" | "amount_minor" | "currency_minor_unit" | "reason_code"
+  > & { reason_notes?: string | null },
+  postingDate: string,
 ): Record<string, unknown> {
+  const minorUnit = refund.currency_minor_unit;
+  const amountMinor = BigInt(refund.amount_minor);
+  const toMinor = (value: number | string | undefined) =>
+    toMinorUnits(Number(value ?? 0) || 0, minorUnit);
+
+  const weighted = [
+    ...(invoice.items ?? []).map((item) => ({
+      account: item.income_account,
+      cost_center: item.cost_center,
+      weight: toMinor(item.net_amount),
+    })),
+    ...(invoice.taxes ?? []).map((tax) => ({
+      account: tax.account_head,
+      cost_center: tax.cost_center,
+      weight: toMinor(tax.tax_amount_after_discount_amount),
+    })),
+  ].filter((line) => line.account && line.weight > 0n);
+  const totalWeight = weighted.reduce((sum, line) => sum + line.weight, 0n);
+  if (weighted.length === 0 || totalWeight <= 0n) {
+    throw new RangeError("the invoice has no income or tax lines to reverse");
+  }
+
+  const shares = weighted.map((line) => (amountMinor * line.weight) / totalWeight);
+  const remainder = amountMinor - shares.reduce((sum, share) => sum + share, 0n);
+  const largest = weighted.reduce(
+    (top, line, i) => (line.weight > weighted[top]!.weight ? i : top),
+    0,
+  );
+  shares[largest] = shares[largest]! + remainder;
+
+  const outstandingMinor = toMinor(invoice.outstanding_amount);
+  const applied = outstandingMinor >= amountMinor;
+  const remark = [refundTag(refund.id), `(${refund.reason_code})`, refund.reason_notes]
+    .filter(Boolean)
+    .join(" ");
+
   return {
-    doctype: "Sales Invoice",
-    is_return: 1,
-    return_against: params.erpnext_invoice_id,
-    customer: "",
-    items: [],
-    total: -params.amount,
-    grand_total: -params.amount,
-    outstanding_amount: -params.amount,
-    is_pos: 0,
-    update_stock: 0,
-    custom_school_id: schoolId,
-    custom_student_id: params.student_id,
-    custom_reason_code: params.reason_code,
-    ...(params.reason_notes ? { custom_reason_notes: params.reason_notes } : {}),
+    doctype: "Journal Entry",
+    voucher_type: "Credit Note",
+    company: invoice.company,
+    posting_date: postingDate,
+    user_remark: remark,
+    accounts: [
+      ...weighted
+        .map((line, i) => ({
+          account: line.account,
+          ...(line.cost_center ? { cost_center: line.cost_center } : {}),
+          debit_in_account_currency: fromMinorUnits(shares[i]!, minorUnit),
+        }))
+        .filter((line) => line.debit_in_account_currency > 0),
+      {
+        account: invoice.debit_to,
+        party_type: "Customer",
+        party: invoice.customer,
+        credit_in_account_currency: fromMinorUnits(amountMinor, minorUnit),
+        ...(applied
+          ? { reference_type: "Sales Invoice", reference_name: refund.erpnext_invoice_id }
+          : {}),
+      },
+    ],
     docstatus: 1,
   };
 }
@@ -386,9 +477,9 @@ export const STALE_REFUND_CLAIM_MINUTES = 15;
 export type RefundLog = Pick<Logger, "error" | "warn" | "info">;
 
 /**
- * The text a credit note carries in its standard `remarks` field so it can be found again after an
- * ambiguous failure. `remarks` is a stock Sales Invoice field on every ERPNext site, so the lookup
- * needs no custom field (unknown `custom_*` fields are dropped silently by Frappe on insert).
+ * The text a credit note carries in its standard `user_remark` field so it can be found again after
+ * an ambiguous failure. `user_remark` is a stock Journal Entry field on every ERPNext site, so the
+ * lookup needs no custom field (unknown `custom_*` fields are dropped silently by Frappe on insert).
  */
 export function refundTag(refundId: string): string {
   return `Studafy refund request ${refundId}`;
@@ -436,10 +527,19 @@ export async function approveRefund(
     }
     assertApprovable(refund, userId);
 
-    const call =
-      refund.kind === "credit_note"
-        ? await creditNoteCall(tx, schoolId, refund)
-        : await cancellationCall(tx, schoolId, refund);
+    // A credit note is shaped from the invoice in ERPNext, which is read after this transaction
+    // (no transaction is held across ERPNext); a cancellation's call is known now.
+    let call: ApprovalCall | null = null;
+    let alreadyRefundedMinor = 0n;
+    let postingDate = "";
+    if (refund.kind === "credit_note") {
+      await assertCreditNoteCurrency(tx, refund);
+      alreadyRefundedMinor = await refundedOnInvoice(tx, schoolId, refund);
+      // The school's own date, not the server's UTC one (QA-044).
+      postingDate = await schoolToday(tx);
+    } else {
+      call = await cancellationCall(tx, schoolId, refund);
+    }
 
     const claimed = await tx`
       UPDATE app.refund_requests
@@ -460,10 +560,31 @@ export async function approveRefund(
     return {
       refund: { ...refund, checker_id: userId },
       call,
+      alreadyRefundedMinor,
+      postingDate,
       erpnext: await erpnextFor(tx),
     };
   });
-  const { refund, call, erpnext } = claim;
+  const { refund, erpnext } = claim;
+  let call: ApprovalCall;
+  if (claim.call) {
+    call = claim.call;
+  } else {
+    // Reads only: nothing here touches the ledger, so any failure hands the claim back exactly as
+    // a refusal does.
+    try {
+      call = await creditNoteCall(
+        erpnext,
+        refund,
+        claim.alreadyRefundedMinor,
+        claim.postingDate,
+        acceptLanguage,
+      );
+    } catch (error) {
+      await releaseClaim(runTx, schoolId, refundId, userId);
+      translateErpNextRefundError(error);
+    }
+  }
 
   // Only the POST is inside the try: a lookup's own 503 must not be mistaken for the call failing.
   let created: { name?: string } | undefined;
@@ -496,7 +617,58 @@ export async function approveRefund(
     translateErpNextRefundError(callError);
   }
 
-  return runTx((tx) => finalizeApproval(tx, schoolId, refund, call.docname, outcome));
+  const row = await runTx((tx) => finalizeApproval(tx, schoolId, refund, call.docname, outcome));
+  if (refund.kind === "credit_note") {
+    await refreshRefundedInvoice(runTx, erpnext, schoolId, refund.erpnext_invoice_id, log);
+  }
+  return row;
+}
+
+/**
+ * What this invoice's other live credit-note refunds have already credited, in minor units. A
+ * journal credit is not counted by ERPNext against the invoice the way a return is, so Studafy
+ * keeps the running total.
+ */
+async function refundedOnInvoice(
+  tx: TransactionSql,
+  schoolId: string,
+  refund: RefundRow,
+): Promise<bigint> {
+  const [row] = await tx<{ refunded: string }[]>`
+    SELECT COALESCE(SUM(amount_minor), 0)::text AS refunded
+    FROM app.refund_requests
+    WHERE school_id = ${schoolId}::uuid
+      AND erpnext_invoice_id = ${refund.erpnext_invoice_id}
+      AND kind = 'credit_note'
+      AND status IN ('approved', 'submitted_to_erpnext', 'completed')
+      AND id <> ${refund.id}::uuid
+  `;
+  return BigInt(row?.refunded ?? "0");
+}
+
+/**
+ * Re-read the refunded invoice and update its cached copy: a credit applied to it lowers its
+ * outstanding with no Sales Invoice event, so no webhook would. Best-effort, after the approval is
+ * recorded: a failure is logged, and the next payment or refund re-reads it.
+ */
+async function refreshRefundedInvoice(
+  runTx: TxRunner,
+  erpnext: TenantErpNext,
+  schoolId: string,
+  invoiceName: string,
+  log?: RefundLog,
+): Promise<void> {
+  try {
+    const response = await erpnext.get<{ data: ErpNextSalesInvoice }>(
+      `${SALES_INVOICE_RESOURCE}/${encodeURIComponent(invoiceName)}`,
+    );
+    await runTx((tx) => projectInvoiceEntry(tx, schoolId, response.data.data));
+  } catch (error) {
+    log?.warn(
+      { school_id: schoolId, erpnext_docname: invoiceName, err: error },
+      "could not refresh the invoice after a refund",
+    );
+  }
 }
 
 /**
@@ -591,8 +763,8 @@ function reportUnsettled(
 
 /**
  * Whether an approval's ERPNext write landed, read from ERPNext with GETs only (it never posts):
- *   - credit note: a submitted return Sales Invoice against the invoice whose `remarks` carry the
- *     refund's tag (refundTag).
+ *   - credit note: a submitted Credit Note Journal Entry whose `user_remark` carries the refund's
+ *     tag (refundTag).
  *   - cancellation / reversal: the target document's docstatus is 2 (cancelled).
  * Throws when ERPNext cannot be asked.
  */
@@ -603,13 +775,12 @@ export async function lookUpOutcome(
 ): Promise<ErpNextOutcome> {
   if (refund.kind === "credit_note") {
     const filters = JSON.stringify([
-      ["is_return", "=", 1],
-      ["return_against", "=", refund.erpnext_invoice_id],
+      ["voucher_type", "=", "Credit Note"],
       ["docstatus", "=", 1],
-      ["remarks", "like", `%${refundTag(refund.id)}%`],
+      ["user_remark", "like", `%${refundTag(refund.id)}%`],
     ]);
     const response = await erpnext.get<{ data?: { name?: string }[] }>(
-      `${SALES_INVOICE_RESOURCE}?filters=${encodeURIComponent(filters)}` +
+      `${JOURNAL_ENTRY_RESOURCE}?filters=${encodeURIComponent(filters)}` +
         `&fields=${encodeURIComponent(JSON.stringify(["name"]))}&limit_page_length=1`,
     );
     const name = response.data.data?.[0]?.name?.trim();
@@ -658,10 +829,13 @@ async function finalizeCreditNote(
   refund: RefundRow,
   creditNoteId: string,
 ): Promise<RefundRow> {
+  // A submitted Journal Entry is final in ERPNext the moment the call returns: no later document
+  // event confirms it, so the refund completes here.
   await tx`
     UPDATE app.refund_requests
-    SET status = 'submitted_to_erpnext',
+    SET status = 'completed',
         erpnext_credit_note_id = ${creditNoteId},
+        completed_at = CURRENT_TIMESTAMP,
         updated_at = CURRENT_TIMESTAMP
     WHERE school_id = ${schoolId}::uuid AND id = ${refund.id}::uuid
   `;
@@ -681,7 +855,7 @@ async function finalizeCreditNote(
       status: "pending_approval",
     },
     newValues: {
-      status: "submitted_to_erpnext",
+      status: "completed",
       checker_id: refund.checker_id,
       erpnext_credit_note_id: creditNoteId,
       reason_code: refund.reason_code,
@@ -882,46 +1056,76 @@ async function releaseClaim(
   }
 }
 
-/** A credit note: a submitted return Sales Invoice against the refunded invoice. */
-async function creditNoteCall(
-  tx: TransactionSql,
-  schoolId: string,
-  refund: RefundRow,
-): Promise<ApprovalCall> {
-  const currency = await getCurrencyByCode(tx, refund.currency);
-  if (!currency) {
+/** A credit note's currency must still be active, as when it was requested. */
+async function assertCreditNoteCurrency(tx: TransactionSql, refund: RefundRow): Promise<void> {
+  if (!(await getCurrencyByCode(tx, refund.currency))) {
     throw new CodedHttpException(
       400,
       ERROR_CODES.VALIDATION_FAILED,
       `Currency for refund no longer active: ${refund.currency}`,
     );
   }
+}
 
-  const amountDecimal = Number(refund.amount_minor) / Math.pow(10, currency.minorUnit);
+function refundRefused(message: string): CodedHttpException {
+  return new CodedHttpException(400, ERROR_CODES.VALIDATION_FAILED, message);
+}
 
-  return {
-    path: SALES_INVOICE_RESOURCE,
-    body: {
-      doctype: "Sales Invoice",
-      is_return: 1,
-      return_against: refund.erpnext_invoice_id,
-      customer: "",
-      items: [],
-      total: -amountDecimal,
-      grand_total: -amountDecimal,
-      outstanding_amount: -amountDecimal,
-      is_pos: 0,
-      update_stock: 0,
-      custom_school_id: schoolId,
-      custom_student_id: refund.student_id,
-      custom_reason_code: refund.reason_code,
-      ...(refund.reason_notes ? { custom_reason_notes: refund.reason_notes } : {}),
-      // How the note is found again after an ambiguous failure (lookUpOutcome).
-      remarks: refundTag(refund.id),
-      docstatus: 1,
-    },
-    docname: null,
-  };
+/**
+ * A credit note: a submitted Journal Entry crediting the family (buildCreditNoteEntry). Reads the
+ * invoice only; nothing is posted here. `alreadyRefundedMinor` is what this invoice's other live
+ * refunds have already credited, so no invoice is refunded beyond what it charged.
+ */
+async function creditNoteCall(
+  erpnext: TenantErpNext,
+  refund: RefundRow,
+  alreadyRefundedMinor: bigint,
+  postingDate: string,
+  acceptLanguage?: string,
+): Promise<ApprovalCall> {
+  const minorUnit = refund.currency_minor_unit;
+  const invoice =
+    (
+      await erpnext.get<{ data?: RefundableInvoice }>(
+        `${SALES_INVOICE_RESOURCE}/${encodeURIComponent(refund.erpnext_invoice_id)}`,
+        { acceptLanguage },
+      )
+    ).data.data ?? {};
+  if (invoice.docstatus !== 1 || Number(invoice.is_return ?? 0) === 1) {
+    throw refundRefused("Only a submitted invoice can be refunded");
+  }
+  if ((invoice.currency ?? "").toUpperCase() !== refund.currency.toUpperCase()) {
+    throw refundRefused(
+      `The invoice is in ${invoice.currency ?? "another currency"}, not ${refund.currency}`,
+    );
+  }
+  if (Number(invoice.conversion_rate ?? 1) !== 1) {
+    throw refundRefused("Refunds of an invoice in a foreign currency are not supported");
+  }
+
+  // What the family was charged: ERPNext's rounded total when it rounds (its default), else exact.
+  const rounded = Number(invoice.rounded_total ?? 0);
+  const chargedMinor = toMinorUnits(
+    Number.isFinite(rounded) && rounded > 0 ? rounded : Number(invoice.grand_total ?? 0) || 0,
+    minorUnit,
+  );
+  const leftMinor = chargedMinor - alreadyRefundedMinor;
+  if (BigInt(refund.amount_minor) > leftMinor) {
+    throw refundRefused(
+      leftMinor > 0n
+        ? `The refund is more than is left to refund on this invoice ` +
+            `(${formatMinorUnits(leftMinor, minorUnit)} ${refund.currency})`
+        : "Nothing on this invoice is left to refund",
+    );
+  }
+
+  let body: Record<string, unknown>;
+  try {
+    body = buildCreditNoteEntry(invoice, refund, postingDate);
+  } catch {
+    throw refundRefused("This invoice has no income or tax lines a refund can reverse");
+  }
+  return { path: JOURNAL_ENTRY_RESOURCE, body, docname: null };
 }
 
 // ---------------------------------------------------------------------------

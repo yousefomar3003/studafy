@@ -29,7 +29,7 @@ import { ErpNextError } from "../../../erpnext/client";
 import {
   approveRefund,
   applyRefundCompleted,
-  buildCreditNotePayload,
+  buildCreditNoteEntry,
   getRefund,
   hashRefundRequest,
   initiateRefund,
@@ -109,54 +109,89 @@ describe("idempotency request hash", () => {
 // ERPNext Credit Note document shape
 // ---------------------------------------------------------------------------
 
-describe("Credit Note payload", () => {
-  test("submits rather than saving a draft", () => {
-    expect(buildCreditNotePayload(makeParams(), SCHOOL_ID).docstatus).toBe(1);
+describe("Credit Note journal entry", () => {
+  const refund = {
+    id: "33333333-3333-4333-8333-333333333333",
+    erpnext_invoice_id: "ACC-SINV-2026-00042",
+    amount_minor: 100_000, // 100.000 JOD
+    currency_minor_unit: 3,
+    reason_code: "overpayment" as const,
+    reason_notes: null as string | null,
+  };
+  interface Line {
+    account: string;
+    party_type?: string;
+    debit_in_account_currency?: number;
+    credit_in_account_currency?: number;
+    reference_type?: string;
+    reference_name?: string;
+    party?: string;
+  }
+  const entry = (invoice = REFUNDABLE_INVOICE, r = refund) =>
+    buildCreditNoteEntry(invoice, r, "2026-11-28") as { accounts: Line[] } & Record<
+      string,
+      unknown
+    >;
+
+  test("is a submitted Credit Note journal entry, tagged with the refund", () => {
+    const body = entry();
+    expect(body).toMatchObject({
+      doctype: "Journal Entry",
+      voucher_type: "Credit Note",
+      company: "Test School",
+      posting_date: "2026-11-28",
+      docstatus: 1,
+    });
+    expect(String(body.user_remark)).toContain(refundTag(refund.id));
   });
 
-  test("is marked as a return against the original invoice", () => {
-    const payload = buildCreditNotePayload(
-      makeParams({ erpnext_invoice_id: "ACC-SINV-2026-00042" }),
-      SCHOOL_ID,
+  test("credits the family the refund, applied to the invoice while it owes at least that", () => {
+    const credit = entry().accounts.at(-1)!;
+    expect(credit).toEqual({
+      account: "Debtors - TS",
+      party_type: "Customer",
+      party: "STU-0001",
+      credit_in_account_currency: 100,
+      reference_type: "Sales Invoice",
+      reference_name: "ACC-SINV-2026-00042",
+    });
+  });
+
+  test("leaves the credit unallocated (owed to the family) when the invoice owes less", () => {
+    for (const outstanding_amount of [0, 99.999]) {
+      const credit = entry({ ...REFUNDABLE_INVOICE, outstanding_amount }).accounts.at(-1)!;
+      expect(credit).not.toHaveProperty("reference_name");
+      expect(credit.credit_in_account_currency).toBe(100);
+    }
+  });
+
+  test("reverses income and VAT in the invoice's proportions", () => {
+    const debits = entry().accounts.slice(0, -1);
+    expect(debits.map((l) => [l.account, l.debit_in_account_currency])).toEqual([
+      ["Tuition - TS", 70],
+      ["Transport - TS", 25],
+      ["VAT - TS", 5],
+    ]);
+  });
+
+  test("the debits always sum to the refund exactly; the remainder goes to the largest line", () => {
+    const odd = { ...refund, amount_minor: 33_333 }; // 33.333 JOD
+    const debits = entry(REFUNDABLE_INVOICE, odd).accounts.slice(0, -1);
+    const sum = debits.reduce(
+      (total, l) => total + Math.round(l.debit_in_account_currency! * 1000),
+      0,
     );
-    expect(payload.is_return).toBe(1);
-    expect(payload.return_against).toBe("ACC-SINV-2026-00042");
+    expect(sum).toBe(33_333);
+    expect(debits[0]!.debit_in_account_currency).toBe(23.334); // 23.333 + the 0.001 remainder
   });
 
-  test("carries the school and student so the webhook can route back", () => {
-    const payload = buildCreditNotePayload(makeParams(), SCHOOL_ID);
-    expect(payload.custom_school_id).toBe(SCHOOL_ID);
-    expect(payload.custom_student_id).toBe(STUDENT_ID);
+  test("carries the reason in the remark", () => {
+    const body = entry(REFUNDABLE_INVOICE, { ...refund, reason_notes: "Parent requested refund" });
+    expect(body.user_remark).toBe(`${refundTag(refund.id)} (overpayment) Parent requested refund`);
   });
 
-  test("amounts are negative for a return", () => {
-    const payload = buildCreditNotePayload(makeParams({ amount: 50 }), SCHOOL_ID);
-    expect(payload.total).toBe(-50);
-    expect(payload.grand_total).toBe(-50);
-    expect(payload.outstanding_amount).toBe(-50);
-  });
-
-  test("carries the reason code as a custom field", () => {
-    const payload = buildCreditNotePayload(makeParams({ reason_code: "withdrawal" }), SCHOOL_ID);
-    expect(payload.custom_reason_code).toBe("withdrawal");
-  });
-
-  test("omits reason_notes when absent", () => {
-    const payload = buildCreditNotePayload(makeParams(), SCHOOL_ID);
-    expect(payload).not.toHaveProperty("custom_reason_notes");
-  });
-
-  test("includes reason_notes when provided", () => {
-    const payload = buildCreditNotePayload(
-      makeParams({ reason_notes: "Parent requested refund" }),
-      SCHOOL_ID,
-    );
-    expect(payload.custom_reason_notes).toBe("Parent requested refund");
-  });
-
-  test("does not update stock for a credit note", () => {
-    const payload = buildCreditNotePayload(makeParams(), SCHOOL_ID);
-    expect(payload.update_stock).toBe(0);
+  test("refuses an invoice with no income or tax lines", () => {
+    expect(() => entry({ ...REFUNDABLE_INVOICE, items: [], taxes: [] })).toThrow(RangeError);
   });
 });
 
@@ -203,9 +238,43 @@ function inTx(tx: TransactionSql): TxRunner {
   return (fn) => fn(tx);
 }
 
+/** The refunded invoice, as approval reads it before posting: 950 JOD of fees + 50 VAT. */
+const REFUNDABLE_INVOICE = {
+  name: "ACC-SINV-FIXTURE",
+  docstatus: 1,
+  is_return: 0,
+  company: "Test School",
+  customer: "STU-0001",
+  currency: "JOD",
+  conversion_rate: 1,
+  debit_to: "Debtors - TS",
+  grand_total: 1000,
+  rounded_total: 1000,
+  outstanding_amount: 1000,
+  items: [
+    { income_account: "Tuition - TS", cost_center: "Main - TS", net_amount: 700 },
+    { income_account: "Transport - TS", cost_center: "Main - TS", net_amount: 250 },
+  ],
+  taxes: [
+    { account_head: "VAT - TS", cost_center: "Main - TS", tax_amount_after_discount_amount: 50 },
+  ],
+};
+
+/** Answers the approval's read of the invoice; null for any other GET. */
+function invoiceRead(path: string): Promise<unknown> | null {
+  if (/^\/api\/resource\/Sales%20Invoice\/[^?]+$/.test(path)) {
+    return Promise.resolve({
+      data: { data: REFUNDABLE_INVOICE },
+      status: 200,
+      headers: new Headers(),
+    });
+  }
+  return null;
+}
+
 function mockErpNext(creditNoteName: string): TenantErpNext {
   return {
-    get: () => Promise.reject(new Error("not implemented")),
+    get: (path: string) => invoiceRead(path) ?? Promise.reject(new Error("not implemented")),
     post: () =>
       Promise.resolve({
         data: { data: { name: creditNoteName } },
@@ -642,7 +711,7 @@ describeDb("rejectRefund", () => {
 // ---------------------------------------------------------------------------
 
 describeDb("approveRefund", () => {
-  test("approves a refund and marks it as submitted_to_erpnext", async () => {
+  test("approves a refund and completes it once its journal entry is submitted", async () => {
     const school = await createSchool(db.sql);
     const student = await createStudent(db.sql, school.id);
     const makerId = await createFinanceUser(school.id);
@@ -675,7 +744,7 @@ describeDb("approveRefund", () => {
       ),
     );
 
-    expect(approved.status).toBe("submitted_to_erpnext");
+    expect(approved.status).toBe("completed");
     expect(approved.checker_id).toBe(checkerId);
     expect(approved.erpnext_credit_note_id).toBe(creditNoteName);
     expect(approved.approved_at).not.toBeNull();
@@ -810,6 +879,9 @@ describeDb("approveRefund: ERPNext is called with no transaction open", () => {
     const bodies: unknown[] = [];
     const client = {
       get: (path: string) => {
+        // The invoice reads before the post are not lookups; `gets` records only lookups.
+        const read = invoiceRead(path);
+        if (read) return read;
         gets.push(path);
         return get(path);
       },
@@ -890,7 +962,7 @@ describeDb("approveRefund: ERPNext is called with no transaction open", () => {
       refundId,
     );
     expect(approved).toMatchObject({
-      status: "submitted_to_erpnext",
+      status: "completed",
       erpnext_credit_note_id: "ACC-CRN-F01",
     });
   });
@@ -922,7 +994,7 @@ describeDb("approveRefund: ERPNext is called with no transaction open", () => {
     expect(retry.calls()).toBe(0);
   });
 
-  test("the credit note carries the refund's tag in remarks", async () => {
+  test("the credit note carries the refund's tag in user_remark", async () => {
     const { schoolId, checkerId, refundId } = await pendingRefund("ACC-SINV-T01");
     const erpnext = erpNextAnswering(() =>
       Promise.resolve({ data: { data: { name: "CN-T01" } }, status: 201, headers: new Headers() }),
@@ -934,7 +1006,9 @@ describeDb("approveRefund: ERPNext is called with no transaction open", () => {
       checkerId,
       refundId,
     );
-    expect(erpnext.bodies[0]).toMatchObject({ remarks: refundTag(refundId) });
+    expect(String((erpnext.bodies[0] as { user_remark?: string }).user_remark)).toContain(
+      refundTag(refundId),
+    );
   });
 
   test("ambiguous failure, credit note found in ERPNext: finalized once, never posted again", async () => {
@@ -950,14 +1024,15 @@ describeDb("approveRefund: ERPNext is called with no transaction open", () => {
     );
 
     expect(approved).toMatchObject({
-      status: "submitted_to_erpnext",
+      status: "completed",
       erpnext_credit_note_id: "ACC-CRN-A10",
       checker_id: checkerId,
     });
     expect(erpnext.calls()).toBe(1);
-    // The lookup names the invoice, a submitted return, and the refund's tag.
+    // The lookup asks for a submitted Credit Note journal entry carrying the refund's tag.
     const lookup = decodeURIComponent(erpnext.gets[0]!);
-    expect(lookup).toContain('["return_against","=","ACC-SINV-A10"]');
+    expect(lookup).toStartWith("/api/resource/Journal Entry?");
+    expect(lookup).toContain('["voucher_type","=","Credit Note"]');
     expect(lookup).toContain(refundTag(refundId));
   });
 
@@ -1027,7 +1102,7 @@ describeDb("approveRefund: ERPNext is called with no transaction open", () => {
       refundId,
     );
     expect(settled).toMatchObject({
-      status: "submitted_to_erpnext",
+      status: "completed",
       erpnext_credit_note_id: "ACC-CRN-A12",
     });
     expect(found.calls()).toBe(0);
@@ -1095,7 +1170,7 @@ describeDb("approveRefund: ERPNext is called with no transaction open", () => {
     expect(outcomes.map((o) => o.status).sort()).toEqual(["fulfilled", "rejected"]);
     const rejected = outcomes.find((o) => o.status === "rejected") as PromiseRejectedResult;
     expect(rejected.reason).toMatchObject({ status: 409 });
-    expect((await statusOf(schoolId, refundId)).status).toBe("submitted_to_erpnext");
+    expect((await statusOf(schoolId, refundId)).status).toBe("completed");
   });
 });
 
@@ -1135,9 +1210,8 @@ describeDb("reconcileStaleRefundClaims", () => {
       get: (path: string) =>
         Promise.resolve({
           data: {
-            data: decodeURIComponent(path).includes("ACC-SINV-R01")
-              ? [{ name: "ACC-CRN-R01" }]
-              : [],
+            // The lookup finds a journal entry by the refund's tag (its id), not by the invoice.
+            data: decodeURIComponent(path).includes(posted) ? [{ name: "ACC-CRN-R01" }] : [],
           },
           status: 200,
           headers: new Headers(),
@@ -1165,7 +1239,7 @@ describeDb("reconcileStaleRefundClaims", () => {
     `;
     const byId = new Map(rows.map((row) => [row.id, row]));
     expect(byId.get(posted)).toMatchObject({
-      status: "submitted_to_erpnext",
+      status: "completed",
       erpnext_credit_note_id: "ACC-CRN-R01",
     });
     expect(byId.get(missing)!.status).toBe("pending_approval");
@@ -1175,7 +1249,7 @@ describeDb("reconcileStaleRefundClaims", () => {
     const [audit] = await db.sql<{ n: number }[]>`
       SELECT count(*)::int AS n FROM app.audit_logs
       WHERE target_table = 'refund_requests' AND target_id = ${posted}
-        AND new_values->>'status' = 'submitted_to_erpnext'
+        AND new_values->>'status' = 'completed'
     `;
     expect(audit!.n).toBe(1);
   });
@@ -1334,11 +1408,11 @@ describeDb("applyRefundCompleted", () => {
       ),
     );
 
-    expect(approved.status).toBe("submitted_to_erpnext");
+    expect(approved.status).toBe("completed");
     expect(approved.checker_id).toBe(checkerId);
     expect(approved.erpnext_credit_note_id).toBe(creditNoteName);
 
-    // ERPNext sends webhook confirmation
+    // A later credit-note webhook for it changes nothing: the refund is already complete.
     await withTx(school.id, (tx) => applyRefundCompleted(tx, school.id, creditNoteName, {}));
 
     const completed = await withTx(school.id, (tx) => getRefund(tx, school.id, initiated.id));
@@ -1346,5 +1420,174 @@ describeDb("applyRefundCompleted", () => {
     expect(completed.status).toBe("completed");
     expect(completed.erpnext_credit_note_id).toBe(creditNoteName);
     expect(completed.completed_at).not.toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The credit note is built from the invoice in ERPNext
+// ---------------------------------------------------------------------------
+
+describeDb("approveRefund: the credit note is a journal entry built from the invoice", () => {
+  const ok = (data: unknown) => Promise.resolve({ data, status: 200, headers: new Headers() });
+
+  async function pendingRefund(
+    invoice: string,
+    amount = 25,
+    schoolId?: string,
+    studentId?: string,
+  ) {
+    const school = schoolId ? { id: schoolId } : await createSchool(db.sql);
+    const student = studentId ? { id: studentId } : await createStudent(db.sql, school.id);
+    const makerId = await createFinanceUser(school.id);
+    const checkerId = await createFinanceUser(school.id);
+    const { row } = await initiateRefund(
+      db.sql,
+      { schoolId: school.id, userId: makerId },
+      {
+        student_id: student.id,
+        erpnext_invoice_id: invoice,
+        amount,
+        currency: "JOD",
+        reason_code: "overpayment",
+      },
+      crypto.randomUUID(),
+    );
+    return { schoolId: school.id, studentId: student.id, checkerId, refundId: row.id };
+  }
+
+  const separateTxs =
+    (schoolId: string): TxRunner =>
+    (fn) =>
+      withTx(schoolId, fn);
+
+  async function statusOf(refundId: string) {
+    const [row] = await db.sql<{ status: string; erpnext_credit_note_id: string | null }[]>`
+      SELECT status, erpnext_credit_note_id FROM app.refund_requests WHERE id = ${refundId}::uuid
+    `;
+    return row!;
+  }
+
+  /** A fake ERPNext site: the invoice, and every write it is sent. */
+  function site(opts: { invoice?: Record<string, unknown> | Error; name?: string } = {}) {
+    const posts: { path: string; body: Record<string, unknown> }[] = [];
+    const client = {
+      get: (path: string) => {
+        if (opts.invoice instanceof Error) return Promise.reject(opts.invoice);
+        return ok({ data: { ...REFUNDABLE_INVOICE, ...opts.invoice } });
+      },
+      post: (path: string, body: Record<string, unknown>, options?: { retry?: boolean }) => {
+        expect(options?.retry).toBe(false);
+        posts.push({ path, body });
+        return ok({ data: { name: opts.name ?? "ACC-JV-0001" } });
+      },
+      put: () => Promise.reject(new Error("not implemented")),
+    } as unknown as TenantErpNext;
+    return { client, posts };
+  }
+
+  test("posts one Credit Note journal entry and completes the refund", async () => {
+    const { schoolId, checkerId, refundId } = await pendingRefund("ACC-SINV-J01");
+    const erpnext = site({ name: "ACC-JV-J01" });
+
+    const approved = await approveRefund(
+      separateTxs(schoolId),
+      async () => erpnext.client,
+      schoolId,
+      checkerId,
+      refundId,
+    );
+
+    expect(approved.status).toBe("completed");
+    expect(approved.erpnext_credit_note_id).toBe("ACC-JV-J01");
+    expect(approved.completed_at).not.toBeNull();
+    expect(erpnext.posts).toHaveLength(1);
+    expect(erpnext.posts[0]!.path).toBe("/api/resource/Journal%20Entry");
+    expect(erpnext.posts[0]!.body).toMatchObject({ voucher_type: "Credit Note", docstatus: 1 });
+  });
+
+  test("a second partial refund of the same invoice is allowed up to what it charged", async () => {
+    const first = await pendingRefund("ACC-SINV-J02", 600);
+    await approveRefund(
+      separateTxs(first.schoolId),
+      async () => site().client,
+      first.schoolId,
+      first.checkerId,
+      first.refundId,
+    );
+
+    const second = await pendingRefund("ACC-SINV-J02", 400, first.schoolId, first.studentId);
+    const approved = await approveRefund(
+      separateTxs(second.schoolId),
+      async () => site({ name: "ACC-JV-J02B" }).client,
+      second.schoolId,
+      second.checkerId,
+      second.refundId,
+    );
+    expect(approved.status).toBe("completed");
+
+    // 600 + 400 is the whole 1000 charged: one more unit is refused, and nothing is posted.
+    const third = await pendingRefund("ACC-SINV-J02", 1, first.schoolId, first.studentId);
+    const erpnext = site();
+    await expect(
+      approveRefund(
+        separateTxs(third.schoolId),
+        async () => erpnext.client,
+        third.schoolId,
+        third.checkerId,
+        third.refundId,
+      ),
+    ).rejects.toMatchObject({ status: 400 });
+    expect(erpnext.posts).toHaveLength(0);
+    expect((await statusOf(third.refundId)).status).toBe("pending_approval");
+  });
+
+  test("a cancelled or draft invoice is refused before anything is posted", async () => {
+    const { schoolId, checkerId, refundId } = await pendingRefund("ACC-SINV-J03");
+    const erpnext = site({ invoice: { docstatus: 2 } });
+
+    await expect(
+      approveRefund(
+        separateTxs(schoolId),
+        async () => erpnext.client,
+        schoolId,
+        checkerId,
+        refundId,
+      ),
+    ).rejects.toMatchObject({ status: 400 });
+    expect(erpnext.posts).toHaveLength(0);
+    expect((await statusOf(refundId)).status).toBe("pending_approval");
+  });
+
+  test("an invoice in another currency is refused before anything is posted", async () => {
+    const { schoolId, checkerId, refundId } = await pendingRefund("ACC-SINV-J04");
+    const erpnext = site({ invoice: { currency: "USD" } });
+
+    await expect(
+      approveRefund(
+        separateTxs(schoolId),
+        async () => erpnext.client,
+        schoolId,
+        checkerId,
+        refundId,
+      ),
+    ).rejects.toMatchObject({ status: 400 });
+    expect(erpnext.posts).toHaveLength(0);
+  });
+
+  test("ERPNext down while reading the invoice hands the claim back and posts nothing", async () => {
+    const { schoolId, checkerId, refundId } = await pendingRefund("ACC-SINV-J05");
+    const erpnext = site({ invoice: new ErpNextError("unreachable", 503, null, "network") });
+
+    await expect(
+      approveRefund(
+        separateTxs(schoolId),
+        async () => erpnext.client,
+        schoolId,
+        checkerId,
+        refundId,
+      ),
+    ).rejects.toMatchObject({ status: 503 });
+    expect(erpnext.posts).toHaveLength(0);
+    expect((await statusOf(refundId)).status).toBe("pending_approval");
   });
 });

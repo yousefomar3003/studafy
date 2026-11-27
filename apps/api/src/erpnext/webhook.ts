@@ -10,8 +10,12 @@ import {
 } from "../modules/finance/communications/service";
 import { projectFeeScheduleEntry } from "../modules/finance/fee-schedules/projection";
 import { projectInvoiceEntry } from "../modules/finance/invoices/projection";
-import { refreshInvoicesSettledBy } from "../modules/finance/invoices/refresh";
+import {
+  refreshInvoiceCreditedBy,
+  refreshInvoicesSettledBy,
+} from "../modules/finance/invoices/refresh";
 import { projectPaymentEntry } from "../modules/finance/payments/projection";
+import { applyRefundCompleted } from "../modules/finance/refunds/service";
 import { openApiValidationHook } from "../openapi/hook";
 import { standardResponses } from "../openapi/responses";
 
@@ -72,8 +76,15 @@ async function projectToCache(
   logger: Logger,
 ): Promise<void> {
   switch (eventName) {
-    case "erpnext.invoiceSubmitted":
     case "erpnext.creditNoteIssued":
+      // A credit note is a refund's ERPNext write: settle the refund it belongs to. It is not an
+      // invoice of its own (its amounts are negative), so it is not projected into invoice_cache;
+      // the invoice it credits is re-read after this (refreshInvoiceCreditedBy).
+      await withTenantTx(db, { schoolId }, (tx) =>
+        applyRefundCompleted(tx, schoolId, String(data.name ?? "").trim(), data),
+      );
+      break;
+    case "erpnext.invoiceSubmitted":
       // ST-121 follow-on: the invoice arm previously passed `String(data.student_id ?? data.customer
       // ?? "")` into a uuid column, an ISO currency *code* into the currency_id uuid foreign key,
       // and a raw decimal into total_amount_minor. All three are hard failures on any real payload
@@ -339,6 +350,9 @@ export function erpNextWebhookRoutes(
           body.data as ErpNextPaymentEntry,
           logger,
         );
+      }
+      if (eventName === "erpnext.creditNoteIssued" && erpnextFactory) {
+        await refreshInvoiceCreditedBy(db, erpnextFactory, schoolId, body.data, logger);
       }
       await notifyGuardians(db, schoolId, eventName, body.data as Record<string, unknown>, logger);
     } catch (err) {
