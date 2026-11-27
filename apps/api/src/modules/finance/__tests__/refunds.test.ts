@@ -30,6 +30,7 @@ import {
   approveRefund,
   applyRefundCompleted,
   buildCreditNoteEntry,
+  refundSettlementOf,
   getRefund,
   hashRefundRequest,
   initiateRefund,
@@ -157,12 +158,60 @@ describe("Credit Note journal entry", () => {
     });
   });
 
-  test("leaves the credit unallocated (owed to the family) when the invoice owes less", () => {
-    for (const outstanding_amount of [0, 99.999]) {
-      const credit = entry({ ...REFUNDABLE_INVOICE, outstanding_amount }).accounts.at(-1)!;
-      expect(credit).not.toHaveProperty("reference_name");
-      expect(credit.credit_in_account_currency).toBe(100);
-    }
+  const CASH = { account: "Cash - TS", modeOfPayment: "Cash" };
+  const lines = (body: { accounts: Line[] }) =>
+    body.accounts
+      .slice(3) // after the three income/VAT debits
+      .map((l) => [
+        l.account,
+        l.debit_in_account_currency ? "Dr" : "Cr",
+        l.debit_in_account_currency ?? l.credit_in_account_currency,
+        l.reference_name ?? null,
+      ]);
+
+  test("a paid invoice refunded in cash: credit and payout in the one entry, nothing left open", () => {
+    const body = buildCreditNoteEntry(
+      { ...REFUNDABLE_INVOICE, outstanding_amount: 0 },
+      { ...refund, payout_mode: "cash" },
+      "2026-11-28",
+      CASH,
+    ) as { accounts: Line[] } & Record<string, unknown>;
+    expect(body.mode_of_payment).toBe("Cash");
+    expect(lines(body)).toEqual([
+      ["Debtors - TS", "Cr", 100, null],
+      ["Debtors - TS", "Dr", 100, null],
+      ["Cash - TS", "Cr", 100, null],
+    ]);
+  });
+
+  test("an invoice owing part of the refund: that part credited to it, the rest paid out", () => {
+    const body = buildCreditNoteEntry(
+      { ...REFUNDABLE_INVOICE, outstanding_amount: 40 },
+      { ...refund, payout_mode: "cash" },
+      "2026-11-28",
+      CASH,
+    ) as { accounts: Line[] } & Record<string, unknown>;
+    expect(lines(body)).toEqual([
+      ["Debtors - TS", "Cr", 40, "ACC-SINV-2026-00042"],
+      ["Debtors - TS", "Cr", 60, null],
+      ["Debtors - TS", "Dr", 60, null],
+      ["Cash - TS", "Cr", 60, null],
+    ]);
+  });
+
+  test("kept as credit: the rest stays on the family's account, no cash moves", () => {
+    const body = entry({ ...REFUNDABLE_INVOICE, outstanding_amount: 0 }, {
+      ...refund,
+      payout_mode: "credit",
+    } as typeof refund);
+    expect(body).not.toHaveProperty("mode_of_payment");
+    expect(lines(body)).toEqual([["Debtors - TS", "Cr", 100, null]]);
+  });
+
+  test("a payout with no account to pay it from is refused", () => {
+    expect(() =>
+      buildCreditNoteEntry({ ...REFUNDABLE_INVOICE, outstanding_amount: 0 }, refund, "2026-11-28"),
+    ).toThrow(RangeError);
   });
 
   test("reverses income and VAT in the invoice's proportions", () => {
@@ -192,6 +241,29 @@ describe("Credit Note journal entry", () => {
 
   test("refuses an invoice with no income or tax lines", () => {
     expect(() => entry({ ...REFUNDABLE_INVOICE, items: [], taxes: [] })).toThrow(RangeError);
+  });
+});
+
+describe("refundSettlementOf", () => {
+  test("what the invoice owes is credited first; the rest goes back by the payout mode", () => {
+    expect(refundSettlementOf(1000n, 100n, "cash")).toEqual({
+      settlement: "invoice",
+      appliedMinor: 100n,
+      restMinor: 0n,
+    });
+    expect(refundSettlementOf(40n, 100n, "cash")).toEqual({
+      settlement: "paid_out",
+      appliedMinor: 40n,
+      restMinor: 60n,
+    });
+    expect(refundSettlementOf(0n, 100n, "bank_transfer").settlement).toBe("paid_out");
+    expect(refundSettlementOf(0n, 100n, "credit")).toEqual({
+      settlement: "family_credit",
+      appliedMinor: 0n,
+      restMinor: 100n,
+    });
+    // An invoice already credited past zero owes nothing.
+    expect(refundSettlementOf(-5n, 100n, "cash").appliedMinor).toBe(0n);
   });
 });
 
@@ -1435,6 +1507,7 @@ describeDb("approveRefund: the credit note is a journal entry built from the inv
     amount = 25,
     schoolId?: string,
     studentId?: string,
+    payout_mode?: "cash" | "bank_transfer" | "card_external" | "credit",
   ) {
     const school = schoolId ? { id: schoolId } : await createSchool(db.sql);
     const student = studentId ? { id: studentId } : await createStudent(db.sql, school.id);
@@ -1449,6 +1522,7 @@ describeDb("approveRefund: the credit note is a journal entry built from the inv
         amount,
         currency: "JOD",
         reason_code: "overpayment",
+        ...(payout_mode ? { payout_mode } : {}),
       },
       crypto.randomUUID(),
     );
@@ -1468,10 +1542,23 @@ describeDb("approveRefund: the credit note is a journal entry built from the inv
   }
 
   /** A fake ERPNext site: the invoice, and every write it is sent. */
-  function site(opts: { invoice?: Record<string, unknown> | Error; name?: string } = {}) {
+  function site(
+    opts: {
+      invoice?: Record<string, unknown> | Error;
+      name?: string;
+      cashAccount?: string | null;
+    } = {},
+  ) {
     const posts: { path: string; body: Record<string, unknown> }[] = [];
+    const accountLookups: string[] = [];
     const client = {
       get: (path: string) => {
+        if (path.includes("get_bank_cash_account")) {
+          accountLookups.push(decodeURIComponent(path));
+          return ok({
+            message: opts.cashAccount === null ? {} : { account: opts.cashAccount ?? "Cash - TS" },
+          });
+        }
         if (opts.invoice instanceof Error) return Promise.reject(opts.invoice);
         return ok({ data: { ...REFUNDABLE_INVOICE, ...opts.invoice } });
       },
@@ -1482,7 +1569,7 @@ describeDb("approveRefund: the credit note is a journal entry built from the inv
       },
       put: () => Promise.reject(new Error("not implemented")),
     } as unknown as TenantErpNext;
-    return { client, posts };
+    return { client, posts, accountLookups };
   }
 
   test("posts one Credit Note journal entry and completes the refund", async () => {
@@ -1572,6 +1659,113 @@ describeDb("approveRefund: the credit note is a journal entry built from the inv
       ),
     ).rejects.toMatchObject({ status: 400 });
     expect(erpnext.posts).toHaveLength(0);
+  });
+
+  test("an unpaid invoice: the refund is taken off it and no cash moves", async () => {
+    const { schoolId, checkerId, refundId } = await pendingRefund("ACC-SINV-J10");
+    const erpnext = site();
+
+    const approved = await approveRefund(
+      separateTxs(schoolId),
+      async () => erpnext.client,
+      schoolId,
+      checkerId,
+      refundId,
+    );
+
+    expect(approved).toMatchObject({
+      payout_mode: "cash",
+      settlement: "invoice",
+      paid_out_amount_minor: 0,
+    });
+    expect(erpnext.accountLookups).toHaveLength(0);
+  });
+
+  test("a paid invoice refunded in cash: paid out from the Cash account, recorded as paid out", async () => {
+    const { schoolId, checkerId, refundId } = await pendingRefund("ACC-SINV-J11", 25);
+    const erpnext = site({ invoice: { outstanding_amount: 0 }, cashAccount: "Cash - TS" });
+
+    const approved = await approveRefund(
+      separateTxs(schoolId),
+      async () => erpnext.client,
+      schoolId,
+      checkerId,
+      refundId,
+    );
+
+    expect(approved).toMatchObject({
+      status: "completed",
+      payout_mode: "cash",
+      settlement: "paid_out",
+      paid_out_amount: "25.000",
+      paid_out_amount_minor: 25_000,
+    });
+    expect(erpnext.accountLookups[0]).toContain("mode_of_payment=Cash");
+    const accounts = erpnext.posts[0]!.body.accounts as Record<string, unknown>[];
+    expect(accounts.at(-1)).toEqual({ account: "Cash - TS", credit_in_account_currency: 25 });
+  });
+
+  test("kept as credit: nothing is paid out and no cash account is needed", async () => {
+    const { schoolId, checkerId, refundId } = await pendingRefund(
+      "ACC-SINV-J12",
+      25,
+      undefined,
+      undefined,
+      "credit",
+    );
+    const erpnext = site({ invoice: { outstanding_amount: 0 }, cashAccount: null });
+
+    const approved = await approveRefund(
+      separateTxs(schoolId),
+      async () => erpnext.client,
+      schoolId,
+      checkerId,
+      refundId,
+    );
+
+    expect(approved).toMatchObject({ settlement: "family_credit", paid_out_amount_minor: 0 });
+    expect(erpnext.accountLookups).toHaveLength(0);
+  });
+
+  test("no default cash account in ERPNext: refused before anything is posted, still pending", async () => {
+    const { schoolId, checkerId, refundId } = await pendingRefund("ACC-SINV-J13");
+    const erpnext = site({ invoice: { outstanding_amount: 0 }, cashAccount: null });
+
+    await expect(
+      approveRefund(
+        separateTxs(schoolId),
+        async () => erpnext.client,
+        schoolId,
+        checkerId,
+        refundId,
+      ),
+    ).rejects.toMatchObject({ status: 400 });
+    expect(erpnext.posts).toHaveLength(0);
+    const [row] = await db.sql<{ status: string; settlement: string; paid_out_minor: string }[]>`
+      SELECT status, settlement, paid_out_minor::text FROM app.refund_requests WHERE id = ${refundId}::uuid
+    `;
+    expect(row).toEqual({ status: "pending_approval", settlement: "pending", paid_out_minor: "0" });
+  });
+
+  test("a refusal after the settlement is recorded puts it back to pending", async () => {
+    const { schoolId, checkerId, refundId } = await pendingRefund("ACC-SINV-J14");
+    const erpnext = site({ invoice: { outstanding_amount: 0 } });
+    (erpnext.client as unknown as { post: unknown }).post = () =>
+      Promise.reject(new ErpNextError("Cash account is frozen", 417, {}));
+
+    await expect(
+      approveRefund(
+        separateTxs(schoolId),
+        async () => erpnext.client,
+        schoolId,
+        checkerId,
+        refundId,
+      ),
+    ).rejects.toMatchObject({ status: 400 });
+    const [row] = await db.sql<{ status: string; settlement: string }[]>`
+      SELECT status, settlement FROM app.refund_requests WHERE id = ${refundId}::uuid
+    `;
+    expect(row).toEqual({ status: "pending_approval", settlement: "pending" });
   });
 
   test("ERPNext down while reading the invoice hands the claim back and posts nothing", async () => {

@@ -10,6 +10,7 @@ import { schoolToday } from "../../../lib/school-today";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
 import { formatMinorUnits, fromMinorUnits, getCurrencyByCode, toMinorUnits } from "../currency";
 import { projectInvoiceEntry } from "../invoices/projection";
+import { BANK_CASH_ACCOUNT_METHOD, PAYMENT_MODE_MAP } from "../payments/service";
 
 import type { Database } from "../../../db/client";
 import type { TenantContext, TxRunner } from "../../../db/tenant-tx";
@@ -31,6 +32,15 @@ export type RefundKind = "credit_note" | "invoice_cancellation" | "payment_rever
 export type RefundStatus =
   "pending_approval" | "approved" | "rejected" | "submitted_to_erpnext" | "completed" | "failed";
 
+/**
+ * How the part of a refund not taken off what the invoice still owes goes back to the family (000271):
+ * handed back by cash, bank transfer or card, or kept on their account as credit.
+ */
+export type PayoutMode = "cash" | "bank_transfer" | "card_external" | "credit";
+
+/** What an approval did with the refund (000271). */
+export type RefundSettlement = "pending" | "invoice" | "paid_out" | "family_credit";
+
 export interface InitiateRefundParams {
   student_id: string;
   erpnext_invoice_id: string;
@@ -38,6 +48,8 @@ export interface InitiateRefundParams {
   currency: string;
   reason_code: ReasonCode;
   reason_notes?: string;
+  /** Defaults to cash: most schools here are paid, and pay back, in cash. */
+  payout_mode?: PayoutMode;
 }
 
 export interface RefundRow {
@@ -54,6 +66,10 @@ export interface RefundRow {
   currency_minor_unit: number;
   reason_code: ReasonCode;
   reason_notes: string | null;
+  payout_mode: PayoutMode;
+  settlement: RefundSettlement;
+  paid_out_amount: string;
+  paid_out_amount_minor: number;
   status: RefundStatus;
   maker_id: string;
   checker_id: string | null;
@@ -83,6 +99,9 @@ const REFUND_COLUMNS = `
   rr.amount_minor,
   rr.reason_code,
   rr.reason_notes,
+  rr.payout_mode,
+  rr.settlement,
+  rr.paid_out_minor,
   rr.status,
   rr.maker_id,
   rr.checker_id,
@@ -113,6 +132,10 @@ function parseRefundRow(row: Record<string, unknown>): RefundRow {
     currency_minor_unit: minorUnit,
     reason_code: row.reason_code as ReasonCode,
     reason_notes: row.reason_notes as string | null,
+    payout_mode: row.payout_mode as PayoutMode,
+    settlement: row.settlement as RefundSettlement,
+    paid_out_amount: formatMinorUnits(BigInt(row.paid_out_minor as string | number), minorUnit),
+    paid_out_amount_minor: Number(row.paid_out_minor),
     status: row.status as RefundStatus,
     maker_id: row.maker_id as string,
     checker_id: row.checker_id as string | null,
@@ -247,18 +270,44 @@ export interface RefundableInvoice {
 }
 
 /**
- * The credit note to submit: a Journal Entry of type Credit Note for exactly the refund's amount.
+ * How an approval settles a refund: what the invoice still owes is credited first; the rest is
+ * handed back to the family by the refund's payout mode, or kept on their account as credit.
+ */
+export function refundSettlementOf(
+  outstandingMinor: bigint,
+  amountMinor: bigint,
+  payoutMode: PayoutMode,
+): { settlement: Exclude<RefundSettlement, "pending">; appliedMinor: bigint; restMinor: bigint } {
+  const appliedMinor =
+    outstandingMinor <= 0n ? 0n : outstandingMinor < amountMinor ? outstandingMinor : amountMinor;
+  const restMinor = amountMinor - appliedMinor;
+  const settlement =
+    restMinor === 0n ? "invoice" : payoutMode === "credit" ? "family_credit" : "paid_out";
+  return { settlement, appliedMinor, restMinor };
+}
+
+/** Where a paid-out refund's money leaves from: the Mode of Payment's own default account. */
+export interface PayoutAccount {
+  account: string;
+  modeOfPayment: string;
+}
+
+/**
+ * The credit note to submit: one Journal Entry of type Credit Note for exactly the refund's amount.
  *
  * Not a return Sales Invoice: ERPNext counts a return by item quantity, so after one partial refund
  * of a tuition invoice its items read as fully returned and no further refund of it is possible
  * (and a return of zero quantity is refused). A journal credit carries an amount, not quantities.
  *
- *   - Credit: the invoice's receivable account, for the invoice's customer. Applied to the invoice
- *     (its outstanding drops by the refund) while the invoice still owes at least that much;
- *     otherwise (paid, or owing less) left unallocated on the customer: a balance due to the family.
  *   - Debit: the invoice's own income and tax accounts, in the invoice's proportions, so income and
  *     VAT are reversed as a return would reverse them. Shares are worked out in minor units and the
  *     rounding remainder goes to the largest line, so the lines always sum to the refund exactly.
+ *   - Credit: the invoice's receivable, for its customer: first what the invoice still owes, applied
+ *     to it (its outstanding drops), then the rest unallocated: a balance due to the family.
+ *   - Paid out (refundSettlementOf): that rest is handed back in the same voucher, the receivable
+ *     debited again and the cash or bank account credited, so nothing is left open on the family's
+ *     account. ERPNext lets a receivable line reference a document only when it is credited, so a
+ *     payout posted later could not be matched to the credit; one voucher keeps the two together.
  *
  * `user_remark` carries the refund's tag: how the entry is found again after an ambiguous failure.
  */
@@ -267,13 +316,15 @@ export function buildCreditNoteEntry(
   refund: Pick<
     RefundRow,
     "id" | "erpnext_invoice_id" | "amount_minor" | "currency_minor_unit" | "reason_code"
-  > & { reason_notes?: string | null },
+  > & { reason_notes?: string | null; payout_mode?: PayoutMode },
   postingDate: string,
+  payout?: PayoutAccount,
 ): Record<string, unknown> {
   const minorUnit = refund.currency_minor_unit;
   const amountMinor = BigInt(refund.amount_minor);
   const toMinor = (value: number | string | undefined) =>
     toMinorUnits(Number(value ?? 0) || 0, minorUnit);
+  const money = (minor: bigint) => fromMinorUnits(minor, minorUnit);
 
   const weighted = [
     ...(invoice.items ?? []).map((item) => ({
@@ -300,8 +351,15 @@ export function buildCreditNoteEntry(
   );
   shares[largest] = shares[largest]! + remainder;
 
-  const outstandingMinor = toMinor(invoice.outstanding_amount);
-  const applied = outstandingMinor >= amountMinor;
+  const { settlement, appliedMinor, restMinor } = refundSettlementOf(
+    toMinor(invoice.outstanding_amount),
+    amountMinor,
+    refund.payout_mode ?? "cash",
+  );
+  if (settlement === "paid_out" && !payout) {
+    throw new RangeError("a paid-out refund needs the account its money leaves from");
+  }
+  const family = { account: invoice.debit_to, party_type: "Customer", party: invoice.customer };
   const remark = [refundTag(refund.id), `(${refund.reason_code})`, refund.reason_notes]
     .filter(Boolean)
     .join(" ");
@@ -312,23 +370,32 @@ export function buildCreditNoteEntry(
     company: invoice.company,
     posting_date: postingDate,
     user_remark: remark,
+    ...(settlement === "paid_out" ? { mode_of_payment: payout!.modeOfPayment } : {}),
     accounts: [
       ...weighted
         .map((line, i) => ({
           account: line.account,
           ...(line.cost_center ? { cost_center: line.cost_center } : {}),
-          debit_in_account_currency: fromMinorUnits(shares[i]!, minorUnit),
+          debit_in_account_currency: money(shares[i]!),
         }))
         .filter((line) => line.debit_in_account_currency > 0),
-      {
-        account: invoice.debit_to,
-        party_type: "Customer",
-        party: invoice.customer,
-        credit_in_account_currency: fromMinorUnits(amountMinor, minorUnit),
-        ...(applied
-          ? { reference_type: "Sales Invoice", reference_name: refund.erpnext_invoice_id }
-          : {}),
-      },
+      ...(appliedMinor > 0n
+        ? [
+            {
+              ...family,
+              credit_in_account_currency: money(appliedMinor),
+              reference_type: "Sales Invoice",
+              reference_name: refund.erpnext_invoice_id,
+            },
+          ]
+        : []),
+      ...(restMinor > 0n ? [{ ...family, credit_in_account_currency: money(restMinor) }] : []),
+      ...(settlement === "paid_out"
+        ? [
+            { ...family, debit_in_account_currency: money(restMinor) },
+            { account: payout!.account, credit_in_account_currency: money(restMinor) },
+          ]
+        : []),
     ],
     docstatus: 1,
   };
@@ -404,7 +471,7 @@ export async function initiateRefund(
     const [inserted] = await tx<Record<string, unknown>[]>`
       INSERT INTO app.refund_requests (
         school_id, student_id, erpnext_invoice_id, amount_minor, currency_id,
-        reason_code, reason_notes, status, maker_id, idempotency_key
+        reason_code, reason_notes, payout_mode, status, maker_id, idempotency_key
       ) VALUES (
         ${schoolId}::uuid,
         ${params.student_id}::uuid,
@@ -413,6 +480,7 @@ export async function initiateRefund(
         ${currency.id}::uuid,
         ${params.reason_code as string},
         ${params.reason_notes ?? null},
+        ${params.payout_mode ?? "cash"},
         'pending_approval',
         ${makerUserId}::uuid,
         ${idempotencyKey}
@@ -436,6 +504,7 @@ export async function initiateRefund(
         amount_minor: Number(amountMinor),
         currency: currency.code,
         reason_code: params.reason_code,
+        payout_mode: params.payout_mode ?? "cash",
         status: "pending_approval",
         maker_id: makerUserId,
       },
@@ -461,6 +530,8 @@ interface ApprovalCall {
   body: Record<string, unknown>;
   /** The ERPNext document the call acts on (a cancellation's invoice or Payment Entry). */
   docname: string | null;
+  /** A credit note's settlement (refundSettlementOf), recorded with the claim before the post. */
+  settlement?: { settlement: Exclude<RefundSettlement, "pending">; paidOutMinor: bigint };
 }
 
 /** Where an approval's ERPNext write stands, as far as ERPNext itself says. */
@@ -584,6 +655,20 @@ export async function approveRefund(
       await releaseClaim(runTx, schoolId, refundId, userId);
       translateErpNextRefundError(error);
     }
+  }
+
+  if (call.settlement) {
+    // Recorded with the claim, so an outcome settled later (a stale claim) still knows what the
+    // approval did. A release puts it back to pending.
+    const { settlement, paidOutMinor } = call.settlement;
+    await runTx(
+      (tx) => tx`
+        UPDATE app.refund_requests
+        SET settlement = ${settlement}, paid_out_minor = ${paidOutMinor.toString()}::bigint
+        WHERE school_id = ${schoolId}::uuid AND id = ${refundId}::uuid
+          AND status = 'approved' AND checker_id = ${userId}::uuid
+      `,
+    );
   }
 
   // Only the POST is inside the try: a lookup's own 503 must not be mistaken for the call failing.
@@ -847,6 +932,9 @@ async function finalizeCreditNote(
       AND idempotency_key = ${refund.idempotency_key}
   `;
 
+  const row = await getRefundById(tx, schoolId, refund.id);
+  if (!row) throw new Error("refund row vanished after update");
+
   await emitAuditLog(tx, {
     action: "update",
     targetTable: "refund_requests",
@@ -860,11 +948,13 @@ async function finalizeCreditNote(
       erpnext_credit_note_id: creditNoteId,
       reason_code: refund.reason_code,
       amount_minor: refund.amount_minor,
+      // What left the school's cash or bank, and how: the audit trail of a cash refund.
+      settlement: row.settlement,
+      payout_mode: row.payout_mode,
+      paid_out_minor: row.paid_out_amount_minor,
     },
   });
 
-  const row = await getRefundById(tx, schoolId, refund.id);
-  if (!row) throw new Error("refund row vanished after update");
   return row;
 }
 
@@ -1046,7 +1136,7 @@ async function releaseClaim(
       (tx) => tx`
         UPDATE app.refund_requests
         SET status = 'pending_approval', checker_id = NULL, approved_at = NULL,
-            updated_at = CURRENT_TIMESTAMP
+            settlement = 'pending', paid_out_minor = 0, updated_at = CURRENT_TIMESTAMP
         WHERE school_id = ${schoolId}::uuid AND id = ${refundId}::uuid
           AND status = 'approved' AND checker_id = ${userId}::uuid
       `,
@@ -1119,13 +1209,56 @@ async function creditNoteCall(
     );
   }
 
+  const { settlement, restMinor } = refundSettlementOf(
+    toMinorUnits(Number(invoice.outstanding_amount ?? 0) || 0, minorUnit),
+    BigInt(refund.amount_minor),
+    refund.payout_mode,
+  );
+  const payout =
+    settlement === "paid_out"
+      ? await payoutAccount(erpnext, refund.payout_mode, invoice.company, acceptLanguage)
+      : undefined;
+
   let body: Record<string, unknown>;
   try {
-    body = buildCreditNoteEntry(invoice, refund, postingDate);
+    body = buildCreditNoteEntry(invoice, refund, postingDate, payout);
   } catch {
     throw refundRefused("This invoice has no income or tax lines a refund can reverse");
   }
-  return { path: JOURNAL_ENTRY_RESOURCE, body, docname: null };
+  return {
+    path: JOURNAL_ENTRY_RESOURCE,
+    body,
+    docname: null,
+    settlement: { settlement, paidOutMinor: settlement === "paid_out" ? restMinor : 0n },
+  };
+}
+
+/**
+ * The account a paid-out refund leaves from: the Mode of Payment's default account for the
+ * invoice's company, as ERPNext configures it (the same lookup a received payment's deposit
+ * account comes from). A mode with no default account is refused with a message that says what
+ * to set up in ERPNext.
+ */
+async function payoutAccount(
+  erpnext: TenantErpNext,
+  mode: PayoutMode,
+  company: string | undefined,
+  acceptLanguage?: string,
+): Promise<PayoutAccount> {
+  const modeOfPayment = PAYMENT_MODE_MAP[mode as Exclude<PayoutMode, "credit">];
+  const query = new URLSearchParams({ mode_of_payment: modeOfPayment, company: company ?? "" });
+  const response = await erpnext.get<{ message?: { account?: string | null } }>(
+    `${BANK_CASH_ACCOUNT_METHOD}?${query.toString()}`,
+    { acceptLanguage },
+  );
+  const account = response.data.message?.account?.trim();
+  if (!account) {
+    throw refundRefused(
+      `ERPNext has no default account for the "${modeOfPayment}" mode of payment for ` +
+        `${company ?? "this school"}; set one up in ERPNext, then approve again`,
+    );
+  }
+  return { account, modeOfPayment };
 }
 
 // ---------------------------------------------------------------------------
