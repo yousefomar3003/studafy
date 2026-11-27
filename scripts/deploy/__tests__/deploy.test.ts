@@ -209,6 +209,61 @@ esac`,
   test("smoke fails when the auth surface errors", () => {
     expect(smoke({ ...healthy, "/api/auth/sessions": ["500"] }).code).toBe(1);
   });
+
+  const ips = (list: object[] | null) =>
+    run("release.sh", ["private-only", "studafy-core-erpnext"], {
+      FLYCTL: fake("flyctl", `echo '${JSON.stringify(list)}'`),
+    });
+  const privateIp = { Address: "fdaa:0:1::3", Type: "private_v6" };
+
+  test("private-only passes for an app with only a private address", () => {
+    const result = ips([privateIp]);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain("private address only");
+  });
+
+  test("private-only fails when any public address exists, and names it", () => {
+    const result = ips([privateIp, { Address: "2a09:8280:1::1", Type: "v6" }]);
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("2a09:8280:1::1");
+  });
+
+  test("private-only fails for an app with no address (a deploy would allocate public ones)", () => {
+    expect(ips([]).code).toBe(1);
+    expect(ips(null).code).toBe(1);
+  });
+
+  /** A flyctl with one started machine whose `machine exec` prints `execOutput`. */
+  const machine = (execOutput: string) =>
+    fake(
+      "flyctl",
+      `case "$1 $2" in
+  "machine list") echo '[{"id":"m1","state":"started"}]' ;;
+  "machine exec") [ "$3" = m1 ] && printf '%s\\n' '${execOutput}' ;;
+  *) exit 1 ;;
+esac`,
+    );
+  const smokePrivate = (flyctl: string) =>
+    run("release.sh", ["smoke-private", "studafy-core-erpnext", "http://127.0.0.1:8000/x"], {
+      FLYCTL: flyctl,
+      SMOKE_ATTEMPTS: "2",
+      SMOKE_DELAY: "0",
+    });
+
+  test("smoke-private passes when the URL answers below 500 inside the machine", () => {
+    // Frappe answers 404 when no site matches the Host header: the web process is up.
+    const result = smokePrivate(machine("smoke-status-404"));
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain("answers http://127.0.0.1:8000/x with 404");
+  });
+
+  test("smoke-private fails on a 5xx, a refused connection, or no started machine", () => {
+    expect(smokePrivate(machine("smoke-status-502")).code).toBe(1);
+    expect(smokePrivate(machine("smoke-status-000")).code).toBe(1);
+    const none = smokePrivate(fake("flyctl", `echo '[{"id":"m1","state":"stopped"}]'`));
+    expect(none.code).toBe(1);
+    expect(none.stderr).toContain("never answered");
+  });
 });
 
 describe("fly-production-deploy.yml", () => {
@@ -244,5 +299,48 @@ describe("fly-production-deploy.yml", () => {
     expect(workflow).toContain("JWT_PRIVATE_KEY_PEM: ${{ secrets.JWT_PRIVATE_KEY_PEM }}");
     expect(workflow).toMatch(/for key in[^;]*JWT_PRIVATE_KEY_PEM/);
     expect(workflow).toMatch(/stage studafy-core-api[\s\S]*?JWT_PRIVATE_KEY_PEM/);
+  });
+
+  describe("ERPNext stays off unless ERPNEXT_ENABLED is 'true'", () => {
+    interface Step {
+      name?: string;
+      id?: string;
+      if?: string;
+      run?: string;
+      env?: Record<string, string>;
+      with?: Record<string, string>;
+    }
+    const parsed = Bun.YAML.parse(workflow) as { jobs: { deploy: { steps: Step[] } } };
+    const steps = parsed.jobs.deploy.steps;
+    const isErpNext = (step: Step) => (step.name ?? "").startsWith("ERPNext:");
+    const gate = /^\$\{\{ vars\.ERPNEXT_ENABLED == 'true' \}\}$/;
+
+    test("every ERPNext step is gated on the variable (the rollback on its gated deploy)", () => {
+      const erpnext = steps.filter(isErpNext);
+      expect(erpnext.map((step) => step.id ?? step.name)).toEqual([
+        "ERPNext: check the app is private, and copy its secrets",
+        "previous_erpnext",
+        "erpnext_image",
+        "deploy_erpnext",
+        "ERPNext: smoke check",
+        "ERPNext: roll back to the previous image",
+      ]);
+      for (const step of erpnext.slice(0, -1)) expect(step.if).toMatch(gate);
+      expect(erpnext.at(-1)!.if).toBe(
+        "${{ failure() && steps.deploy_erpnext.outcome != 'skipped' }}",
+      );
+    });
+
+    test("no ungated step builds, stages or deploys anything ERPNext", () => {
+      for (const step of steps.filter((s) => !isErpNext(s))) {
+        expect(JSON.stringify(step)).not.toMatch(/erpnext|MARIADB|BACKUP_S3/i);
+      }
+    });
+
+    test("ERPNext deploys after the migrations and before the API", () => {
+      const index = (name: string) => steps.findIndex((step) => step.name === name);
+      expect(index("Run database migrations")).toBeLessThan(index("ERPNext: deploy"));
+      expect(index("ERPNext: smoke check")).toBeLessThan(index("Deploy the API"));
+    });
   });
 });

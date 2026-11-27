@@ -1,0 +1,63 @@
+# ERPNext (school finance) on fly.io (production): MariaDB, Redis, Frappe gunicorn, one RQ worker,
+# the scheduler and the site agent in one container on one machine, under supervisord
+# (infra/docker/erpnext-fly.Dockerfile, infra/erpnext/fly/, docs/plans/erpnext-fly.md). One Frappe
+# site per school, picked by the Host header. Deploy from the repo root:
+#   fly deploy . --config infra/fly/erpnext.toml --remote-only
+#
+# PRIVATE ONLY. Give this app a Flycast address and nothing else, before its first deploy:
+#   fly ips allocate-v6 --private --app studafy-core-erpnext
+# and never `fly ips allocate-v4` or a public v6. `fly ips list --app studafy-core-erpnext` must
+# show only the private address (a first deploy of an app with no address may allocate public ones;
+# release them with `fly ips release`). ERPNext's REST API and desk are not hardened for the
+# internet; the API and workers reach it at http://studafy-core-erpnext.flycast:8000 over the
+# organisation's private network, and an operator uses `fly proxy 8000 --app studafy-core-erpnext`.
+#
+# Secrets (fly secrets, staged by the deploy workflow): MARIADB_ROOT_PASSWORD,
+# ERPNEXT_ADMIN_PASSWORD, STUDAFY_API_URL, ERPNEXT_AGENT_TOKEN, STUDAFY_ERPNEXT_API_KEY,
+# STUDAFY_ERPNEXT_WEBHOOK_SECRET, BACKUP_S3_ENDPOINT, BACKUP_S3_ACCESS_KEY_ID,
+# BACKUP_S3_SECRET_ACCESS_KEY, BACKUP_S3_BUCKET.
+app = "studafy-core-erpnext"
+primary_region = "fra"
+
+# supervisord stops the agent and the bench programs, then Redis, then MariaDB (a clean InnoDB
+# shutdown); give that time instead of fly's default 5 s before SIGKILL.
+kill_signal = "SIGTERM"
+kill_timeout = "150s"
+
+# Swap absorbs site creation's peaks (bench new-site with erpnext + education) on 2 GB of RAM.
+swap_size_mb = 2048
+
+[build]
+  dockerfile = "../docker/erpnext-fly.Dockerfile"
+
+# MariaDB's data directory, the queue Redis's append-only file and the bench sites/ directory
+# (every school's site). Created once: fly volumes create erpnext_data --size 10 --region fra
+[mounts]
+  source = "erpnext_data"
+  destination = "/data"
+
+[[services]]
+  internal_port = 8000
+  protocol = "tcp"
+  # Always on: finance requests come from the API at any time, and the machine holds the database.
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[services.ports]]
+    port = 8000
+    handlers = ["http"]
+
+  # A TCP check, which passes with no site at all: every HTTP path on this server belongs to some
+  # school's site, so there is no site-independent page to ask for (a Host that matches no site
+  # gets a 404, which the deploy's smoke check counts as up). Gunicorn listens only once MariaDB
+  # and Redis are up (wait-for-services.sh). First boot initialises MariaDB (~5 s measured
+  # locally); the grace period leaves room for crash recovery on a big data directory.
+  [[services.tcp_checks]]
+    interval = "15s"
+    timeout = "3s"
+    grace_period = "90s"
+
+[[vm]]
+  size = "shared-cpu-2x"
+  memory = "2048mb"

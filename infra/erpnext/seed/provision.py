@@ -73,6 +73,17 @@ def complete_setup(company_name, company_abbr, currency, country, timezone="Asia
     return company_name
 
 
+def resolve_country(country_code):
+    """ERPNext's Country record for an ISO 3166-1 alpha-2 code (Frappe stores `code` lowercase)."""
+    code = (country_code or "").strip().lower()
+    if len(code) != 2 or not code.isalpha():
+        sys.exit(f"--country-code must be an ISO 3166-1 alpha-2 code, got {country_code!r}")
+    name = frappe.db.get_value("Country", {"code": code}, "name")
+    if not name:
+        sys.exit(f"no Country with code {code.upper()!r} on this site")
+    return name
+
+
 def set_integration_key(api_key, api_secret):
     """Create or update the integration user and give it the shared Studafy API credential."""
     if frappe.db.exists("User", INTEGRATION_USER):
@@ -323,7 +334,10 @@ def main(argv=None):
     parser.add_argument("--company", help="setup: the school's company name")
     parser.add_argument("--abbr", help="setup: a short company abbreviation, e.g. SDA")
     parser.add_argument("--currency", default="JOD")
-    parser.add_argument("--country", default="Jordan")
+    parser.add_argument("--country", default="Jordan", help="setup: ERPNext Country name")
+    parser.add_argument(
+        "--country-code", help="setup: ISO 3166-1 alpha-2 code, e.g. JO; takes priority over --country"
+    )
     parser.add_argument("--school-id", help="setup: the Studafy school id, stamped on webhooks")
     parser.add_argument("--api-url", help="setup: apps/api's base URL the webhooks post to")
     args = parser.parse_args(argv)
@@ -345,7 +359,8 @@ def main(argv=None):
                     "setup needs --school-id, --api-url and STUDAFY_ERPNEXT_WEBHOOK_SECRET "
                     "(the webhooks apps/api projects invoices and payments from)"
                 )
-            company = complete_setup(args.company, args.abbr, args.currency, args.country)
+            country = resolve_country(args.country_code) if args.country_code else args.country
+            company = complete_setup(args.company, args.abbr, args.currency, country)
             set_integration_key(api_key, api_secret)
             ensure_scholarship_award_doctype()
             ensure_invoice_idempotency_field()

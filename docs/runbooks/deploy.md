@@ -17,6 +17,7 @@ Production is released by **Production deploy (fly.io)**, `.github/workflows/fly
    - an anonymous `GET /api/auth/sessions` must answer 401, so the auth stack is up and not erroring;
    - five JWKS reads must agree on one `kid` set, so every machine shares `JWT_PRIVATE_KEY_PEM` (QA-023).
 4. **Rollback:** if any step from the API deploy onward fails, every service is redeployed on the digest it ran before the workflow started (recorded at the top of the run). **Migrations aren't reverted.** They are forward-only, so a release must not ship a migration the previous code can't run against (expand, then contract).
+5. **ERPNext** (`studafy-core-erpnext`) only while the repository variable `ERPNEXT_ENABLED` is `true`. Every step for it is named `ERPNext: …` and skipped otherwise, so the api and workers then get no `ERPNEXT_*` secret. When on, it is built once and deployed by digest after the migrations and before the API. It is not Trivy-gated, like its report-only scan in `containers.yml`. Its smoke check runs inside its machine, since it has no public address, and also fails if it has a public IP. From its deploy onward, a failure puts it back on its previous digest. See [erpnext-fly.md](erpnext-fly.md).
 
 ## Server-side settings (NEEDS HUMAN, once)
 

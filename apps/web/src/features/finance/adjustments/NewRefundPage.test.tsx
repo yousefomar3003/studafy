@@ -1,6 +1,6 @@
 import { ToastProvider } from "@studafy/ui";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { MemoryRouter } from "react-router-dom";
@@ -40,6 +40,11 @@ const CREATED_REFUND = {
   kind: "credit_note",
   reason_code: "overpayment",
   reason_notes: null,
+  payout_mode: "cash",
+  settlement: "pending",
+  paid_out_amount: "0.000",
+  paid_out_amount_minor: 0,
+  receipt_url: null,
   status: "pending_approval",
   maker_id: "user-1",
   checker_id: null,
@@ -164,7 +169,58 @@ describe("NewRefundPage", () => {
       currency: "JOD",
       reason_code: "overpayment",
       reason_notes: undefined,
+      payout_mode: "cash",
     });
     expect(init.params.header["idempotency-key"]).toBeTruthy();
+  });
+
+  test("says what approval will do with the money: off the invoice first, the rest back in cash", async () => {
+    renderPage(await loadPage());
+    await pickInvoice();
+    pickReason("Overpayment");
+
+    // The invoice still owes 400.000: a refund of 100 all comes off it.
+    fireEvent.change(screen.getByLabelText("Amount", { exact: false }), {
+      target: { value: "100" },
+    });
+    await screen.findByText(
+      "All 100.000 JOD will be taken off what this invoice still owes. No money is handed back.",
+    );
+
+    // 500 is more than is owed: 400 off the invoice, 100 handed back in cash (the default).
+    fireEvent.change(screen.getByLabelText("Amount", { exact: false }), {
+      target: { value: "500" },
+    });
+    await screen.findByText(
+      "400.000 JOD will be taken off what this invoice still owes, and 100.000 JOD handed back by Cash when it is approved.",
+    );
+  });
+
+  test("keeping it as credit is sent as the payout mode", async () => {
+    renderPage(await loadPage());
+    await pickInvoice();
+    fireEvent.change(screen.getByLabelText("Amount", { exact: false }), {
+      target: { value: "500" },
+    });
+    pickReason("Overpayment");
+    fireEvent.click(screen.getByRole("combobox", { name: "How the money is given back" }));
+    fireEvent.click(screen.getByRole("option", { name: "Keep as credit for a later invoice" }));
+    await screen.findByText(
+      "400.000 JOD will be taken off what this invoice still owes, and 100.000 JOD kept as credit on the family's account.",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Review refund" }));
+    await screen.findByRole("dialog", { name: "Request refund?" });
+    fireEvent.click(screen.getByRole("button", { name: "Request refund" }));
+    await waitFor(() => expect(initiateRefundCalls).toBe(1));
+    const [, init] = postMock.mock.calls[0] as [string, { body: Record<string, unknown> }];
+    expect(init.body.payout_mode).toBe("credit");
+  });
+
+  test("a write-off never hands money back, so it does not ask how", async () => {
+    renderPage(await loadPage());
+    await pickInvoice();
+    pickReason("Write-off");
+    expect(screen.queryByRole("combobox", { name: "How the money is given back" })).toBeNull();
   });
 });

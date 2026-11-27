@@ -1,0 +1,46 @@
+# MariaDB for the all-in-one ERPNext machine (2 GB RAM). mariadbd reads only this file
+# (--defaults-file, supervisord.conf), not Debian's /etc/mysql tree, so nothing else changes it.
+# Client tools (mariadb, mariadb-admin) still read /etc/mysql and find the same socket.
+
+[mysqld]
+datadir = /data/mysql
+socket = /run/mysqld/mysqld.sock
+pid-file = /run/mysqld/mysqld.pid
+# Only this machine's processes connect. TCP from 127.0.0.1 is matched as 'localhost' (name
+# resolution stays on for that), which is what `bench new-site --mariadb-user-host-login-scope=localhost`
+# grants each site's user.
+bind-address = 127.0.0.1
+port = 3306
+# No log_error: errors go to stderr, which supervisord sends to the machine's log stream.
+
+# What Frappe requires (it refuses to create a site otherwise).
+character-set-server = utf8mb4
+collation-server = utf8mb4_unicode_ci
+skip-character-set-client-handshake
+
+# Memory: about 500 MB for MariaDB in total, leaving the rest of 2 GB to gunicorn, the worker,
+# the scheduler and site creation.
+innodb_buffer_pool_size = 384M
+innodb_log_buffer_size = 16M
+performance_schema = OFF
+# Every school site is its own database of ~1,000 tables, so the table caches, not the buffer pool,
+# are what grows with the number of sites. Fixed caps keep memory flat however many sites there are
+# (measured: 1.1 GiB for the whole machine with 10 warm sites, flat after the cache fills); more
+# sites only means more cache turnover.
+table_open_cache = 2000
+table_definition_cache = 2000
+innodb_open_files = 2000
+max_connections = 40
+key_buffer_size = 8M
+tmp_table_size = 32M
+max_heap_table_size = 32M
+thread_cache_size = 8
+max_allowed_packet = 64M
+
+# Durable commits (the defaults, stated): finance data.
+innodb_flush_log_at_trx_commit = 1
+innodb_file_per_table = ON
+
+[client]
+default-character-set = utf8mb4
+socket = /run/mysqld/mysqld.sock

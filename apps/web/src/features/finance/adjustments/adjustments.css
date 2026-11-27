@@ -308,3 +308,7 @@
   flex-wrap: wrap;
   gap: var(--space-8);
 }
+
+.adjustments-detail__receipt {
+  margin-block-start: var(--space-12);
+}

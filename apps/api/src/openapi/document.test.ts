@@ -12,6 +12,7 @@ import { createLogger } from "../logger";
 import { KeyStore } from "../modules/auth";
 import { createUnusableRedis } from "../redis-unusable";
 
+import { OPENAPI_DOCUMENT_CONFIG } from "./config";
 import { buildOpenApiDocument } from "./document";
 import { PROBLEM_STATUSES } from "./responses";
 
@@ -329,6 +330,7 @@ describe("structure", () => {
         "/api/finance/families/{familyId}/statements",
         "/api/finance/reminders",
         "/api/finance/payments/{paymentId}/receipt",
+        "/api/finance/refunds/{refundId}/receipt",
         "/api/finance/refunds/initiate",
         "/api/finance/reports/ar-aging",
         "/api/finance/reports/collections-vs-due",
@@ -1774,6 +1776,7 @@ describe("security", () => {
         "POST /api/finance/families/{familyId}/statements",
         "POST /api/finance/reminders",
         "GET /api/finance/payments/{paymentId}/receipt",
+        "GET /api/finance/refunds/{refundId}/receipt",
         "POST /api/finance/reconciliation/run",
         "POST /api/auth/devices",
         "POST /api/auth/guardian/children/{studentId}/session",
@@ -1922,5 +1925,31 @@ describe("the reference site", () => {
 
   test("does not serve the document when disabled", async () => {
     expect((await build(false).request("/openapi.json")).status).toBe(404);
+  });
+});
+
+// The ERPNext site agent's routes (modules/finance/erpnext-agent) are an internal machine contract:
+// `hide: true` keeps them out of the document, and so out of openapi.json and the generated clients,
+// even on a deployment that mounts them.
+describe("internal routes", () => {
+  test("/api/internal/erpnext is mounted but absent from the document", async () => {
+    const keyStore = new KeyStore(60_000);
+    await keyStore.init();
+    const app = createApp({
+      isReady: () => true,
+      tracker: createInflightTracker(),
+      logger: createLogger({ destination: () => undefined }),
+      redis: createUnusableRedis(),
+      database: createUnusableDatabase(),
+      keyStore,
+      erpnextAgentToken: "x".repeat(32),
+    });
+    keyStore.destroy();
+
+    expect(app.routes.some((route) => route.path.startsWith("/api/internal/erpnext/"))).toBe(true);
+    const mounted = Object.keys(app.getOpenAPI31Document(OPENAPI_DOCUMENT_CONFIG).paths ?? {});
+    expect(mounted.filter((path) => path.startsWith("/api/internal"))).toEqual([]);
+    const generated = Object.keys(document.paths ?? {});
+    expect(generated.filter((path) => path.startsWith("/api/internal"))).toEqual([]);
   });
 });

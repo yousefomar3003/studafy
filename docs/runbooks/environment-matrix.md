@@ -16,13 +16,13 @@ secrets, domains, deploys). This doc only collects what differs between the two.
 
 ## Data tier
 
-| Resource | local                                           | prod                                                                                                                                       |
-| -------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| Postgres | `pgvector/pgvector:pg16` container (port 54330) | Supabase project `studafy-prod` (`eu-central-1`); services use the transaction pooler (port 6543), migrations connect directly (port 5432) |
-| Redis    | Redis 7 container (port 6391)                   | Redis Cloud (`eu-central-1`, `noeviction`, AOF every second)                                                                               |
-| Files    | as configured in `compose.yml`                  | Cloudflare R2, bucket `studafy-prod-files`, through the S3 API (`S3_REGION = "auto"`)                                                      |
-| Email    | `EMAIL_DRY_RUN`                                 | Resend (`RESEND_API_KEY`; webhook `/email/webhooks/resend`)                                                                                |
-| ERPNext  | `db/compose.yml` (`bun run erpnext:up`)         | not deployed — there is no ERPNext fly app                                                                                                 |
+| Resource | local                                           | prod                                                                                                                                                              |
+| -------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Postgres | `pgvector/pgvector:pg16` container (port 54330) | Supabase project `studafy-prod` (`eu-central-1`); services use the transaction pooler (port 6543), migrations connect directly (port 5432)                        |
+| Redis    | Redis 7 container (port 6391)                   | Redis Cloud (`eu-central-1`, `noeviction`, AOF every second)                                                                                                      |
+| Files    | as configured in `compose.yml`                  | Cloudflare R2, bucket `studafy-prod-files`, through the S3 API (`S3_REGION = "auto"`)                                                                             |
+| Email    | `EMAIL_DRY_RUN`                                 | Resend (`RESEND_API_KEY`; webhook `/email/webhooks/resend`)                                                                                                       |
+| ERPNext  | `db/compose.yml` (`bun run erpnext:up`)         | `studafy-core-erpnext`, one private machine with MariaDB, one site per school; deployed only while `ERPNEXT_ENABLED` is `true` ([erpnext-fly.md](erpnext-fly.md)) |
 
 ## Edge / DNS
 
@@ -39,15 +39,16 @@ domains. See [`infra/fly/README.md#domains`](../../infra/fly/README.md#domains).
 
 ## Compute tier
 
-| Service  | local (compose) | prod (fly app, machine size)                                                    |
-| -------- | --------------- | ------------------------------------------------------------------------------- |
-| api      | `api`           | `studafy-core-api`, shared-cpu-1x 1 GB, always on                               |
-| realtime | `realtime`      | `studafy-core-realtime`, shared-cpu-1x 512 MB, scaled to zero                   |
-| workers  | `workers`       | `studafy-core-workers`, shared-cpu-1x 2 GB, always on                           |
-| web      | `web` (nginx)   | `studafy-core-web`, shared-cpu-1x 256 MB, always on                             |
-| scanner  | —               | `studafy-core-scanner` (clamd), private Flycast address, started on demand      |
-| migrate  | `migrations`    | `studafy-core-migrate`, a one-off machine per deploy                            |
-| logs     | —               | `studafy-log-shipper`, ships every app's logs to Axiom (dataset `studafy-logs`) |
+| Service  | local (compose)  | prod (fly app, machine size)                                                                                             |
+| -------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| api      | `api`            | `studafy-core-api`, shared-cpu-1x 1 GB, always on                                                                        |
+| realtime | `realtime`       | `studafy-core-realtime`, shared-cpu-1x 512 MB, scaled to zero                                                            |
+| workers  | `workers`        | `studafy-core-workers`, shared-cpu-1x 2 GB, always on                                                                    |
+| web      | `web` (nginx)    | `studafy-core-web`, shared-cpu-1x 256 MB, always on                                                                      |
+| scanner  | —                | `studafy-core-scanner` (clamd), private Flycast address, started on demand                                               |
+| erpnext  | `db/compose.yml` | `studafy-core-erpnext`, shared-cpu-2x 2 GB, private Flycast address, always on, 10 GB volume; gated by `ERPNEXT_ENABLED` |
+| migrate  | `migrations`     | `studafy-core-migrate`, a one-off machine per deploy                                                                     |
+| logs     | —                | `studafy-log-shipper`, ships every app's logs to Axiom (dataset `studafy-logs`)                                          |
 
 The `infra/fly/*.toml` files are the source of truth for these values.
 
@@ -58,3 +59,5 @@ After a run of **Production deploy (fly.io)**:
 - `curl https://api.studafy.com/readyz` answers 200 (the API's fly health check uses the same path).
 - `fly status --app <app>` shows each always-on app with a started machine.
 - `fly logs --app studafy-core-migrate --no-tail` ends with "database is up to date".
+- With `ERPNEXT_ENABLED` on: the run's `ERPNext: smoke check` step passed, and
+  `fly ips list --app studafy-core-erpnext` shows one `private_v6` address and nothing else.

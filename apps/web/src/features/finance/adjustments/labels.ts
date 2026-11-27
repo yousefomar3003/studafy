@@ -1,4 +1,4 @@
-import type { ReasonCode, RefundKind, RefundStatus } from "./queries";
+import type { PayoutMode, ReasonCode, RefundKind, RefundSettlement, RefundStatus } from "./queries";
 
 // Translation keys (not display strings): resolved with `t()` at render time so the label follows
 // the active locale instead of whatever locale was active when this module loaded.
@@ -37,4 +37,19 @@ export const REFUND_KIND_EFFECT_KEYS: Record<RefundKind, string> = {
   credit_note: "financeReports.adjustments.refunds.approveDescription",
   invoice_cancellation: "financeReports.adjustments.corrections.approveCancellation",
   payment_reversal: "financeReports.adjustments.corrections.approveReversal",
+};
+
+/** How the money a refund gives back reaches the family (000271). */
+export const PAYOUT_MODE_LABEL_KEYS: Record<PayoutMode, string> = {
+  cash: "financeReports.adjustments.payoutMode.cash",
+  bank_transfer: "financeReports.adjustments.payoutMode.bank_transfer",
+  card_external: "financeReports.adjustments.payoutMode.card_external",
+  credit: "financeReports.adjustments.payoutMode.credit",
+};
+
+/** What an approved refund did, worded with the amount and payout mode (see RefundDetailPage). */
+export const SETTLEMENT_LABEL_KEYS: Record<Exclude<RefundSettlement, "pending">, string> = {
+  invoice: "financeReports.adjustments.settlement.invoice",
+  paid_out: "financeReports.adjustments.settlement.paid_out",
+  family_credit: "financeReports.adjustments.settlement.family_credit",
 };

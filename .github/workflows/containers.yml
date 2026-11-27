@@ -8,6 +8,7 @@ on:
         "packages/**",
         "db/**",
         "infra/docker/**",
+        "infra/erpnext/**",
         "bun.lock",
         ".dockerignore",
         "scripts/ci/assert-clean-build-context.sh",
@@ -23,6 +24,7 @@ on:
         "packages/**",
         "db/**",
         "infra/docker/**",
+        "infra/erpnext/**",
         "bun.lock",
         ".dockerignore",
         "scripts/ci/assert-clean-build-context.sh",
@@ -104,13 +106,19 @@ jobs:
             dockerfile: infra/docker/erpnext.Dockerfile
             max_mb: 3072
             trivy_exit_code: "0"
+          # The all-in-one production ERPNext (infra/fly/erpnext.toml): the image above plus MariaDB,
+          # Redis, supervisor and rclone (~200 MB more). Report-only for the same reason.
+          - service: erpnext-fly
+            dockerfile: infra/docker/erpnext-fly.Dockerfile
+            max_mb: 3328
+            trivy_exit_code: "0"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # erpnext's image (~2.7 GB) exhausts ubuntu-latest's default free disk when trivy exports
       # it for analysis.  Pre-installed toolchains (Android SDK, .NET, GHC, Boost) are irrelevant
       # to a Docker build and together account for ~25 GB — removing them gives trivy enough room.
       - name: Free disk space
-        if: matrix.service == 'erpnext'
+        if: startsWith(matrix.service, 'erpnext')
         run: |
           sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /usr/local/share/boost
           docker system prune -af

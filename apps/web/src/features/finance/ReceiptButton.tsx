@@ -22,13 +22,23 @@ export async function fetchReceipt(paymentId: string, locale: string): Promise<B
   return data as unknown as Blob;
 }
 
-interface ReceiptButtonProps {
-  paymentId: string;
-  variant?: ButtonVariant;
+/** A refund's PDF receipt (money handed back to a family), fetched the same way. */
+export async function fetchRefundReceipt(refundId: string, locale: string): Promise<Blob> {
+  const { data } = await api.GET("/api/finance/refunds/{refundId}/receipt", {
+    params: { path: { refundId } },
+    headers: { "Accept-Language": locale },
+    parseAs: "blob",
+  });
+  if (!data) throw new Error("Receipt unavailable");
+  return data as unknown as Blob;
 }
 
-/** Opens the receipt in a new tab. */
-export function ReceiptButton({ paymentId, variant = "tertiary" }: ReceiptButtonProps) {
+type ReceiptButtonProps = (
+  { paymentId: string; refundId?: undefined } | { refundId: string; paymentId?: undefined }
+) & { variant?: ButtonVariant };
+
+/** Opens the receipt (a payment's, or a refund's) in a new tab. */
+export function ReceiptButton({ paymentId, refundId, variant = "tertiary" }: ReceiptButtonProps) {
   const { t } = useTranslation();
   const { locale } = useLocale();
   const { show } = useToast();
@@ -40,7 +50,10 @@ export function ReceiptButton({ paymentId, variant = "tertiary" }: ReceiptButton
     const tab = window.open("", "_blank");
     setOpening(true);
     try {
-      const url = URL.createObjectURL(await fetchReceipt(paymentId, locale));
+      const blob = refundId
+        ? await fetchRefundReceipt(refundId, locale)
+        : await fetchReceipt(paymentId!, locale);
+      const url = URL.createObjectURL(blob);
       if (tab) tab.location.href = url;
       else window.location.assign(url);
       // Long enough for the viewer to load it; the tab keeps its own copy after that.

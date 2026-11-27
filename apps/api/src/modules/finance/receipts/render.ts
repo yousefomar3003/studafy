@@ -1,5 +1,7 @@
 /**
- * A payment receipt as a one-page PDF, rendered by Studafy from the finance cache.
+ * A payment receipt, or a refund receipt, as a one-page PDF rendered by Studafy from the finance
+ * cache. The refund receipt is for money handed back to a family (most often in cash), with lines
+ * for the guardian who receives it and the staff member who pays it to sign.
  *
  * Not ERPNext's own print format: that needs ERPNext's PDF renderer to reach the school's site over
  * its own hostname, which fails wherever that name does not resolve from inside the ERPNext
@@ -34,6 +36,29 @@ export interface ReceiptInput {
   amount: string;
   currency: string;
   paymentMode: "cash" | "bank_transfer" | "card_external" | null;
+  generatedAt: Date;
+}
+
+/** A refund the school handed back to a family (settlement paid_out). */
+export interface RefundReceiptInput {
+  locale: "en" | "ar";
+  schoolName: string;
+  taxRegistrationNumber: string | null;
+  /** The ERPNext journal entry that recorded the refund and the payout. */
+  receiptNumber: string;
+  /** The school-local date the refund was paid out. */
+  refundDate: string;
+  studentName: string;
+  admissionNumber: string;
+  familyName: string | null;
+  invoiceId: string;
+  /** What was handed back, and the whole refund it is part of (more when some was credited). */
+  paidOutAmount: string;
+  refundAmount: string;
+  currency: string;
+  payoutMode: "cash" | "bank_transfer" | "card_external";
+  reason: "overpayment" | "withdrawal" | "discount_adjustment" | "error_correction" | "write_off";
+  notes: string | null;
   generatedAt: Date;
 }
 
@@ -78,6 +103,49 @@ const LABELS = {
       failed: "لم تكتمل",
       reversed: "مُلغاة — أُلغيت هذه الدفعة",
     },
+    footer: "صدر عن Studafy بتاريخ {date}. يرجى الاحتفاظ بهذا الإيصال.",
+  },
+} as const;
+
+const REFUND_LABELS = {
+  en: {
+    title: "Refund receipt",
+    amount: "Amount handed back",
+    date: "Refund date",
+    refundTotal: "Refund total",
+    method: "Paid back by",
+    reason: "Reason",
+    notes: "Notes",
+    reasons: {
+      overpayment: "Overpayment",
+      withdrawal: "Withdrawal",
+      discount_adjustment: "Discount adjustment",
+      error_correction: "Error correction",
+      write_off: "Write-off",
+    },
+    receivedBy: "Received by (parent or guardian): name and signature",
+    paidBy: "Paid by (school): name and signature",
+    footer: "Issued by Studafy on {date}. Keep this receipt for your records.",
+  },
+  ar: {
+    title: "إيصال استرداد",
+    amount: "المبلغ المُعاد",
+    date: "تاريخ الاسترداد",
+    refundTotal: "إجمالي الاسترداد",
+    method: "طريقة الإعادة",
+    reason: "السبب",
+    notes: "ملاحظات",
+    reasons: {
+      overpayment: "دفعة زائدة",
+      withdrawal: "انسحاب",
+      discount_adjustment: "تعديل خصم",
+      error_correction: "تصحيح خطأ",
+      write_off: "شطب",
+    },
+    // No brackets or colon inside an Arabic phrase: they are drawn with the Arabic font, which has
+    // no glyphs for them (they print as empty boxes).
+    receivedBy: "اسم وتوقيع ولي الأمر المستلم",
+    paidBy: "اسم وتوقيع موظف المدرسة المسلّم",
     footer: "صدر عن Studafy بتاريخ {date}. يرجى الاحتفاظ بهذا الإيصال.",
   },
 } as const;
@@ -225,14 +293,30 @@ class TextPainter {
   }
 }
 
-export async function renderReceiptPdf(input: ReceiptInput): Promise<Uint8Array> {
-  const labels = LABELS[input.locale];
-  const rtl = input.locale === "ar";
+/** One receipt page: what every receipt shares, whatever it records. */
+interface ReceiptLayout {
+  locale: "en" | "ar";
+  /** The English title, for the PDF's own metadata. */
+  metadataTitle: string;
+  schoolName: string;
+  title: string;
+  amountLabel: string;
+  amount: string;
+  documentNumber: string;
+  rows: [string, string][];
+  /** Lines to sign, each with its caption under it. */
+  signatures: string[];
+  footer: string;
+  generatedAt: Date;
+}
+
+async function renderLayout(layout: ReceiptLayout): Promise<Uint8Array> {
+  const rtl = layout.locale === "ar";
 
   const document = await PDFDocument.create();
-  document.setTitle(`${LABELS.en.title} ${input.receiptNumber}`);
+  document.setTitle(`${layout.metadataTitle} ${layout.documentNumber}`);
   document.setCreator("Studafy");
-  document.setCreationDate(input.generatedAt);
+  document.setCreationDate(layout.generatedAt);
 
   const page = document.addPage([595, 842]);
   const painter = new TextPainter(
@@ -246,10 +330,10 @@ export async function renderReceiptPdf(input: ReceiptInput): Promise<Uint8Array>
   const right = page.getWidth() - margin;
   const muted = rgb(0.38, 0.43, 0.5);
   const accent = rgb(0.15, 0.39, 0.92);
-  const rule = (y: number) =>
+  const rule = (y: number, from = margin, to = right) =>
     page.drawLine({
-      start: { x: margin, y },
-      end: { x: right, y },
+      start: { x: from, y },
+      end: { x: to, y },
       thickness: 1,
       color: rgb(0.86, 0.88, 0.91),
     });
@@ -262,18 +346,47 @@ export async function renderReceiptPdf(input: ReceiptInput): Promise<Uint8Array>
   };
 
   let y = page.getHeight() - margin - 10;
-  line(input.schoolName, y, { size: 18, bold: true });
+  line(layout.schoolName, y, { size: 18, bold: true });
   y -= 28;
-  line(labels.title, y, { size: 13, bold: true, color: accent });
+  line(layout.title, y, { size: 13, bold: true, color: accent });
   y -= 14;
   rule(y);
   y -= 30;
 
-  line(labels.amount, y, { size: 10, color: muted });
+  line(layout.amountLabel, y, { size: 10, color: muted });
   y -= 26;
-  line(`${input.amount} ${input.currency}`, y, { size: 24, bold: true });
+  line(layout.amount, y, { size: 24, bold: true });
   y -= 36;
 
+  for (const [label, value] of layout.rows) {
+    line(label, y, { size: 10, color: muted });
+    line(value, y, { size: 11, offset: 170 });
+    y -= 24;
+  }
+
+  for (const caption of layout.signatures) {
+    // A blank line to sign on, with what it is for under it.
+    y -= 44;
+    // Signed at the reading-start edge, like the text.
+    if (rtl) rule(y, right - 300, right);
+    else rule(y, margin, margin + 300);
+    y -= 14;
+    line(caption, y, { size: 9, color: muted });
+  }
+
+  y -= 12;
+  rule(y);
+  y -= 22;
+  line(layout.footer.replace("{date}", layout.generatedAt.toISOString().slice(0, 10)), y, {
+    size: 9,
+    color: muted,
+  });
+
+  return document.save();
+}
+
+export async function renderReceiptPdf(input: ReceiptInput): Promise<Uint8Array> {
+  const labels = LABELS[input.locale];
   const rows: [string, string][] = [
     ...(input.taxRegistrationNumber
       ? [[labels.taxRegistration, input.taxRegistrationNumber] as [string, string]]
@@ -288,19 +401,55 @@ export async function renderReceiptPdf(input: ReceiptInput): Promise<Uint8Array>
   if (input.paymentMode) rows.push([labels.method, labels.modes[input.paymentMode]]);
   rows.push([labels.status, labels.statuses[input.status]]);
 
-  for (const [label, value] of rows) {
-    line(label, y, { size: 10, color: muted });
-    line(value, y, { size: 11, offset: 170 });
-    y -= 24;
-  }
-
-  y -= 12;
-  rule(y);
-  y -= 22;
-  line(labels.footer.replace("{date}", input.generatedAt.toISOString().slice(0, 10)), y, {
-    size: 9,
-    color: muted,
+  return renderLayout({
+    locale: input.locale,
+    metadataTitle: LABELS.en.title,
+    schoolName: input.schoolName,
+    title: labels.title,
+    amountLabel: labels.amount,
+    amount: `${input.amount} ${input.currency}`,
+    documentNumber: input.receiptNumber,
+    rows,
+    signatures: [],
+    footer: labels.footer,
+    generatedAt: input.generatedAt,
   });
+}
 
-  return document.save();
+/** A refund handed back to a family, with lines for the guardian and the school to sign. */
+export async function renderRefundReceiptPdf(input: RefundReceiptInput): Promise<Uint8Array> {
+  const labels = LABELS[input.locale];
+  const refund = REFUND_LABELS[input.locale];
+  const rows: [string, string][] = [
+    ...(input.taxRegistrationNumber
+      ? [[labels.taxRegistration, input.taxRegistrationNumber] as [string, string]]
+      : []),
+    [labels.receiptNumber, input.receiptNumber],
+    [refund.date, input.refundDate],
+    [labels.student, input.studentName],
+    [labels.admission, input.admissionNumber],
+  ];
+  if (input.familyName) rows.push([labels.family, input.familyName]);
+  rows.push([labels.invoice, input.invoiceId]);
+  rows.push([refund.method, labels.modes[input.payoutMode]]);
+  rows.push([refund.reason, refund.reasons[input.reason]]);
+  if (input.refundAmount !== input.paidOutAmount) {
+    // Part of the refund was taken off what the invoice still owed; this much was handed back.
+    rows.push([refund.refundTotal, `${input.refundAmount} ${input.currency}`]);
+  }
+  if (input.notes) rows.push([refund.notes, input.notes]);
+
+  return renderLayout({
+    locale: input.locale,
+    metadataTitle: REFUND_LABELS.en.title,
+    schoolName: input.schoolName,
+    title: refund.title,
+    amountLabel: refund.amount,
+    amount: `${input.paidOutAmount} ${input.currency}`,
+    documentNumber: input.receiptNumber,
+    rows,
+    signatures: [refund.receivedBy, refund.paidBy],
+    footer: refund.footer,
+    generatedAt: input.generatedAt,
+  });
 }

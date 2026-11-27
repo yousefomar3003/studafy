@@ -19,6 +19,11 @@ function makeRequest(overrides: Record<string, unknown> = {}) {
     currency_minor_unit: 3,
     reason_code: "error_correction",
     reason_notes: "Billed the wrong structure",
+    payout_mode: "cash",
+    settlement: "pending",
+    paid_out_amount: "0.000",
+    paid_out_amount_minor: 0,
+    receipt_url: null,
     status: "pending_approval",
     maker_id: "user-other",
     checker_id: null,
@@ -76,6 +81,38 @@ describe("RefundDetailPage", () => {
     await renderPage(["FINANCE"]);
     await screen.findByRole("heading", { name: "Invoice cancellation" });
     expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
+  });
+
+  test("a refund handed back in cash says how much went back, and how", async () => {
+    request = makeRequest({
+      kind: "credit_note",
+      status: "completed",
+      settlement: "paid_out",
+      paid_out_amount: "25.000",
+      paid_out_amount_minor: 25_000,
+      erpnext_credit_note_id: "ACC-JV-2026-00001",
+      receipt_url: "/api/finance/refunds/refund-1/receipt",
+    });
+    await renderPage(["ORG_ADMIN"]);
+    await screen.findByRole("heading", { name: "Credit note" });
+    expect(screen.getByText("25.000 JOD handed back by Cash")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Open receipt" })).toBeTruthy();
+    expect(screen.getByText("How the money is given back").nextElementSibling?.textContent).toBe(
+      "Cash",
+    );
+  });
+
+  test("a refund kept as credit says so", async () => {
+    request = makeRequest({
+      kind: "credit_note",
+      status: "completed",
+      payout_mode: "credit",
+      settlement: "family_credit",
+    });
+    await renderPage(["ORG_ADMIN"]);
+    expect(await screen.findByText("Kept as credit on the family's account")).toBeTruthy();
+    // Nothing was handed back, so there is nothing to sign.
+    expect(screen.queryByRole("button", { name: "Open receipt" })).toBeNull();
   });
 
   test("the maker cannot approve their own request", async () => {
