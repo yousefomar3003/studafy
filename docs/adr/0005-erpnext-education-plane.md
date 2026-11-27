@@ -7,6 +7,10 @@ Superseded — AWS was retired in November 2026; production runs on fly.io (see
 this ADR describes and `infra/deploy` were removed; the seed and provisioning scripts live on in
 `infra/erpnext/seed`. Originally: Accepted.
 
+ERPNext returns to production as the private fly app `studafy-core-erpnext`, gated by
+`ERPNEXT_ENABLED`: see [docs/plans/erpnext-fly.md](../plans/erpnext-fly.md) and the runbook
+[docs/runbooks/erpnext-fly.md](../runbooks/erpnext-fly.md).
+
 ## Context
 
 The staging-environment ticket ("Set up staging environment end to end") calls for a new plane
