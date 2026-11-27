@@ -44,6 +44,7 @@ const CREATED_REFUND = {
   settlement: "pending",
   paid_out_amount: "0.000",
   paid_out_amount_minor: 0,
+  receipt_url: null,
   status: "pending_approval",
   maker_id: "user-1",
   checker_id: null,

@@ -23,6 +23,7 @@ function makeRequest(overrides: Record<string, unknown> = {}) {
     settlement: "pending",
     paid_out_amount: "0.000",
     paid_out_amount_minor: 0,
+    receipt_url: null,
     status: "pending_approval",
     maker_id: "user-other",
     checker_id: null,
@@ -90,10 +91,12 @@ describe("RefundDetailPage", () => {
       paid_out_amount: "25.000",
       paid_out_amount_minor: 25_000,
       erpnext_credit_note_id: "ACC-JV-2026-00001",
+      receipt_url: "/api/finance/refunds/refund-1/receipt",
     });
     await renderPage(["ORG_ADMIN"]);
     await screen.findByRole("heading", { name: "Credit note" });
     expect(screen.getByText("25.000 JOD handed back by Cash")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Open receipt" })).toBeTruthy();
     expect(screen.getByText("How the money is given back").nextElementSibling?.textContent).toBe(
       "Cash",
     );
@@ -108,6 +111,8 @@ describe("RefundDetailPage", () => {
     });
     await renderPage(["ORG_ADMIN"]);
     expect(await screen.findByText("Kept as credit on the family's account")).toBeTruthy();
+    // Nothing was handed back, so there is nothing to sign.
+    expect(screen.queryByRole("button", { name: "Open receipt" })).toBeNull();
   });
 
   test("the maker cannot approve their own request", async () => {

@@ -7,6 +7,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { useAuth, usePermissions } from "../../../lib/auth";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
+import { ReceiptButton } from "../ReceiptButton";
 
 import { AdjustmentConfirmDialog } from "./AdjustmentConfirmDialog";
 import {
@@ -140,6 +141,12 @@ export default function RefundDetailPage() {
           <Link to={`/portal/finance/students/${request.student_id}`}>
             {t("financeReports.adjustments.detail.studentAccount")}
           </Link>
+          {request.receipt_url ? (
+            // Money was handed back: the receipt the guardian and the school sign.
+            <div className="adjustments-detail__receipt">
+              <ReceiptButton refundId={request.id} variant="secondary" />
+            </div>
+          ) : null}
         </Card.Body>
       </Card>
 
