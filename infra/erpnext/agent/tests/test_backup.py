@@ -86,17 +86,17 @@ class BackupRunTest(unittest.TestCase):
                 folder = os.path.join(self.config.sites_dir, site, "private", "backups")
                 open(os.path.join(folder, f"20261127_023000-{site}-database.sql.gz"), "w").close()
 
-        self.runner.on("backup", "--compress", effect=bench_backup)
+        self.runner.on("backup", "--with-files", effect=bench_backup)
         self.runner.on("lsf", result=ok(stdout="2026-11-27/\n2026-11-12/\n2026-11-13/\nnotes/\n"))
 
         backup.run()
 
         self.assertEqual(
             self.runner.steps(),
-            ["backup --compress", "rclone copy", "rclone copy", "rclone lsf", "rclone purge"],
+            ["backup --with-files --compress", "rclone copy", "rclone copy", "rclone lsf", "rclone purge"],
         )
         bench = self.runner.calls[0]
-        self.assertEqual(bench.argv, ["bench", "--site", "all", "backup", "--compress"])
+        self.assertEqual(bench.argv, ["bench", "--site", "all", "backup", "--with-files", "--compress"])
         self.assertEqual(bench.cwd, self.config.bench_dir)
 
         alpha_copy = self.runner.calls[1]

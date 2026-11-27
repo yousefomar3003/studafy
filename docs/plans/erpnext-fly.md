@@ -81,7 +81,7 @@ A small Python program (`infra/erpnext/agent/`) running on the ERPNext machine. 
    the scheduler only runs ERPNext's periodic jobs (overdue statuses and similar), so waking never
    blocks a request.
 3. **Daily:** put to sleep any site with no finance activity for 30 days (the API returns the list).
-4. **Nightly, 02:00 Asia/Amman:** `bench --site all backup --compress` → upload to R2 bucket
+4. **Nightly, 02:00 Asia/Amman:** `bench --site all backup --with-files --compress` → upload to R2 bucket
    `studafy-prod-erpnext-backups` with `rclone` → keep 14 days. The bucket is separate so a lifecycle
    rule can expire old backups, and backups never count against a school's storage meter.
 

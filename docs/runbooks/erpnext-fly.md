@@ -217,7 +217,8 @@ rclone lsf -R ":s3:$BACKUP_S3_BUCKET" | grep "${site//./_}" | sort | tail -n 5
 mkdir -p /data/restore
 rclone copy ":s3:$BACKUP_S3_BUCKET/<path from the list>" /data/restore/
 bench --site "$site" set-maintenance-mode on
-bench --site "$site" restore /data/restore/<file>-database.sql.gz --db-root-password "$MARIADB_ROOT_PASSWORD"
+bench --site "$site" restore /data/restore/<file>-database.sql.gz --db-root-password "$MARIADB_ROOT_PASSWORD" \
+  --with-public-files /data/restore/<file>-files.tar --with-private-files /data/restore/<file>-private-files.tar
 bench --site "$site" migrate     # only if the backup was taken on an older ERPNext image
 bench --site "$site" set-maintenance-mode off
 rm -rf /data/restore
@@ -268,7 +269,7 @@ destroy the old volume after a few days: `fly volumes destroy <old-vol-id>`.
    fly volumes snapshots create <vol-id>
    ```
 
-   **(machine)**, as `frappe`: `bench --site all backup --compress`.
+   **(machine)**, as `frappe`: `bench --site all backup --with-files --compress`.
 
 3. **Migrate** **(machine)**, as root. Stop the agent, worker and scheduler so the migration has the
    memory, and run it under `nohup` so a dropped SSH session does not stop it:
@@ -288,6 +289,10 @@ destroy the old volume after a few days: `fly volumes destroy <old-vol-id>`.
 
 Do not roll back the image after a migration: the schema has moved forward. Restore from the
 snapshot taken in step 2 instead.
+
+**MariaDB major version.** The image uses Debian's MariaDB (10.11 today). If a new base image moves
+it to a new major version, run `mariadb-upgrade` **(machine)**, as root, once after the deploy and
+before `bench migrate`. Nothing runs it automatically.
 
 ## 6. Resizing
 

@@ -18,7 +18,7 @@ One loop, one job at a time, so a backup never runs while a site is being create
 | pending | every 60 s           | `GET /sites/pending`; per site: `bench new-site` → `erpnext_seed.provision <site> setup` → `bench --site <site> disable-scheduler` → `POST /sites/{id}/created`. On failure `POST /sites/{id}/failed`. |
 | wake    | every 60 s           | `GET /sites/wake` → `bench --site <site> enable-scheduler` → `POST /sites/{id}/woken`                                                                                                                  |
 | idle    | at start, then daily | `GET /sites/idle` → `bench --site <site> disable-scheduler` → `POST /sites/{id}/slept`                                                                                                                 |
-| backup  | 02:00 Asia/Amman     | `bench --site all backup --compress` → `rclone copy` each site's `private/backups/` to `<bucket>/<YYYY-MM-DD>/<site>/` → delete the local files → purge date folders older than 14 days                |
+| backup  | 02:00 Asia/Amman     | `bench --site all backup --with-files --compress` → `rclone copy` each site's `private/backups/` to `<bucket>/<YYYY-MM-DD>/<site>/` → delete the local files → purge date folders older than 14 days   |
 
 Details worth knowing:
 

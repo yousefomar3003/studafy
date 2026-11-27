@@ -1,4 +1,4 @@
-"""Nightly backups: `bench --site all backup --compress`, then each site's files to R2 with rclone.
+"""Nightly backups: `bench --site all backup --with-files --compress`, then each site's files to R2 with rclone.
 
 Layout in the bucket: `<YYYY-MM-DD>/<site>/<bench's backup files>`, the date in Asia/Amman. Date
 folders older than 14 days are purged. Local backup files are deleted once uploaded, so the 10 GB
@@ -107,7 +107,7 @@ class Backup:
         day = self.clock().astimezone(self.tz).date()
         self.log.info("backup_started", day=day.isoformat())
 
-        result = self.runner.run([cfg.bench_bin, "--site", "all", "backup", "--compress"],
+        result = self.runner.run([cfg.bench_bin, "--site", "all", "backup", "--with-files", "--compress"],
                                  cwd=cfg.bench_dir, timeout=BACKUP_TIMEOUT, interruptible=True,
                                  env=child_env())
         if result.interrupted:
