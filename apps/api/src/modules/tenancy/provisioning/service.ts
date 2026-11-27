@@ -309,29 +309,39 @@ export function erpNextSiteName(slug: string): string {
   return `${slug}.${process.env.ERPNEXT_SITE_DOMAIN || "erpnext.studafy.com"}`;
 }
 
+export type RegisterErpNextSiteParams = Pick<
+  ProvisionTenantParams,
+  "schoolId" | "slug" | "schoolName" | "tenantContext"
+>;
+
 /**
  * Record the school's ERPNext site as awaiting creation.
  *
  * A Frappe site can only be created by bench (`bench new-site`), never over the REST API, so the API
- * cannot create one itself. An operator runs `bench new-site <site>` and then
+ * cannot create one itself. The ERPNext site agent (docs/plans/erpnext-fly.md) picks this row up
+ * from GET /api/internal/erpnext/sites/pending, runs `bench new-site <site>` and then
  * infra/erpnext/seed/provision.py's `setup`, which finishes ERPNext's setup wizard (the school's company) and sets
  * the integration key. The credential resolver (modules/finance/client/credential-resolver.ts)
  * then notices the site answering on the school's next finance request and marks it 'completed'
  * with its company -- so this row is all provisioning has to write.
+ *
+ * Exported for the one-off backfill (scripts/backfill-erpnext-sites.ts), which writes the same row
+ * for schools approved while ERPNext was unconfigured. Idempotent: returns false when the school
+ * already has a row.
  */
-async function registerErpNextSite(
+export async function registerErpNextSite(
   database: Database,
-  params: ProvisionTenantParams,
+  params: RegisterErpNextSiteParams,
   logger: Logger,
-): Promise<void> {
+): Promise<boolean> {
   const siteName = erpNextSiteName(params.slug);
   const companyAbbr = params.slug
     .replace(/[^a-z0-9]/gi, "")
     .slice(0, 4)
     .toUpperCase();
 
-  await withTenantTx(database, params.tenantContext, async (tx) => {
-    await tx`
+  const inserted = await withTenantTx(database, params.tenantContext, async (tx) => {
+    const rows = await tx`
       INSERT INTO app.erpnext_site_configs (
         school_id, site_name, company_name, company_abbr, status
       ) VALUES (
@@ -342,13 +352,18 @@ async function registerErpNextSite(
         'pending'::app.provisioning_status
       )
       ON CONFLICT (school_id) DO NOTHING
+      RETURNING id
     `;
+    return rows.length > 0;
   });
 
-  logger.info(
-    { school_id: params.schoolId, site_name: siteName },
-    "ERPNext site registered; awaiting its bench site",
-  );
+  if (inserted) {
+    logger.info(
+      { school_id: params.schoolId, site_name: siteName },
+      "ERPNext site registered; awaiting its bench site",
+    );
+  }
+  return inserted;
 }
 
 // ---------------------------------------------------------------------------
