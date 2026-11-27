@@ -260,18 +260,43 @@ A and B are independent of C. D and E come last.
     signed webhooks fill Studafy's invoice and payment copies → finance reads (invoices, payments,
     fee structures, AR aging, collections, general ledger) → a cash payment is recorded in ERPNext
     and the balance updates → finance use wakes the site → a with-files backup → a restore.
-  - **Not passed: refund approval.** It fails against ERPNext, and that bug was already in the
-    finance code; this work did not cause it (see Known issues).
+  - **Refund approval failed at first.** That bug was already in the finance code, not caused by
+    this work. It is now fixed and passed a second live run on 2026-11-28 (see Known issues).
 - [ ] Merged to dev → stage
 - [ ] Released with the batch, backfill run, production check passed
 
-## Known issues found while testing
+## Known issues found while testing (fixed)
 
-- **Refund approval never worked against a real ERPNext.** `buildCreditNotePayload` and the
-  approval payload in `apps/api/src/modules/finance/refunds/service.ts` send `customer: ""` and
-  `items: []`. ERPNext v15 rejects the credit note: wrong customer, "Update Outstanding for Self",
-  and an amount above the outstanding on a paid invoice. The unit tests mock ERPNext, so they pass.
-  The fix needs a design choice for paid invoices (a credit note kept on the note plus a refund
-  Payment Entry) versus unpaid ones (credit the invoice). For both, build the note from ERPNext's
-  `make_sales_return`. Tracked separately; it does not block hosting, but refunds must not be
-  announced to schools until it is fixed.
+- **Refund approval never worked against a real ERPNext.** The credit note was a return Sales
+  Invoice built with `customer: ""` and `items: []`, which ERPNext rejects. The unit tests passed
+  because they mock ERPNext. A real return Sales Invoice would not work either: ERPNext counts a
+  return by item quantity, so after one partial refund a tuition invoice reads as fully returned and
+  cannot be refunded again (and a return of quantity 0 is refused).
+
+  **Fix:** the approval now posts a **Credit Note Journal Entry** for exactly the refund
+  (`buildCreditNoteEntry` in `apps/api/src/modules/finance/refunds/service.ts`).
+  - **Credit:** the invoice's receivable, for its customer.
+    - Applied to the invoice while it still owes at least the refund, so its outstanding drops.
+    - Otherwise left unallocated, as a balance owed to the family.
+  - **Debit:** the invoice's own income and VAT accounts, in the invoice's proportions.
+  - **Rules:**
+    - Studafy keeps the running total, so an invoice is never refunded beyond what it charged.
+    - The refund completes as soon as the entry is submitted.
+    - The cached invoice is re-read after the approval.
+  - **Tested live:**
+    - partly owed, paid, and repeat partial refunds
+    - VAT with a scholarship discount
+    - refunding the rest including ERPNext's rounding
+    - over-refunding, which is refused
+    - a double approval, which is refused
+
+- **Invoices ERPNext rounded up were never cached.** `projectInvoiceEntry` read `grand_total`
+  (1208.55) while ERPNext counts the outstanding from the rounded total (1209), so the cache's
+  `outstanding <= total` check skipped them; invoices rounded down showed the wrong total. It now
+  uses `rounded_total` when ERPNext rounds, as the finance reports already did.
+- **Still not built:** recording the cash actually handed back to a family for a credit left on
+  their account (a Pay Payment Entry). Until then the school records the payout in ERPNext, or keeps
+  the credit against the family's next invoice.
+- **VAT reporting:** a journal credit reverses VAT in the ledger (the tax account). Reports built
+  from Sales Invoices rather than the ledger may not include journal credits; check the VAT report a
+  school files from before relying on it.
