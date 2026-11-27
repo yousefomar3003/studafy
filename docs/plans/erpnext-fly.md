@@ -41,14 +41,14 @@ have **no** row.
 
 A new private Fly app, `studafy-core-erpnext`, runs on **one** machine:
 
-| Process               | Notes                                                                                                                                              |
-| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| MariaDB 10.6          | Tuned for 2 GB: `innodb_buffer_pool_size=384M`, `performance_schema=OFF`, `max_connections=40`                                                     |
-| Redis (cache + queue) | One local `redis-server`, `maxmemory 96mb`, two logical DBs. Not Redis Cloud: ERPNext's cache wants eviction and production Redis is `noeviction`. |
-| Gunicorn (Frappe web) | 2 workers × 4 threads. Picks each school's site by the `Host` header.                                                                              |
-| One RQ worker         | Listens on `short,default,long`                                                                                                                    |
-| Scheduler             | `bench schedule`; per-site jobs only run for awake sites (see below)                                                                               |
-| Site agent            | New, see below                                                                                                                                     |
+| Process                           | Notes                                                                                                                                                                                                                                                                           |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| MariaDB 10.11 (Debian bookworm's) | Tuned for 2 GB: `innodb_buffer_pool_size=384M`, `performance_schema=OFF`, `max_connections=40`                                                                                                                                                                                  |
+| Redis (cache + queue)             | Two local `redis-server`s, as Frappe runs by default: cache (no persistence, `maxmemory 64mb`, `allkeys-lru`) and queue (append-only file on the volume, `maxmemory 64mb`, `noeviction`). Not Redis Cloud: ERPNext's cache wants eviction and production Redis is `noeviction`. |
+| Gunicorn (Frappe web)             | 2 workers × 4 threads. Picks each school's site by the `Host` header.                                                                                                                                                                                                           |
+| One RQ worker                     | Listens on `short,default,long`                                                                                                                                                                                                                                                 |
+| Scheduler                         | `bench schedule`; per-site jobs only run for awake sites (see below)                                                                                                                                                                                                            |
+| Site agent                        | New, see below                                                                                                                                                                                                                                                                  |
 
 All of these run under `supervisord` in one container. Fly process groups would put each process on
 its own machine and multiply the cost.
@@ -155,8 +155,9 @@ An unknown `{id}` gets 404.
   `redis-server`, `supervisor` and `rclone`. Copies `infra/erpnext/seed/` to
   `/home/frappe/frappe-bench/erpnext_seed/` and `infra/erpnext/agent/` to
   `/home/frappe/frappe-bench/erpnext_agent/`. Both are on `PYTHONPATH`.
-- Volume at `/data`: MariaDB data in `/data/mysql`, bench sites in `/data/sites`, symlinked to
-  `/home/frappe/frappe-bench/sites`.
+- Volume at `/data`: MariaDB data in `/data/mysql`, bench sites in `/data/sites`, bind-mounted at
+  `/home/frappe/frappe-bench/sites` (not symlinked: `../env/bin/python` run from `sites/` must
+  resolve inside the bench, and the kernel resolves `..` from the physical directory).
 - Web: gunicorn on `0.0.0.0:8000` (`frappe.app:application`, gthread, 2 workers, 4 threads,
   `--timeout 120`), with no default site, so `Host` picks the site.
 - Supervisord programs: `mariadb`, `redis`, `web`, `worker` (`bench worker --queue short,default,long`),
