@@ -283,6 +283,7 @@ const app = createApp({
   jwtAccessTtlSeconds: env.JWT_ACCESS_TTL_SECONDS,
   jwtRefreshTtlSeconds: env.JWT_REFRESH_TTL_SECONDS,
   realtimeTicketSecret: env.WS_JWT_SECRET,
+  erpnextAgentToken: env.ERPNEXT_AGENT_TOKEN,
   reviewLoginPassword: env.REVIEW_LOGIN_PASSWORD,
   reviewLoginAllowedEmails: env.REVIEW_LOGIN_ALLOWED_EMAILS?.split(",")
     .map((email) => email.trim())

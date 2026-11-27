@@ -817,7 +817,9 @@ export async function reconcileStaleRefundClaims(
       const row = await getRefundById(tx, schoolId, id);
       if (row) refunds.push(row);
     }
-    return { refunds, erpnext: await erpnextFactory.forSchool(tx, schoolId) };
+    // Run by the reconciliation job, not by the school: no finance activity (erpnext-agent).
+    const erpnext = await erpnextFactory.forSchool(tx, schoolId, { recordActivity: false });
+    return { refunds, erpnext };
   });
   if (!listed) return counts;
 

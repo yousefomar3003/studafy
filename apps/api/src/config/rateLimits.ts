@@ -216,6 +216,11 @@ export const ROUTE_CLASS_MAP: Record<string, RouteClass> = {
   "/api/finance/fee-structures/*": "default",
   "/api/finance/expenses": "default",
   "/api/finance/expenses/*": "default",
+  // The ERPNext site agent (modules/finance/erpnext-agent): one machine, keyed on its IP. `default`
+  // rather than an `auth` class: its legitimate bursts (a wake or sleep report per site) would
+  // exhaust a 10-token bucket and read as auth anomalies, and a 32+ character random token cannot
+  // be guessed at any rate.
+  "/api/internal/erpnext/*": "default",
   // Mobile release floor (ST-257) — public, unauthenticated, IP-scoped, polled on app launch/resume.
   // Generous (default) budget: it is a tiny static read, and throttling it hard would only delay a
   // client learning it must force-update.

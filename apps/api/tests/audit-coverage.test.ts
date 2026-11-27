@@ -464,6 +464,13 @@ const EXPECTED_MUTATING_ROUTES = [
   // to finance_reconciliation_logs. Audit row written by auditAction middleware in
   // finance/jobs/reconciliation.routes.ts.
   "POST /api/finance/reconciliation/run",
+  // ERPNext site agent reports (modules/finance/erpnext-agent). auditAction declares the update;
+  // the service writes one app.audit_logs row per report in the owning school with a NULL actor,
+  // the convention the ERPNext webhook's rows use.
+  "POST /api/internal/erpnext/sites/{id}/created",
+  "POST /api/internal/erpnext/sites/{id}/failed",
+  "POST /api/internal/erpnext/sites/{id}/woken",
+  "POST /api/internal/erpnext/sites/{id}/slept",
   // ST-121. auditAction("insert", "payment_cache") declares the intent; emitAuditLog writes the row
   // inside the forwarder's own transaction so it commits with the payment or not at all.
   "POST /api/finance/payments",

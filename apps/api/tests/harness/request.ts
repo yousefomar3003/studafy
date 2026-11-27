@@ -67,6 +67,8 @@ export interface TestAppOptions {
   jwtPrivateKeyPem?: string;
   /** Called when a material upload starts (lib/scanner-warmup.ts). Defaults to none. */
   scannerWarmup?: ScannerWarmup | null;
+  /** Mounts the ERPNext site agent's routes with this token. Defaults to none: they 404. */
+  erpnextAgentToken?: string | null;
 }
 
 /** A test app plus the key store whose keys its tokens must be signed with. */
@@ -106,6 +108,7 @@ export function createTestApp(options: TestAppOptions): TestApp & { ready: Promi
     storage: options.storage ?? null,
     uploadScanEnqueuer: options.uploadScanEnqueuer ?? null,
     scannerWarmup: options.scannerWarmup ?? null,
+    erpnextAgentToken: options.erpnextAgentToken ?? null,
   });
 
   const ready = Promise.all([

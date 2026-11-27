@@ -68,6 +68,26 @@ export interface TenantErpNextFactoryOptions {
   /** Absent in local/test configurations; the breaker then degrades to per-process state. */
   redis?: RedisClient | null;
   timeout?: number;
+  /**
+   * Records that a school used finance, which is what wakes its sleeping ERPNext site
+   * (erpnext-agent/activity-marker.ts). Called after the site resolves, fire and forget: it must
+   * never fail or delay the request. Absent in tests and wherever there is no Redis to throttle it.
+   */
+  activity?: FinanceActivitySink | null;
+}
+
+/** What the factory needs from the activity marker. `mark` must never reject. */
+export interface FinanceActivitySink {
+  mark(schoolId: string): Promise<unknown>;
+}
+
+export interface ForSchoolOptions {
+  /**
+   * False for work the system does on its own schedule or on ERPNext's behalf (the reconciliation
+   * job, re-reads after an ERPNext webhook): that is not a school using finance, and counting it
+   * would keep every site awake. Default true.
+   */
+  recordActivity?: boolean;
 }
 
 /**
@@ -83,11 +103,13 @@ export class TenantErpNextFactory {
   private readonly logger: Logger;
   private readonly breaker: CircuitBreaker;
   private readonly timeout: number | undefined;
+  private readonly activity: FinanceActivitySink | null;
 
   constructor(options: TenantErpNextFactoryOptions) {
     this.resolver = options.resolver;
     this.logger = options.logger;
     this.timeout = options.timeout;
+    this.activity = options.activity ?? null;
     this.breaker = options.redis
       ? new RedisCircuitBreaker(options.redis, options.logger, {
           // Preserve the key shape and log component the ERPNext breaker used before the generic
@@ -99,8 +121,17 @@ export class TenantErpNextFactory {
       : new InMemoryCircuitBreaker({ isFailure: isTransientErpNextFailure });
   }
 
-  async forSchool(tx: TransactionSql, schoolId: string): Promise<TenantErpNext> {
+  async forSchool(
+    tx: TransactionSql,
+    schoolId: string,
+    options: ForSchoolOptions = {},
+  ): Promise<TenantErpNext> {
     const credentials = await this.resolver.resolve(tx, schoolId);
+
+    // Not awaited: the marker writes in its own transaction, and `tx` may hold the row it updates.
+    if (this.activity && options.recordActivity !== false) {
+      void this.activity.mark(schoolId).catch(() => undefined);
+    }
 
     const client = new ErpNextClient({
       baseUrl: credentials.baseUrl,

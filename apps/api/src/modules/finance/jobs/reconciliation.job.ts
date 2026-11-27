@@ -355,7 +355,8 @@ export async function runGlobalReconciliation(
         await tx`SELECT set_config('role', 'studafy_app', true)`.execute();
         await tx`SELECT set_config('app.school_id', ${school.id}, true)`.execute();
 
-        const erpnext = await erpnextFactory.forSchool(tx, school.id);
+        // The daily job is not a school using finance: it must not keep sleeping sites awake.
+        const erpnext = await erpnextFactory.forSchool(tx, school.id, { recordActivity: false });
 
         return reconcileSchool(tx, school.id, erpnext, logger);
       });
