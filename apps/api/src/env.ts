@@ -189,6 +189,9 @@ export const envSchema = z
     ERPNEXT_API_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // ERPNext site domain for auto-provisioned sites (e.g., "erpnext.studafy.com").
     ERPNEXT_SITE_DOMAIN: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    // Shared bearer token of the ERPNext site agent (docs/plans/erpnext-fly.md), which creates,
+    // wakes and sleeps sites through /api/internal/erpnext/*. Unset: those routes are not mounted.
+    ERPNEXT_AGENT_TOKEN: z.preprocess(emptyAsUnset, z.string().min(32).optional()),
     // JWT access-token signing
     JWT_ISSUER: z.string().min(1).default("studafy"),
     JWT_AUDIENCE: z.string().min(1).default("studafy-api"),

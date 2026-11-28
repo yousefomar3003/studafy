@@ -378,6 +378,12 @@ const EXPECTED_MUTATING_ROUTES = [
   // ST-122. Internal API-key-authenticated reconciliation job; listed here for inventory accuracy
   // but added to GUARD_EXEMPT_ROUTES below because there is no bearer token to check.
   "POST /api/finance/reconciliation/run",
+  // The ERPNext site agent's reports (modules/finance/erpnext-agent). Machine-authenticated by
+  // ERPNEXT_AGENT_TOKEN; exempt below for the same reason as reconciliation.
+  "POST /api/internal/erpnext/sites/{id}/created",
+  "POST /api/internal/erpnext/sites/{id}/failed",
+  "POST /api/internal/erpnext/sites/{id}/woken",
+  "POST /api/internal/erpnext/sites/{id}/slept",
   // ST-121. Guarded by billing:update. The payment-confirmed webhook is not listed here because it
   // carries no requirePermission — it authenticates by HMAC over the raw body, not by a bearer token.
   "POST /api/finance/payments",
@@ -724,6 +730,12 @@ const GUARD_EXEMPT_ROUTES = new Set([
   "POST /api/subscriptions/webhook/tap",
   // Daily reconciliation (ST-122) — API-key-authenticated, not bearer; no JWT to check.
   "POST /api/finance/reconciliation/run",
+  // ERPNext site agent (modules/finance/erpnext-agent) — a machine bearing ERPNEXT_AGENT_TOKEN,
+  // compared in constant time; it holds no Studafy identity to check a permission against.
+  "POST /api/internal/erpnext/sites/{id}/created",
+  "POST /api/internal/erpnext/sites/{id}/failed",
+  "POST /api/internal/erpnext/sites/{id}/woken",
+  "POST /api/internal/erpnext/sites/{id}/slept",
   // Account activation (ST-078) — public self-service onboarding. Authorized by the invitation
   // token in the path plus a verified Microsoft OIDC identity, not by a bearer permission; there is
   // no other user's data to protect.

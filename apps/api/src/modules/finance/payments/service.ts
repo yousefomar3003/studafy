@@ -53,7 +53,7 @@ import type { JSONValue, TransactionSql } from "postgres";
 
 const PAYMENT_ENTRY_RESOURCE = "/api/resource/Payment%20Entry";
 const SALES_INVOICE_RESOURCE = "/api/resource/Sales%20Invoice";
-const BANK_CASH_ACCOUNT_METHOD =
+export const BANK_CASH_ACCOUNT_METHOD =
   "/api/method/erpnext.accounts.doctype.sales_invoice.sales_invoice.get_bank_cash_account";
 
 export type PaymentMode = "cash" | "bank_transfer" | "card_external";

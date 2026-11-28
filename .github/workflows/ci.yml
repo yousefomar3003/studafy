@@ -618,6 +618,10 @@ jobs:
       # Repo-level script and infra guards: the deploy gate and release scripts (QA-005, against fake
       # gh/flyctl/curl), the container base-image pins (QA-053) and the action SHA pins (QA-006).
       - run: bun test scripts/deploy scripts/ci
+      # The ERPNext site agent's loop logic (infra/erpnext/agent/README.md): standard-library
+      # Python against a fake agent API and a fake bench, no Frappe. The runner's python3 is enough.
+      - name: ERPNext site agent unit tests
+        run: python3 -m unittest discover -s infra/erpnext/agent/tests
       - name: Every action is pinned to a commit SHA (QA-006)
         run: bash scripts/ci/check-pinned-actions.sh
       - name: Every .trivyignore waiver is inside its review date (QA-073)

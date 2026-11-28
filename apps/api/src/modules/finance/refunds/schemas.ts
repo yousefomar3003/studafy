@@ -14,10 +14,30 @@ export const refundKindSchema = z
   .enum(["credit_note", "invoice_cancellation", "payment_reversal"])
   .openapi("RefundKind", {
     description:
-      "What approval does in ERPNext. `credit_note` — a Sales Invoice return (refund, fee " +
-      "correction, write-off). `invoice_cancellation` — cancel an invoice nothing was paid " +
+      "What approval does in ERPNext. `credit_note` — a Credit Note journal entry for the amount " +
+      "(refund, fee correction, write-off), with any payout to the family in the same entry. `invoice_cancellation` — cancel an invoice nothing was paid " +
       "against. `payment_reversal` — cancel a payment recorded by mistake; its invoice is owed " +
       "again. The last two complete on approval.",
+  });
+
+export const payoutModeSchema = z
+  .enum(["cash", "bank_transfer", "card_external", "credit"])
+  .openapi("RefundPayoutMode", {
+    description:
+      "How the part of a refund not taken off what the invoice still owes goes back to the family. " +
+      "`cash`, `bank_transfer` or `card_external`: handed back on approval, from the school's " +
+      "default account for that mode of payment in ERPNext. `credit`: kept on the family's account " +
+      "for a later invoice.",
+  });
+
+export const refundSettlementSchema = z
+  .enum(["pending", "invoice", "paid_out", "family_credit"])
+  .openapi("RefundSettlement", {
+    description:
+      "What the approval did. `pending` — not approved yet. `invoice` — all of it taken off what " +
+      "the invoice owed. `paid_out` — what the invoice owed was credited and the rest " +
+      "(`paid_out_amount`) handed back by `payout_mode`. `family_credit` — the rest kept on the " +
+      "family's account.",
   });
 
 export const refundStatusSchema = z
@@ -27,8 +47,9 @@ export const refundStatusSchema = z
       "`pending_approval` — maker created, awaiting checker. " +
       "`approved` — checker approved but not yet forwarded. " +
       "`rejected` — checker declined. " +
-      "`submitted_to_erpnext` — forwarded to ERPNext, awaiting its submission webhook. " +
-      "`completed` — ERPNext confirmed the credit note. " +
+      "`submitted_to_erpnext` — forwarded to ERPNext, awaiting its submission webhook (no longer " +
+      "used for credit notes, which complete on approval). " +
+      "`completed` — ERPNext has the credit note (and any payout). " +
       "`failed` — ERPNext rejected or processing failed.",
   });
 
@@ -103,6 +124,9 @@ export const initiateRefundBodySchema = z
       .max(1000)
       .optional()
       .openapi({ description: "Free-text explanation for the refund reason." }),
+    // Optional with the default applied by the service (cash), not .default(): a default on a shared
+    // enum breaks the generated mobile client.
+    payout_mode: payoutModeSchema.optional(),
   })
   .openapi("InitiateRefundBody");
 
@@ -164,6 +188,22 @@ export const refundSchema = z
     currency_minor_unit: z.number().int(),
     reason_code: reasonCodeSchema,
     reason_notes: z.string().nullable(),
+    payout_mode: payoutModeSchema,
+    settlement: refundSettlementSchema,
+    paid_out_amount: z.string().openapi({
+      description:
+        "What was handed back to the family, as a decimal string; '0.000' unless paid_out.",
+    }),
+    paid_out_amount_minor: z.number().int(),
+    receipt_url: z
+      .string()
+      .nullable()
+      .openapi({
+        description:
+          "Path of the refund's PDF receipt on this API (`GET " +
+          "/api/finance/refunds/{refundId}/receipt`), present once money was handed back " +
+          "(`settlement: paid_out`). Relative to the API origin; fetched with the caller's token.",
+      }),
     status: refundStatusSchema,
     maker_id: uuidSchema,
     checker_id: uuidSchema.nullable(),

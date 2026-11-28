@@ -63,7 +63,7 @@
       "ownRejectHint": "A different user must reject this refund.",
       "approvedToast": "Refund approved",
       "approveTitle": "Approve refund?",
-      "approveDescription": "This forwards the refund to ERPNext as a credit note. It cannot be undone from here.",
+      "approveDescription": "This records the refund in ERPNext. What the invoice still owes is credited first; any rest is handed back as the request says, or kept as credit. It cannot be undone from here.",
       "approveLabel": "Approve refund",
       "approveError": "The refund could not be approved."
     },
@@ -89,7 +89,13 @@
       "upToOutstanding": "Up to {{amount}} {{currency}} is still owed and can be written off.",
       "exceedsOutstanding": "This is more than is still owed on this invoice ({{amount}} {{currency}}). Reduce the amount to continue.",
       "upToTotal": "Up to {{amount}} {{currency}} (the invoice total) can be credited.",
-      "exceedsTotal": "This is more than the invoice total ({{amount}} {{currency}}). Reduce the amount to continue."
+      "exceedsTotal": "This is more than the invoice total ({{amount}} {{currency}}). Reduce the amount to continue.",
+      "payoutModeLabel": "How the money is given back",
+      "payoutAllOffInvoice": "All {{amount}} will be taken off what this invoice still owes. No money is handed back.",
+      "payoutHandedBackSplit": "{{offInvoice}} will be taken off what this invoice still owes, and {{back}} handed back by {{mode}} when it is approved.",
+      "payoutHandedBack": "{{back}} will be handed back by {{mode}} when it is approved.",
+      "payoutKeptAsCreditSplit": "{{offInvoice}} will be taken off what this invoice still owes, and {{back}} kept as credit on the family's account.",
+      "payoutKeptAsCredit": "{{back}} will be kept as credit on the family's account."
     },
     "rejectRefund": {
       "title": "Reject refund",
@@ -288,7 +294,19 @@
       "approvedAt": "Approved",
       "completedAt": "Completed",
       "creditNote": "Credit note",
-      "studentAccount": "Open the student's account"
+      "studentAccount": "Open the student's account",
+      "settlement": "Result"
+    },
+    "payoutMode": {
+      "cash": "Cash",
+      "bank_transfer": "Bank transfer",
+      "card_external": "Card",
+      "credit": "Keep as credit for a later invoice"
+    },
+    "settlement": {
+      "invoice": "Taken off what the invoice owed; no money handed back",
+      "paid_out": "{{amount}} handed back by {{mode}}",
+      "family_credit": "Kept as credit on the family's account"
     }
   },
   "reports": {
